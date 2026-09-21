@@ -1,5 +1,5 @@
 # Compatibility list for non-uv tooling. For development, use `uv sync --extra dev`.
 -r requirements.txt
-pytest>=8.0
+pytest>=9.1.1
 pytest-cov>=5.0
 ruff>=0.6
