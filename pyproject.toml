@@ -34,7 +34,7 @@ dependencies = [
   "scipy>=1.10",
   "pandas",
   "h5py",
-  "pillow>=10.0",
+  "pillow>=12.3.0",
 ]
 
 [project.optional-dependencies]
