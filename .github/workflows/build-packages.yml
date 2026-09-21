@@ -38,8 +38,13 @@ jobs:
             pyproject.toml
             uv.lock
 
-      - name: Install locked test environment
+      - name: Install locked test environment with CGNS support
+        if: matrix.os == 'ubuntu-latest'
         run: uv sync --locked --extra dev --extra ci
+
+      - name: Install locked test environment without CGNS support
+        if: matrix.os != 'ubuntu-latest'
+        run: uv sync --locked --extra dev --extra cosapp
 
       - name: Run Ruff
         run: uv run ruff format --check . && uv run ruff check .
@@ -47,8 +52,13 @@ jobs:
       - name: Audit dependencies
         run: uvx --from pip-audit pip-audit --strict
 
-      - name: Run tests
+      - name: Run tests with CGNS coverage
+        if: matrix.os == 'ubuntu-latest'
         run: uv run pytest
+
+      - name: Run tests without CGNS-dependent tests
+        if: matrix.os != 'ubuntu-latest'
+        run: uv run pytest --ignore=tests/test_plaid_bridge.py
 
   build:
     name: Build packages on hosted runner
