@@ -1,0 +1,70 @@
+{
+  "edges": [
+    {
+      "source_node": "file-path",
+      "source_port": "path",
+      "target_node": "load-muscat",
+      "target_port": "path"
+    },
+    {
+      "source_node": "load-muscat",
+      "source_port": "mesh",
+      "target_node": "mesh-sink_2",
+      "target_port": "mesh"
+    },
+    {
+      "source_node": "select-server-file_1",
+      "source_port": "path",
+      "target_node": "file-path",
+      "target_port": "path"
+    }
+  ],
+  "format": "flowgraph-workflow",
+  "nodes": [
+    {
+      "definition_id": "select-file",
+      "id": "file-path",
+      "parameters": {
+        "path": "{testdata}/FlowGraph.stl"
+      },
+      "position": {
+        "x": 158.84236178540158,
+        "y": 112.45731019009182
+      }
+    },
+    {
+      "definition_id": "load-muscat",
+      "id": "load-muscat",
+      "parameters": {},
+      "position": {
+        "x": 405.15846639414195,
+        "y": 266.371436871848
+      }
+    },
+    {
+      "definition_id": "select-server-file",
+      "id": "select-server-file_1",
+      "parameters": {
+        "file name": "{testdata}/FlowGraph.stl"
+      },
+      "position": {
+        "x": -106.11400606172988,
+        "y": -87.70353005781195
+      }
+    },
+    {
+      "definition_id": "mesh-sink",
+      "id": "mesh-sink_2",
+      "parameters": {
+        "color_field": "point:originalIds",
+        "show_axis_grid": true,
+        "show_representation": true
+      },
+      "position": {
+        "x": 554.5372659626406,
+        "y": 466.814694707449
+      }
+    }
+  ],
+  "version": 1
+}

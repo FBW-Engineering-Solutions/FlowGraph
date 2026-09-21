@@ -1,0 +1,390 @@
+{
+  "edges": [
+    {
+      "source_node": "set-list[str]-1",
+      "source_port": "value",
+      "target_node": "load-csv-2",
+      "target_port": "value"
+    },
+    {
+      "source_node": "load-csv-2",
+      "source_port": "mesh",
+      "target_node": "filter-mesh-muscat-3",
+      "target_port": "mesh"
+    },
+    {
+      "source_node": "create-muscat-element-filter-4",
+      "source_port": "filter",
+      "target_node": "filter-mesh-muscat-3",
+      "target_port": "filter"
+    },
+    {
+      "source_node": "set-string-7",
+      "source_port": "value",
+      "target_node": "load-csv-1",
+      "target_port": "path"
+    },
+    {
+      "source_node": "load-csv-1",
+      "source_port": "table",
+      "target_node": "load-csv-2",
+      "target_port": "table"
+    },
+    {
+      "source_node": "select-file-7",
+      "source_port": "path",
+      "target_node": "load-muscat",
+      "target_port": "path"
+    },
+    {
+      "source_node": "select-file-7",
+      "source_port": "path",
+      "target_node": "load-meshio-10",
+      "target_port": "path"
+    },
+    {
+      "source_node": "filter-mesh-muscat-3",
+      "source_port": "mesh",
+      "target_node": "write-muscat-12",
+      "target_port": "mesh"
+    },
+    {
+      "source_node": "set-string-15",
+      "source_port": "value",
+      "target_node": "write-muscat-12",
+      "target_port": "path"
+    },
+    {
+      "source_node": "Output File Name",
+      "source_port": "value",
+      "target_node": "write-meshio-13",
+      "target_port": "path"
+    },
+    {
+      "source_node": "load-muscat",
+      "source_port": "mesh",
+      "target_node": "write-meshio-13",
+      "target_port": "mesh"
+    },
+    {
+      "source_node": "load-muscat",
+      "source_port": "mesh",
+      "target_node": "mesh-sink-9",
+      "target_port": "mesh"
+    },
+    {
+      "source_node": "select-server-file_1",
+      "source_port": "path",
+      "target_node": "select-file-7",
+      "target_port": "path"
+    },
+    {
+      "source_node": "load-csv-2",
+      "source_port": "mesh",
+      "target_node": "delaunay-3d_1",
+      "target_port": "meshDocument"
+    },
+    {
+      "source_node": "delaunay-3d_1",
+      "source_port": "meshDocument",
+      "target_node": "mesh-sink-5",
+      "target_port": "mesh"
+    }
+  ],
+  "format": "flowgraph-workflow",
+  "nodes": [
+    {
+      "definition_id": "load-muscat",
+      "id": "load-muscat",
+      "parameters": {},
+      "position": {
+        "x": -49.71284722813971,
+        "y": 448.4093703781832
+      }
+    },
+    {
+      "definition_id": "set-list[str]",
+      "id": "set-list[str]-1",
+      "parameters": {
+        "value": "['Points_0','Points_1','Points_2']"
+      },
+      "position": {
+        "x": -390.29208936126156,
+        "y": -142.6570986112609
+      }
+    },
+    {
+      "definition_id": "csv-to-mesh",
+      "id": "load-csv-2",
+      "parameters": {},
+      "position": {
+        "x": 387.3368913208138,
+        "y": -632.6821670740044
+      }
+    },
+    {
+      "definition_id": "filter-mesh-muscat",
+      "id": "filter-mesh-muscat-3",
+      "parameters": {},
+      "position": {
+        "x": 1178.7934386432692,
+        "y": -404.60420766087486
+      }
+    },
+    {
+      "definition_id": "create-muscat-element-filter",
+      "id": "create-muscat-element-filter-4",
+      "parameters": {
+        "dimensions": [],
+        "element_types": []
+      },
+      "position": {
+        "x": 907.0145916208401,
+        "y": -638.2472795858114
+      }
+    },
+    {
+      "definition_id": "mesh-sink",
+      "id": "mesh-sink-5",
+      "parameters": {
+        "color_field": "",
+        "show_representation": true
+      },
+      "position": {
+        "x": 2239.785006293307,
+        "y": -432.72359397606726
+      }
+    },
+    {
+      "definition_id": "set-string",
+      "id": "set-string-7",
+      "parameters": {
+        "value": "{testdata}/SpherePoints.csv"
+      },
+      "position": {
+        "x": -393.10668439247513,
+        "y": -628.4541569226008
+      }
+    },
+    {
+      "definition_id": "load-csv",
+      "id": "load-csv-1",
+      "parameters": {},
+      "position": {
+        "x": -44.83132041511465,
+        "y": -627.3162867737778
+      }
+    },
+    {
+      "definition_id": "set-int",
+      "id": "set-int-1",
+      "parameters": {
+        "value": 0
+      },
+      "position": {
+        "x": -394,
+        "y": -468
+      }
+    },
+    {
+      "definition_id": "set-float",
+      "id": "set-float-3",
+      "parameters": {
+        "value": 0.0
+      },
+      "position": {
+        "x": -394,
+        "y": -306
+      }
+    },
+    {
+      "definition_id": "set-list[int]",
+      "id": "set-list[int]-5",
+      "parameters": {
+        "value": []
+      },
+      "position": {
+        "x": -390,
+        "y": 192
+      }
+    },
+    {
+      "definition_id": "set-list[float]",
+      "id": "set-list[float]-6",
+      "parameters": {
+        "value": []
+      },
+      "position": {
+        "x": -390,
+        "y": 358
+      }
+    },
+    {
+      "definition_id": "select-file",
+      "id": "select-file-7",
+      "parameters": {
+        "path": "{testdata}/FlowGraph.stl"
+      },
+      "position": {
+        "x": -390,
+        "y": 528
+      }
+    },
+    {
+      "definition_id": "mesh-sink",
+      "id": "mesh-sink-9",
+      "parameters": {},
+      "position": {
+        "x": 1916,
+        "y": 542
+      }
+    },
+    {
+      "definition_id": "load-meshio",
+      "id": "load-meshio-10",
+      "parameters": {},
+      "position": {
+        "x": -39.70284566640166,
+        "y": 639.1967967865925
+      }
+    },
+    {
+      "definition_id": "write-muscat",
+      "id": "write-muscat-12",
+      "parameters": {},
+      "position": {
+        "x": 1806.8227820321258,
+        "y": -658.8482283355717
+      }
+    },
+    {
+      "definition_id": "write-meshio",
+      "id": "write-meshio-13",
+      "parameters": {},
+      "position": {
+        "x": 1775.790050141856,
+        "y": -266.0219053905259
+      }
+    },
+    {
+      "definition_id": "set-string",
+      "id": "set-string-15",
+      "parameters": {
+        "value": "MuscatFiltered.xdmf"
+      },
+      "position": {
+        "x": 1360.6079441839063,
+        "y": -853.8432526815529
+      }
+    },
+    {
+      "definition_id": "select-server-file",
+      "id": "select-server-file_1",
+      "parameters": {
+        "file name": "{testdata}/FlowGraph.stl"
+      },
+      "position": {
+        "x": -742,
+        "y": 530.2308349609375
+      }
+    },
+    {
+      "definition_id": "title-doc",
+      "id": "title-doc_4",
+      "parameters": {
+        "title": "These are the sources"
+      },
+      "position": {
+        "x": -412.3486819477766,
+        "y": -834
+      }
+    },
+    {
+      "definition_id": "title-doc",
+      "id": "title-doc_5",
+      "parameters": {
+        "title": "Mesh and Table Readers"
+      },
+      "position": {
+        "x": -50,
+        "y": -734
+      }
+    },
+    {
+      "definition_id": "title-doc",
+      "id": "title-doc_6",
+      "parameters": {
+        "title": "Mesh Generation"
+      },
+      "position": {
+        "x": 394,
+        "y": -730
+      }
+    },
+    {
+      "definition_id": "title-doc",
+      "id": "title-doc_7",
+      "parameters": {
+        "title": "Mesh Filters"
+      },
+      "position": {
+        "x": 912,
+        "y": -737.7500000000001
+      }
+    },
+    {
+      "definition_id": "title-doc",
+      "id": "title-doc_8",
+      "parameters": {
+        "title": "Sinks"
+      },
+      "position": {
+        "x": 2276,
+        "y": -742
+      }
+    },
+    {
+      "definition_id": "title-doc",
+      "id": "title-doc_9",
+      "parameters": {
+        "title": "Writers"
+      },
+      "position": {
+        "x": 1838.0000000000002,
+        "y": -741.2500000000001
+      }
+    },
+    {
+      "definition_id": "set-string",
+      "id": "Output File Name",
+      "parameters": {
+        "value": "MeshIO_Unfiltered.xdmf"
+      },
+      "position": {
+        "x": -392.7183954606096,
+        "y": 22.18771524529342
+      }
+    },
+    {
+      "definition_id": "paragraph-doc",
+      "id": "paragraph-doc_1",
+      "parameters": {
+        "text": "This is a **bold** word, this is an *italic* word, and this is ***bold and italic***.\n\n- First bullet\n- Second bullet with **bold text**\n- Third bullet with *italic text*\n- Fourth bullet with ***bold italic text***"
+      },
+      "position": {
+        "x": -405.2572935092509,
+        "y": -794.7803164309158
+      }
+    },
+    {
+      "definition_id": "delaunay-3d",
+      "id": "delaunay-3d_1",
+      "parameters": {},
+      "position": {
+        "x": 1467.9547479320331,
+        "y": 57.1826973060591
+      }
+    }
+  ],
+  "version": 1
+}
