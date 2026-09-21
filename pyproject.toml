@@ -49,6 +49,10 @@ ml = [
 cosapp = [
   "cosapp>=1.6.1",
 ]
+ci = [
+  "cosapp>=1.6.1",
+  "pycgns",
+]
 
 [project.urls]
 Homepage = "https://github.com/FBW-Engineering-Solutions/FlowGraph"

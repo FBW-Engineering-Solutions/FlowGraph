@@ -39,7 +39,7 @@ jobs:
             uv.lock
 
       - name: Install locked test environment
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --extra dev --extra ci
 
       - name: Run Ruff
         run: uv run ruff format --check . && uv run ruff check .

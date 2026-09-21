@@ -839,6 +839,10 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+ci = [
+    { name = "cosapp" },
+    { name = "pycgns" },
+]
 cosapp = [
     { name = "cosapp" },
 ]
@@ -853,6 +857,7 @@ ml = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cosapp", marker = "extra == 'ci'", specifier = ">=1.6.1" },
     { name = "cosapp", marker = "extra == 'cosapp'", specifier = ">=1.6.1" },
     { name = "h5py" },
     { name = "meshio", specifier = ">=5.3" },
@@ -860,6 +865,7 @@ requires-dist = [
     { name = "muscat", specifier = ">=2.5.2" },
     { name = "pandas" },
     { name = "pillow", specifier = ">=10.0" },
+    { name = "pycgns", marker = "extra == 'ci'" },
     { name = "pyplaid", marker = "extra == 'ml'" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
@@ -867,7 +873,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.10" },
     { name = "vtk", specifier = ">=9.2" },
 ]
-provides-extras = ["dev", "ml", "cosapp"]
+provides-extras = ["dev", "ml", "cosapp", "ci"]
 
 [[package]]
 name = "fonttools"
