@@ -27,7 +27,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-  "vtk>=9.2",
+  "vtk>=9.7.0",
   "muscat>=2.5.2",
   "meshio>=5.3",
   "meshlane>=5.5.0",
