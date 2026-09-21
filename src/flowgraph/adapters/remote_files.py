@@ -82,6 +82,7 @@ def _download_url(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> 
     descriptor, filename = tempfile.mkstemp(prefix="flowgraph-download-", suffix=_url_suffix(url))
     destination = Path(filename)
     try:
+        os.close(descriptor)
         if IS_PYODIDE:
             from pyodide.ffi import can_run_sync, run_sync
 
@@ -92,7 +93,7 @@ def _download_url(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> 
             content = run_sync(download_content(url))
         else:
             content = _download_desktop_content(url)
-        with os.fdopen(descriptor, "wb") as output:
+        with destination.open("wb") as output:
             output.write(content)
     except Exception:
         destination.unlink(missing_ok=True)
