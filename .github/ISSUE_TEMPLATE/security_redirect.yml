@@ -1,0 +1,8 @@
+name: Security report redirect
+description: Redirect suspected vulnerabilities to the private reporting channel
+title: "[Security]: Please report privately"
+labels: [security]
+body:
+  - type: markdown
+    attributes:
+      value: Do not disclose vulnerability details here. Close this issue and follow SECURITY.md to submit a private report.

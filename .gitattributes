@@ -1,0 +1,19 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.csv text
+*.json text
+*.md text
+*.py text
+*.toml text
+*.lock text
+*.h5 binary
+*.stl binary
+
+# Keep internal planning and local-agent material out of GitHub source archives.
+memory-bank/ export-ignore
+.clinerules/ export-ignore
+AGENTS.md export-ignore
+tests/ export-ignore
+packaging/ export-ignore
+TODO.md export-ignore
