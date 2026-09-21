@@ -102,6 +102,8 @@ jobs:
           path: dist-wheels/*
           compression-level: 0
           if-no-files-found: error
+          # Keep CI artifacts for one day.
+          retention-days: 1
 
   release:
     name: Create GitHub release
