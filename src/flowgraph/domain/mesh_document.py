@@ -66,7 +66,7 @@ Number Of Nodes    : {mesh.GetNumberOfNodes()}
 """
 
         if len(mesh.nodesTags):
-            res += f" Nodes named selections (name: size):\n"
+            res += " Nodes named selections (name: size):\n"
             for x in mesh.nodesTags:
                 res += f"  {x.name}: {len(x)} \n"
 
@@ -76,7 +76,7 @@ Number Of Nodes    : {mesh.GetNumberOfNodes()}
             res += f" Element type: {data.elementType} \n"
             res += f"  Number of elements: {data.GetNumberOfElements()}\n"
             if len(data.tags):
-                res += f"  Named selections (name: size):\n"
+                res += "  Named selections (name: size):\n"
                 for x in data.tags:
                     res += f"   {x.name}: {len(x)} \n"
 

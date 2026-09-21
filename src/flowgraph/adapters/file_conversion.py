@@ -212,11 +212,13 @@ WriterDelayedInitStruct = {
 WriterMapping = DelayInitialization(WriterDelayedInitStruct)
 
 try:
-    from Muscat.Bridges.MeshIOBridge import InitAllWriters, InitAllReaders
+    from Muscat.Bridges.MeshIOBridge import InitAllReaders, InitAllWriters
+
     InitAllWriters()
     InitAllReaders()
-except:
+except ImportError:
     pass
+
 
 def mesh_file_conversion(
     inputs: Mapping[str, Any], parameters: Mapping[str, Any]
