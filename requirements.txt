@@ -6,3 +6,5 @@ meshio>=5.3
 meshlane>=5.5.0
 pandas
 h5py
+numpy>=1.24
+pillow>=10.0

@@ -1,3 +1,4 @@
+import numpy as np
 from Muscat.LinAlg.Transform import Transform
 from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter
 from Muscat.MeshContainers.Filters.FilterOperators import FilterOperatorBase
@@ -21,6 +22,7 @@ FILE = DataType("filename", "Path", str)
 MESH_DOCUMENT = DataType("mesh-document", "Mesh document", MeshDocument)
 TABLE_DOCUMENT = DataType("table-document", "Table", dict)
 IMAGE = DataType("image", "Image", Image)
+IMAGEJ = DataType("imagej", "ImageJ NumPy", np.ndarray)
 MUSCAT_ELEMENT_FILTER = DataType(
     "filter-like",
     "Selector",

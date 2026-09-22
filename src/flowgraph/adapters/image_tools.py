@@ -20,7 +20,7 @@ from flowgraph.application.workflow_core import (
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
-from .data_types import IMAGE, MESH_DOCUMENT, ParameterKind
+from .data_types import IMAGE, IMAGEJ, MESH_DOCUMENT, ParameterKind
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,12 +41,26 @@ class ImageOperationError(RuntimeError):
     """Raised when a Pillow image transformation cannot be completed."""
 
 
+class ImageJConversionError(RuntimeError):
+    """Raised when a Pillow image cannot be converted to an ImageJ NumPy array."""
+
+
 def _require_image(inputs: Mapping[str, Any]) -> Image:
     """Return the required Pillow image input or raise an actionable error."""
     image = inputs["image"]
     if not isinstance(image, Image):
         raise ImageOperationError("Image input must be a PIL.Image.Image instance")
     return image
+
+
+def _pillow_to_imagej(
+    inputs: Mapping[str, Any], _parameters: Mapping[str, Any]
+) -> Mapping[str, Any]:
+    """Convert a Pillow image to a detached NumPy array suitable for ImageJ."""
+    image = inputs["image"]
+    if not isinstance(image, Image):
+        raise ImageJConversionError("Image input must be a PIL.Image.Image instance")
+    return {"image": np.array(image, copy=True)}
 
 
 def _positive_integer(parameters: Mapping[str, Any], name: str) -> int:
@@ -263,6 +277,19 @@ READ_IMAGE = NodeDefinition(
 )
 
 
+PILLOW_TO_IMAGEJ = NodeDefinition(
+    id="pillow-to-imagej",
+    icon="mdi-image-sync-outline",
+    label="Pillow To ImageJ",
+    description="Converts a Pillow image to a detached NumPy array for ImageJ-compatible processing.",
+    ports=(
+        PortDefinition("image", PortDirection.INPUT, IMAGE, "Pillow image"),
+        PortDefinition("image", PortDirection.OUTPUT, IMAGEJ, "ImageJ NumPy array"),
+    ),
+    executor=_pillow_to_imagej,
+)
+
+
 WRITE_IMAGE = NodeDefinition(
     id="write-image",
     icon="mdi-image-arrow-up-outline",
@@ -385,6 +412,7 @@ IMAGE_TO_MESH = NodeDefinition(
 
 AVAILABLE_NODES = (
     READ_IMAGE,
+    PILLOW_TO_IMAGEJ,
     WRITE_IMAGE,
     RESIZE_IMAGE,
     CROP_IMAGE,

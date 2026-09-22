@@ -7,12 +7,13 @@ from Muscat.MeshContainers.ElementsContainers import StructuredElementsContainer
 from PIL import Image as PillowImage
 
 from flowgraph.adapters import ADAPTERS
-from flowgraph.adapters.data_types import BOOLEAN, FILE, FLOAT, IMAGE, INTEGER
+from flowgraph.adapters.data_types import BOOLEAN, FILE, FLOAT, IMAGE, IMAGEJ, INTEGER
 from flowgraph.adapters.image_tools import (
     AVAILABLE_NODES,
     CONVERT_IMAGE_MODE,
     CROP_IMAGE,
     IMAGE_TO_MESH,
+    PILLOW_TO_IMAGEJ,
     READ_IMAGE,
     RESIZE_IMAGE,
     ROTATE_IMAGE,
@@ -23,6 +24,7 @@ from flowgraph.adapters.image_tools import (
 )
 from flowgraph.adapters.simple_sources import SET_FLOAT, SET_INT, SET_STRING
 from flowgraph.application.node_registry import create_node_registry
+from flowgraph.application.port_conversions import resolve_port_conversion
 from flowgraph.application.workflow_core import WorkflowEdge, WorkflowExecutor, WorkflowGraph
 
 
@@ -31,12 +33,30 @@ def test_image_data_type_accepts_pillow_images() -> None:
     assert not IMAGE.accepts("not an image")
 
 
+def test_imagej_data_type_accepts_numpy_arrays() -> None:
+    assert IMAGEJ.accepts(np.zeros((2, 3), dtype=np.uint8))
+    assert not IMAGEJ.accepts("not an array")
+
+
+def test_pillow_to_imagej_returns_a_detached_numpy_array() -> None:
+    image = PillowImage.fromarray(np.array([[1, 2], [3, 4]], dtype=np.uint8), mode="L")
+
+    result = PILLOW_TO_IMAGEJ.executor({"image": image}, {})["image"]
+
+    assert isinstance(result, np.ndarray)
+    assert result.dtype == np.uint8
+    assert result.flags.writeable
+    np.testing.assert_array_equal(result, [[1, 2], [3, 4]])
+    assert not np.shares_memory(result, np.asarray(image))
+
+
 def test_image_tools_are_registered_in_a_top_level_group() -> None:
     group = next(group for group in ADAPTERS.groups if group.label == "Image Tools")
 
     assert group.node_definitions == AVAILABLE_NODES
     assert [definition.id for definition in group.node_definitions] == [
         "read-image",
+        "pillow-to-imagej",
         "write-image",
         "resize-image",
         "crop-image",
@@ -335,6 +355,38 @@ def test_read_image_connects_to_image_to_mesh_in_a_workflow(tmp_path: Path) -> N
 
     assert mesh.nodeFields["Colors"].shape == (6, 3)
     np.testing.assert_array_equal(mesh.nodeFields["Colors"], np.tile([[9, 8, 7]], (6, 1)))
+
+
+def test_read_image_connects_to_pillow_to_imagej_with_registered_conversion(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.png"
+    PillowImage.new("RGB", (2, 1), (9, 8, 7)).save(source)
+    registry = create_node_registry()
+    graph = WorkflowGraph(
+        [
+            SET_STRING.create_instance("source-path", parameters={"value": str(source)}),
+            READ_IMAGE.create_instance("read", parameters={"path": "unused.png"}),
+            PILLOW_TO_IMAGEJ.create_instance("convert"),
+        ]
+    )
+    graph.add_edge(WorkflowEdge("source-path", "value", "read", "path"), registry)
+    edge = WorkflowEdge("read", "image", "convert", "image")
+    graph.add_edge(edge, registry)
+
+    result = WorkflowExecutor(registry).run(graph)
+
+    converted = result.node_outputs["convert"]["image"]
+    assert isinstance(converted, np.ndarray)
+    assert converted.shape == (1, 2, 3)
+    np.testing.assert_array_equal(converted, [[[9, 8, 7], [9, 8, 7]]])
+
+    conversion = resolve_port_conversion(IMAGE, IMAGEJ)
+    assert conversion is not None
+    np.testing.assert_array_equal(
+        conversion.convert(PillowImage.fromarray(np.array([[5]], dtype=np.uint8), mode="L")),
+        [[5]],
+    )
 
 
 def test_image_file_parameter_ports_override_configured_paths(tmp_path: Path) -> None:

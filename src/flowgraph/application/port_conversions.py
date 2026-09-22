@@ -6,6 +6,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
+
+from flowgraph.adapters.data_types import IMAGE, IMAGEJ
 from flowgraph.application.workflow_core import DataType
 
 
@@ -38,6 +41,13 @@ VEC3D_TO_LIST = PortConversion(
     "VEC3D", "list[float]", "Tex3D Vector → list[float]", lambda x: list(x)
 )
 
+PILLOW_TO_IMAGEJ = PortConversion(
+    IMAGE.id,
+    IMAGEJ.id,
+    "Pillow Image → ImageJ NumPy",
+    lambda image: np.array(image, copy=True),
+)
+
 
 PORT_CONVERSIONS = (
     INTEGER_TO_FLOAT,
@@ -49,6 +59,7 @@ PORT_CONVERSIONS = (
     PATH_TO_STR,
     STR_TO_PATH,
     VEC3D_TO_LIST,
+    PILLOW_TO_IMAGEJ,
 )
 
 

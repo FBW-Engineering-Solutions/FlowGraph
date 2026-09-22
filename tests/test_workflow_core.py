@@ -4,6 +4,8 @@ import pytest
 
 from flowgraph.adapters.data_types import (
     FLOAT,
+    IMAGE,
+    IMAGEJ,
     INTEGER,
     LIST_FLOAT,
     LIST_INT,
@@ -345,6 +347,8 @@ def test_port_conversion_registry_is_explicit_and_directional() -> None:
     assert resolve_port_conversion(FLOAT, INTEGER) is not None
     assert resolve_port_conversion(STRING, STRING) is None
     assert resolve_port_conversion(STRING, FLOAT) is None
+    assert resolve_port_conversion(IMAGE, IMAGEJ) is not None
+    assert resolve_port_conversion(IMAGEJ, IMAGE) is None
 
 
 def test_execution_requires_connected_inputs_and_valid_outputs() -> None:
