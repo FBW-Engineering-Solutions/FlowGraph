@@ -51,3 +51,22 @@ def test_legacy_cython_packaging_files_are_absent() -> None:
     assert not (packaging_directory / "build_core_wheel.py").exists()
     assert not (packaging_directory / "build_core_release.py").exists()
     assert not (packaging_directory / "pyproject.toml").exists()
+
+
+def test_conda_recipe_tracks_the_published_python_package() -> None:
+    """Keep the Conda recipe aligned with the release metadata and CLI."""
+    root = Path(__file__).parents[1]
+    recipe = (root / "packaging" / "conda" / "meta.yaml").read_text(encoding="utf-8")
+    metadata = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    project = metadata["project"]
+
+    assert f'{{% set name = "{project["name"]}" %}}' in recipe
+    assert f'{{% set version = "{project["version"]}" %}}' in recipe
+    assert "noarch: python" in recipe
+    assert "--no-deps --no-build-isolation" in recipe
+    assert "- flowgraph --help" in recipe
+    assert "- flowgraph" in recipe
+    assert "license: BSD-3-Clause" in recipe
+    for dependency in project["dependencies"]:
+        package_name = dependency.split(">", 1)[0].split("=", 1)[0].strip()
+        assert f"- {package_name}" in recipe

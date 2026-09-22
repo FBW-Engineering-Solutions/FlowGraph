@@ -1,0 +1,53 @@
+{% set name = "flowgraph" %}
+{% set version = "0.1.2" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: https://files.pythonhosted.org/packages/00/9c/3e2b922d9fa080ffd98aa96f84039f45eefba7de912245bb86906c8ecd41/flowgraph-{{ version }}.tar.gz
+  sha256: e2a05bb4316ce931878cdb7bfff01ba66261c6fafdeb5a9c7bb72ddbf2e6be4e
+
+build:
+  noarch: python
+  number: 0
+  script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation -vv
+
+requirements:
+  host:
+    - python >=3.11
+    - pip
+    - setuptools >=68
+  run:
+    - python >=3.11
+    - vtk >=9.2
+    - muscat >=2.5.2
+    - meshio >=5.3
+    - scipy >=1.10
+    - pandas
+    - h5py
+    - pillow >=10.0
+    - numpy >=1.24
+
+test:
+  commands:
+    - flowgraph --help
+  imports:
+    - flowgraph
+
+about:
+  home: https://github.com/FBW-Engineering-Solutions/FlowGraph
+  summary: Headless typed workflow engine and execution runtime
+  description: |
+    FlowGraph Core is a GUI-free Python workflow engine for typed workflow
+    composition, validation, execution, persistence, and mesh and image data
+    operations.
+  license: BSD-3-Clause
+  license_file: LICENSE
+  doc_url: https://github.com/FBW-Engineering-Solutions/FlowGraph
+  dev_url: https://github.com/FBW-Engineering-Solutions/FlowGraph
+
+extra:
+  recipe-maintainers:
+    - FelipeBordeu

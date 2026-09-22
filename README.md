@@ -45,9 +45,15 @@ uv build --out-dir dist/
 The resulting wheel is compatible with all supported Python platforms. See
 `packaging/README.md` for release details.
 
-The initial supported publication channels are GitHub source releases and
-PyPI. Conda, Docker, operating-system package managers, and third-party mirrors
-are not supported release channels at this time. See
+The repository also includes a Conda recipe under `packaging/conda/`. FlowGraph
+is distributed through the [`flowgraph` Anaconda channel](https://anaconda.org/channels/flowgraph):
+
+```bash
+conda install -c flowgraph flowgraph
+```
+
+Docker, operating-system package managers, and third-party mirrors are not
+supported release channels at this time. See
 [`Release Channels`](docs/policies/release-channels.md) for the release policy.
 
 FlowGraph Core declares Python 3.11 or newer. CI covers Python 3.11 and 3.13 on
