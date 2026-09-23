@@ -215,7 +215,7 @@ WRITE_TABLE = NodeDefinition(
             "/path/to/output.xlsx",
             file_patterns=("*.xlsx",),
         ),
-        ParameterDefinition("sheet_name", ParameterKind.TEXT, "Sheet name", "", "Sheet1"),
+        ParameterDefinition("sheet_name", ParameterKind.TEXT, "Sheet name", "Sheet1", "Sheet1_name"),
         ParameterDefinition("header", ParameterKind.BOOLEAN, "Header", True, port=False),
     ),
 )

@@ -172,7 +172,7 @@ def test_write_table_exposes_requested_parameters_and_registers() -> None:
     assert WRITE_TABLE.input("header") is None
     assert [(parameter.name, parameter.default, parameter.port) for parameter in WRITE_TABLE.parameters] == [
         ("path", "output_pandas.xlsx", True),
-        ("sheet_name", "", True),
+        ("sheet_name", "Sheet1", True),
         ("header", True, False),
     ]
 

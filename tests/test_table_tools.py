@@ -48,6 +48,7 @@ def test_aggregate_lists_to_table_uses_source_output_names_as_columns() -> None:
 
     result = WorkflowExecutor(registry).run(graph)
 
+    assert AGGREGATE_LISTS_TO_TABLE.icon == "mdi-table-column-plus-after"
     assert result.node_outputs["table"] == {
         "table": {"temperature": [20.0, 21.5], "pressure": [100, 101]}
     }
