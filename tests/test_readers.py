@@ -6,7 +6,7 @@ import meshio
 import pytest
 
 from flowgraph.adapters import ADAPTERS
-from flowgraph.adapters.data_types import LIST_STR, STRING
+from flowgraph.adapters.data_types import FILE, LIST_STR
 from flowgraph.adapters.files import READ_DIRECTORY_FILES, DirectoryReadError
 from flowgraph.adapters.readers import (
     LOAD_MESHIO,
@@ -89,7 +89,13 @@ def test_read_directory_files_lists_sorted_immediate_file_names(tmp_path: Path) 
 
     result = READ_DIRECTORY_FILES.executor({"path": tmp_path}, {})
 
-    assert result == {"files": ["alpha.csv", "zeta.txt"]}
+    assert result == {
+        "files": ["alpha.csv", "zeta.txt"],
+        "files_full_paths": [
+            str(tmp_path / "alpha.csv"),
+            str(tmp_path / "zeta.txt"),
+        ],
+    }
 
 
 def test_read_directory_files_filters_with_inclusive_and_exclusive_regexes(tmp_path: Path) -> None:
@@ -98,15 +104,21 @@ def test_read_directory_files_filters_with_inclusive_and_exclusive_regexes(tmp_p
 
     result = READ_DIRECTORY_FILES.executor(
         {"path": tmp_path},
-        {"patterns": "# Include text and CSV files\ninclude:\\.(csv|txt)$\nexclude:generated"},
+        {"include_pattern": r"\.(csv|txt)$", "exclude_pattern": "generated"},
     )
 
-    assert result == {"files": ["data.csv", "report.txt"]}
+    assert result == {
+        "files": ["data.csv", "report.txt"],
+        "files_full_paths": [
+            str(tmp_path / "data.csv"),
+            str(tmp_path / "report.txt"),
+        ],
+    }
 
 
 def test_read_directory_files_rejects_invalid_pattern_rules(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="line 1"):
-        READ_DIRECTORY_FILES.executor({"path": tmp_path}, {"patterns": "["})
+    with pytest.raises(ValueError, match="Invalid filename regular expression"):
+        READ_DIRECTORY_FILES.executor({"path": tmp_path}, {"include_pattern": "["})
 
 
 def test_read_directory_files_rejects_a_missing_directory(tmp_path: Path) -> None:
@@ -116,10 +128,16 @@ def test_read_directory_files_rejects_a_missing_directory(tmp_path: Path) -> Non
 
 def test_read_directory_files_is_registered_with_text_path_and_list_text_output() -> None:
     assert ADAPTERS.require("read-directory-files") is READ_DIRECTORY_FILES
-    assert [(port.name, port.data_type) for port in READ_DIRECTORY_FILES.inputs] == [
-        ("path", STRING)
-    ]
+    assert [(port.name, port.data_type) for port in READ_DIRECTORY_FILES.inputs] == [("path", FILE)]
     assert [(port.name, port.data_type) for port in READ_DIRECTORY_FILES.outputs] == [
-        ("files", LIST_STR)
+        ("files", LIST_STR),
+        ("files_full_paths", LIST_STR),
     ]
-    assert READ_DIRECTORY_FILES.parameters[0].port is False
+    assert [parameter.name for parameter in READ_DIRECTORY_FILES.parameters] == [
+        "path",
+        "include_pattern",
+        "exclude_pattern",
+    ]
+    assert READ_DIRECTORY_FILES.parameters[0].port is True
+    assert READ_DIRECTORY_FILES.parameters[1].port is False
+    assert READ_DIRECTORY_FILES.parameters[2].port is False

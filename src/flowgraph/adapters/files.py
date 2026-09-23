@@ -77,87 +77,65 @@ class DirectoryReadError(ValueError):
 
 
 def _compile_filename_patterns(
-    patterns: object,
-) -> tuple[tuple[re.Pattern[str], ...], tuple[re.Pattern[str], ...]]:
-    """Parse inclusive and exclusive filename regular expressions from text rules.
+    pattern: object,
+) -> re.Pattern[str] | None:
+    """Compile independent inclusive and exclusive filename regular expressions.
 
-    Each non-empty, non-comment line must start with ``+`` or ``include:`` to
-    include matching filenames, or ``-`` or ``exclude:`` to exclude them.
+    Empty text disables the corresponding filter.
 
     Parameters
     ----------
-    patterns : object
-        Configured pattern-rule text.
+    pattern : object
+        One configured regular-expression text value. Empty text disables that
+        filter.
 
     Returns
     -------
-    tuple[tuple[re.Pattern[str], ...], tuple[re.Pattern[str], ...]]
-        Compiled inclusive patterns followed by compiled exclusive patterns.
+    re.Pattern[str] | None
+        The compiled regular expression, or ``None`` for empty text.
 
     Raises
     ------
     TypeError
         If the configured rules are not text.
     ValueError
-        If a rule lacks a supported prefix, has no regular expression, or
-        contains an invalid regular expression.
+        If the configured value is not text or contains an invalid regular
+        expression.
     """
-    if not isinstance(patterns, str):
-        raise TypeError("The filename pattern rules must be text")
-
-    inclusive: list[re.Pattern[str]] = []
-    exclusive: list[re.Pattern[str]] = []
-    for line_number, line in enumerate(patterns.splitlines(), start=1):
-        rule = line.strip()
-        if not rule or rule.startswith("#"):
-            continue
-
-        normalized = rule.casefold()
-        if normalized.startswith("include:"):
-            target, expression = inclusive, rule[len("include:") :].strip()
-        elif normalized.startswith("exclude:"):
-            target, expression = exclusive, rule[len("exclude:") :].strip()
-        elif rule.startswith("+"):
-            target, expression = inclusive, rule[1:].strip()
-        elif rule.startswith("-"):
-            target, expression = exclusive, rule[1:].strip()
-        else:
-            raise ValueError(
-                f"Filename pattern rule on line {line_number} must start with '+', '-', "
-                "'include:', or 'exclude:'"
-            )
-
-        if not expression:
-            raise ValueError(
-                f"Filename pattern rule on line {line_number} has no regular expression"
-            )
-        try:
-            target.append(re.compile(expression))
-        except re.error as error:
-            raise ValueError(
-                f"Invalid filename regular expression on line {line_number}: {error}"
-            ) from error
-
-    return tuple(inclusive), tuple(exclusive)
+    if not isinstance(pattern, str):
+        raise TypeError("The filename pattern must be text")
+    expression = pattern.strip()
+    if not expression:
+        return None
+    try:
+        return re.compile(expression)
+    except re.error as error:
+        raise ValueError(f"Invalid filename regular expression: {error}") from error
 
 
 def _read_directory_files(
     inputs: Mapping[str, Any], parameters: Mapping[str, Any]
 ) -> Mapping[str, Any]:
     """List immediate regular-file names in a directory after regex filtering."""
-    directory = Path(inputs["path"]).expanduser()
+    directory = Path(inputs.get("path", parameters.get("path", ""))).expanduser()
     if not directory.is_dir():
         raise DirectoryReadError(f"Directory does not exist or is not a directory: {directory}")
 
-    inclusive, exclusive = _compile_filename_patterns(parameters.get("patterns", ""))
+    include_pattern = _compile_filename_patterns(parameters.get("include_pattern", ""))
+    exclude_pattern = _compile_filename_patterns(parameters.get("exclude_pattern", ""))
     filenames = sorted(path.name for path in directory.iterdir() if path.is_file())
     filtered_filenames = [
         filename
         for filename in filenames
-        if (not inclusive or any(pattern.search(filename) for pattern in inclusive))
-        and not any(pattern.search(filename) for pattern in exclusive)
+        if (include_pattern is None or include_pattern.search(filename))
+        and (exclude_pattern is None or not exclude_pattern.search(filename))
     ]
-    return {"files": filtered_filenames}
+    return {
+        "files": filtered_filenames,
+        "files_full_paths": [
+            str((directory / filename).resolve()) for filename in filtered_filenames
+        ],
+    }
 
 
 READ_DIRECTORY_FILES = NodeDefinition(
@@ -166,17 +144,38 @@ READ_DIRECTORY_FILES = NodeDefinition(
     label="Read Directory Files",
     description="Lists immediate file names in a directory with optional regular-expression filters.",
     ports=(
-        PortDefinition("path", PortDirection.INPUT, STRING, "Directory path"),
         PortDefinition("files", PortDirection.OUTPUT, LIST_STR, "File names"),
+        PortDefinition(
+            "files_full_paths",
+            PortDirection.OUTPUT,
+            LIST_STR,
+            "Filtered file full paths",
+        ),
     ),
     executor=_read_directory_files,
     parameters=(
         ParameterDefinition(
-            "patterns",
-            ParameterKind.TEXT,
-            "Filename patterns",
+            "path",
+            ParameterKind.FILE,
+            "Directory path",
             "",
-            "+\\.csv$\n-exclude-this\\.csv$",
+            "/path/to/directory",
+            port=True,
+        ),
+        ParameterDefinition(
+            "include_pattern",
+            ParameterKind.TEXT,
+            "Include pattern",
+            "",
+            r"\\.csv$",
+            port=False,
+        ),
+        ParameterDefinition(
+            "exclude_pattern",
+            ParameterKind.TEXT,
+            "Exclude pattern",
+            "",
+            "exclude-this",
             port=False,
         ),
     ),
