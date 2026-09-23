@@ -36,6 +36,7 @@ dependencies = [
   "h5py",
   "pillow>=10.0",
   "numpy>=1.24",
+  "openpyxl>=3.1.5",
 ]
 
 [project.optional-dependencies]

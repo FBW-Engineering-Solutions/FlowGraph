@@ -43,7 +43,7 @@ from flowgraph.adapters.workflow import AVAILABLE_NODES as WORKFLOW_AVAILABLE_NO
 from flowgraph.adapters.workflow_interfaces import (
     AVAILABLE_NODES as WORKFLOW_INTERFACE_AVAILABLE_NODES,
 )
-from flowgraph.adapters.writers import WRITE_MESHIO, WRITE_MESHLANE, WRITE_MUSCAT
+from flowgraph.adapters.writers import WRITE_MESHIO, WRITE_MESHLANE, WRITE_MUSCAT, WRITE_TABLE
 from flowgraph.application.workflow_core import NodeDefinition
 
 
@@ -119,7 +119,9 @@ ADAPTERS = AdapterCatalog(
                 AdapterGroup("Mesh Ops", MESH_OPS_AVAILABLE_NODES),
                 AdapterGroup("Field Ops", FIELD_OPS_AVAILABLE_NODES),
                 AdapterGroup("File Conversion", (MESH_FILE_CONVERSION,)),
-                AdapterGroup("Writers", (WRITE_MUSCAT, WRITE_MESHLANE, WRITE_MESHIO)),
+                AdapterGroup(
+                    "Writers", (WRITE_MUSCAT, WRITE_MESHLANE, WRITE_MESHIO, WRITE_TABLE)
+                ),
             ),
         ),
         AdapterGroup("Controls", CONTROL_AVAILABLE_NODES),

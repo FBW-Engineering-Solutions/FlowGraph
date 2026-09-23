@@ -2,15 +2,19 @@ import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
+import pandas as pd
 import pytest
 from Muscat.MeshContainers.Mesh import Mesh
 
+from flowgraph.adapters.data_types import TABLE_DOCUMENT
 from flowgraph.adapters.readers import LOAD_MUSCAT
 from flowgraph.adapters.writers import (
     WRITE_MESHIO,
     WRITE_MESHLANE,
     WRITE_MUSCAT,
+    WRITE_TABLE,
     MeshWriteError,
+    TableWriteError,
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
@@ -129,3 +133,53 @@ def test_write_meshlane_delegates_conversion_to_muscat_bridge(
 
     assert outputs == {}
     assert write_calls == [(destination, converted_mesh)]
+
+
+def test_write_table_writes_an_excel_workbook(tmp_path: Path) -> None:
+    destination = tmp_path / "output.xlsx"
+    data = {"name": ["Ada", "Grace"], "age": [36, 28]}
+
+    outputs = WRITE_TABLE.executor(
+        {"data": data},
+        {"path": destination, "sheet_name": "Employees", "header": True},
+    )
+
+    assert outputs == {}
+    written = pd.read_excel(destination, sheet_name="Employees")
+    assert list(written.columns) == ["name", "age"]
+    assert written.to_dict(orient="list") == data
+
+
+def test_write_table_uses_default_sheet_name_and_can_omit_headers(tmp_path: Path) -> None:
+    destination = tmp_path / "output.xlsx"
+
+    WRITE_TABLE.executor(
+        {"data": {"name": ["Ada"], "age": [36]}},
+        {"path": destination, "header": False},
+    )
+
+    written = pd.read_excel(destination, header=None)
+    assert written.to_dict(orient="records") == [{0: "Ada", 1: 36}]
+
+
+def test_write_table_exposes_requested_parameters_and_registers() -> None:
+    from flowgraph.adapters import ADAPTERS
+
+    assert ADAPTERS.require("write-table") is WRITE_TABLE
+    assert WRITE_TABLE.input("data").data_type is TABLE_DOCUMENT
+    assert WRITE_TABLE.input("path").is_param
+    assert WRITE_TABLE.input("sheet_name").is_param
+    assert WRITE_TABLE.input("header") is None
+    assert [(parameter.name, parameter.default, parameter.port) for parameter in WRITE_TABLE.parameters] == [
+        ("path", "output_pandas.xlsx", True),
+        ("sheet_name", "", True),
+        ("header", True, False),
+    ]
+
+
+def test_write_table_rejects_missing_output_directory(tmp_path: Path) -> None:
+    with pytest.raises(TableWriteError, match="output directory does not exist"):
+        WRITE_TABLE.executor(
+            {"data": {"name": ["Ada"]}},
+            {"path": tmp_path / "missing" / "output.xlsx"},
+        )

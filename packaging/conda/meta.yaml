@@ -24,11 +24,14 @@ requirements:
     - vtk >=9.2
     - muscat >=2.5.2
     - meshio >=5.3
+    #meshlane is not available in conda-forge yet do not uncomment this line for the moment
+    #- meshlane >=5.5.0
     - scipy >=1.10
     - pandas
     - h5py
     - pillow >=10.0
     - numpy >=1.24
+    - openpyxl >=3.1.5
 
 test:
   commands:

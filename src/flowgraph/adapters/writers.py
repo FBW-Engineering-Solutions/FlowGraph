@@ -14,13 +14,17 @@ from flowgraph.application.workflow_core import (
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
-from .data_types import ParameterKind
+from .data_types import TABLE_DOCUMENT, ParameterKind
 
 LOGGER = logging.getLogger(__name__)
 
 
 class MeshWriteError(RuntimeError):
     """Raised when a mesh document cannot be written by a writer adapter."""
+
+
+class TableWriteError(RuntimeError):
+    """Raised when a table document cannot be written by a writer adapter."""
 
 
 def _validate_destination(
@@ -114,6 +118,42 @@ def _write_meshlane(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) ->
     return {}
 
 
+def _write_table(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Write a table document to an Excel workbook with pandas."""
+    configured_path = inputs.get("path", parameters.get("path", "output_pandas.xlsx"))
+    destination = Path(configured_path).expanduser()
+    if not destination.name:
+        raise TableWriteError("Table filename must not be empty")
+    if not destination.parent.is_dir():
+        raise TableWriteError(
+            f"Table output directory does not exist or is not a directory: {destination.parent}"
+        )
+
+    data = inputs["data"]
+    if not isinstance(data, Mapping):
+        raise TableWriteError("Table data must be a mapping of column names to values")
+
+    sheet_name = parameters.get("sheet_name", "Sheet1")
+    header = parameters.get("header", True)
+
+    try:
+        import pandas as pd
+
+        dataframe = pd.DataFrame(data)
+        dataframe.to_excel(
+            destination,
+            index=False,
+            sheet_name=sheet_name,
+            header=header,
+        )
+    except Exception as error:
+        LOGGER.exception("Pandas failed while writing %s", destination)
+        raise TableWriteError(f"Pandas could not write '{destination}': {error}") from error
+
+    LOGGER.info("Pandas wrote table document to %s", destination.resolve())
+    return {}
+
+
 WRITE_MUSCAT = NodeDefinition(
     id="write-muscat",
     icon="mdi-file-export-outline",
@@ -155,5 +195,27 @@ WRITE_MESHLANE = NodeDefinition(
         ParameterDefinition(
             "path", ParameterKind.FILE, "File path", "", "/path/to/mesh", port=True
         ),
+    ),
+)
+
+
+WRITE_TABLE = NodeDefinition(
+    id="write-table",
+    icon="mdi-file-table-outline",
+    label="Write Table (Pandas)",
+    description="Writes a table document to an Excel workbook with pandas.",
+    ports=(PortDefinition("data", PortDirection.INPUT, TABLE_DOCUMENT, "Data"),),
+    executor=_write_table,
+    parameters=(
+        ParameterDefinition(
+            "path",
+            ParameterKind.FILE,
+            "File path",
+            "output_pandas.xlsx",
+            "/path/to/output.xlsx",
+            file_patterns=("*.xlsx",),
+        ),
+        ParameterDefinition("sheet_name", ParameterKind.TEXT, "Sheet name", "", "Sheet1"),
+        ParameterDefinition("header", ParameterKind.BOOLEAN, "Header", True, port=False),
     ),
 )
