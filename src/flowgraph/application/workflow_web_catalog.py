@@ -103,6 +103,7 @@ def _port_to_dict(port: PortDefinition) -> dict[str, Any]:
         "data_type_label": port.data_type.label,
         "required": port.required,
         "is_param": port.is_param,
+        "expandable": port.expandable,
     }
 
 

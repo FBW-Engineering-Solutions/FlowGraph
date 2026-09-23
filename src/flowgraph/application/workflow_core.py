@@ -19,6 +19,16 @@ InstancePortResolver = Callable[["NodeInstance"], tuple["PortDefinition", ...]]
 InstanceExecutor = Callable[
     ["NodeInstance", Mapping[str, Any], Mapping[str, Any], "NodeRegistry"], Mapping[str, Any] | None
 ]
+EdgeAwareInstanceExecutor = Callable[
+    [
+        "NodeInstance",
+        Mapping[str, Any],
+        Mapping[str, Any],
+        "NodeRegistry",
+        Mapping[str, "WorkflowEdge"],
+    ],
+    Mapping[str, Any] | None,
+]
 SubworkflowFactory = Callable[[], "WorkflowGraph"]
 WorkflowExecutorFunction = Callable[
     [Mapping[str, Any], Mapping[str, Any] | None], Mapping[str, Any]
@@ -51,6 +61,8 @@ class DataType(Generic[T]):
     def is_compatible_with(self, target: DataType[Any]) -> bool:
         """Use stable type identity; conversions require an explicit node."""
         if self.python_type is object or target.python_type is object:
+            return True
+        if target.python_type is list and get_origin(self.python_type) is list:
             return True
         return self.python_type == target.python_type
 
@@ -98,6 +110,20 @@ class PortDefinition:
     required: bool = True
     is_param: bool = False
     accepted_data_types: tuple[DataType[Any], ...] = ()
+    expandable: int = 0
+
+    def __post_init__(self) -> None:
+        """Validate optional bounded input-expansion metadata."""
+        if isinstance(self.expandable, bool) or not isinstance(self.expandable, int):
+            raise TypeError("Port expandable capacity must be an integer")
+        if self.expandable < 0:
+            raise ValueError("Port expandable capacity must be non-negative")
+        if self.expandable and self.direction is not PortDirection.INPUT:
+            raise ValueError("Only input ports may be expandable")
+        if self.expandable and self.required:
+            raise ValueError("Expandable input ports must be optional")
+        if self.expandable and self.is_param:
+            raise ValueError("Parameter ports may not be expandable")
 
     @property
     def display_label(self) -> str:
@@ -150,6 +176,7 @@ class NodeDefinition:
     port_resolver: PortResolver | None = None
     instance_port_resolver: InstancePortResolver | None = None
     instance_executor: InstanceExecutor | None = None
+    edge_aware_instance_executor: EdgeAwareInstanceExecutor | None = None
     subworkflow_factory: SubworkflowFactory | None = None
     color: str | None = None
 
@@ -198,6 +225,12 @@ class NodeDefinition:
 
     def ports_for_instance(self, instance: NodeInstance) -> tuple[PortDefinition, ...]:
         """Return ports resolved from an individual configured node instance."""
+        return _materialize_expandable_ports(
+            self.template_ports_for_instance(instance), instance.parameters
+        )
+
+    def template_ports_for_instance(self, instance: NodeInstance) -> tuple[PortDefinition, ...]:
+        """Return declared ports before bounded expandable inputs are materialized."""
         if self.instance_port_resolver is not None:
             return self.instance_port_resolver(instance)
         return self.ports_for(instance.parameters)
@@ -255,9 +288,14 @@ class NodeDefinition:
         instance: NodeInstance,
         inputs: Mapping[str, Any],
         registry: NodeRegistry,
+        input_edges: Mapping[str, WorkflowEdge] | None = None,
     ) -> Mapping[str, Any] | None:
         """Execute one instance through its specialized or regular executor."""
         parameters = MappingProxyType(instance.parameters)
+        if self.edge_aware_instance_executor is not None:
+            return self.edge_aware_instance_executor(
+                instance, inputs, parameters, registry, input_edges or MappingProxyType({})
+            )
         if self.instance_executor is not None:
             return self.instance_executor(instance, inputs, parameters, registry)
         return self.executor(inputs, parameters)
@@ -324,6 +362,36 @@ class WorkflowEdge:
     @property
     def id(self) -> str:
         return f"{self.source_node}({self.source_port})->{self.target_node}({self.target_port})"
+
+
+_EXPANDABLE_PORT_COUNTS = "_expandable_port_counts"
+
+
+def _materialize_expandable_ports(
+    ports: tuple[PortDefinition, ...], parameters: Mapping[str, Any]
+) -> tuple[PortDefinition, ...]:
+    """Expand bounded input templates into their instance-specific wire endpoints."""
+    configured_counts = parameters.get(_EXPANDABLE_PORT_COUNTS, {})
+    counts = configured_counts if isinstance(configured_counts, Mapping) else {}
+    materialized: list[PortDefinition] = []
+    for port in ports:
+        if not port.expandable:
+            materialized.append(port)
+            continue
+        count = counts.get(port.name, 1)
+        if isinstance(count, bool) or not isinstance(count, int):
+            count = 1
+        count = min(max(count, 1), port.expandable)
+        materialized.extend(
+            replace(
+                port,
+                name=f"{port.name}_{index}",
+                label=f"{port.display_label} {index}",
+                expandable=0,
+            )
+            for index in range(1, count + 1)
+        )
+    return tuple(materialized)
 
 
 class ValidationCode(str, Enum):
@@ -814,9 +882,41 @@ class WorkflowGraph:
                 )
             )
         self._edges.append(edge)
+        self._sync_expandable_input_ports(edge.target_node, registry)
 
-    def remove_edge(self, edge: WorkflowEdge) -> None:
+    def remove_edge(self, edge: WorkflowEdge, registry: NodeRegistry) -> None:
+        """Remove one connection and retain one spare expandable input when possible."""
         self._edges.remove(edge)
+        self._sync_expandable_input_ports(edge.target_node, registry)
+
+    def _sync_expandable_input_ports(self, node_id: str, registry: NodeRegistry) -> None:
+        """Persist materialized counts for each expandable input family on one node."""
+        node = self.get_node(node_id)
+        if node is None:
+            return
+        definition = registry.get(node.definition_id)
+        if definition is None:
+            return
+        templates = {
+            port.name: port
+            for port in definition.template_ports_for_instance(node)
+            if port.direction is PortDirection.INPUT and port.expandable
+        }
+        if not templates:
+            return
+
+        counts = node.parameters.get(_EXPANDABLE_PORT_COUNTS, {})
+        synchronized = dict(counts) if isinstance(counts, Mapping) else {}
+        target_ports = {edge.target_port for edge in self._edges if edge.target_node == node_id}
+        for name, template in templates.items():
+            indexes = [
+                int(target_port.removeprefix(f"{name}_"))
+                for target_port in target_ports
+                if target_port.startswith(f"{name}_")
+                and target_port.removeprefix(f"{name}_").isdigit()
+            ]
+            synchronized[name] = min(max(indexes, default=0) + 1, template.expandable)
+        node.parameters[_EXPANDABLE_PORT_COUNTS] = synchronized
 
     def edge_conversion(self, edge: WorkflowEdge, registry: NodeRegistry) -> PortConversion | None:
         """Return the registered conversion used by a valid edge, if it needs one."""
@@ -1053,6 +1153,7 @@ class WorkflowExecutor:
             node = graph.require_node(node_id)
             definition = self._registry.require(node.definition_id)
             injected_inputs = dict((initial_inputs or {}).get(node_id, {}))
+            input_edges: dict[str, WorkflowEdge] = {}
             connected_ports = {edge.target_port for edge in incoming[node_id]} | set(
                 injected_inputs
             )
@@ -1111,6 +1212,7 @@ class WorkflowExecutor:
                     input_error = True
                     continue
                 node_inputs[edge.target_port] = value
+                input_edges[edge.target_port] = edge
             if input_error:
                 continue
             resolved_inputs[node_id] = MappingProxyType(node_inputs)
@@ -1125,7 +1227,10 @@ class WorkflowExecutor:
             node.parameters.update(parameter_inputs)
             try:
                 raw_outputs = definition.execute_instance(
-                    node, MappingProxyType(node_inputs), self._registry
+                    node,
+                    MappingProxyType(node_inputs),
+                    self._registry,
+                    MappingProxyType(input_edges),
                 )
                 node_outputs = {} if raw_outputs is None else dict(raw_outputs)
             except WorkflowError as error:

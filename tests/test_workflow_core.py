@@ -232,6 +232,75 @@ def test_connected_parameter_port_updates_the_persisted_parameter_before_executi
     assert result.node_outputs["target"] == {"result": "from-port"}
 
 
+def test_expandable_input_ports_grow_independently_and_keep_one_spare_port() -> None:
+    source = definition(
+        "source",
+        (
+            port("first", PortDirection.OUTPUT, LIST_INT),
+            port("second", PortDirection.OUTPUT, LIST_INT),
+        ),
+        lambda _inputs, _parameters: {"first": [1], "second": [2]},
+    )
+    aggregate = definition(
+        "aggregate",
+        (
+            PortDefinition("column", PortDirection.INPUT, LIST_INT, required=False, expandable=3),
+            PortDefinition("metadata", PortDirection.INPUT, LIST_INT, required=False, expandable=2),
+        ),
+    )
+    registry = registry_with(source, aggregate)
+    aggregate_instance = NodeInstance("aggregate", "aggregate")
+    graph = WorkflowGraph([NodeInstance("source", "source"), aggregate_instance])
+
+    assert [port.name for port in aggregate.ports_for_instance(aggregate_instance)] == [
+        "column_1",
+        "metadata_1",
+    ]
+
+    first = WorkflowEdge("source", "first", "aggregate", "column_1")
+    graph.add_edge(first, registry)
+    graph.add_edge(WorkflowEdge("source", "second", "aggregate", "metadata_1"), registry)
+
+    assert [port.name for port in aggregate.ports_for_instance(aggregate_instance)] == [
+        "column_1",
+        "column_2",
+        "metadata_1",
+        "metadata_2",
+    ]
+
+    graph.remove_edge(first, registry)
+
+    assert [port.name for port in aggregate.ports_for_instance(aggregate_instance)] == [
+        "column_1",
+        "metadata_1",
+        "metadata_2",
+    ]
+
+
+@pytest.mark.parametrize(
+    "port, message",
+    [
+        (PortDefinition("input", PortDirection.INPUT, TEXT, required=False, expandable=1), None),
+        (PortDefinition("input", PortDirection.INPUT, TEXT), None),
+    ],
+)
+def test_expandable_port_accepts_valid_input_configurations(port, message) -> None:  # type: ignore[no-untyped-def]
+    assert port.expandable >= 0
+
+
+@pytest.mark.parametrize(
+    "arguments, error",
+    [
+        (("input", PortDirection.OUTPUT, TEXT, None, False, False, (), 1), "Only input"),
+        (("input", PortDirection.INPUT, TEXT, None, True, False, (), 1), "must be optional"),
+        (("input", PortDirection.INPUT, TEXT, None, False, False, (), -1), "non-negative"),
+    ],
+)
+def test_expandable_port_rejects_invalid_configurations(arguments, error) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(ValueError, match=error):
+        PortDefinition(*arguments)
+
+
 def test_scoped_execution_reports_missing_upstream_outputs() -> None:
     source = definition("source", (port("value", PortDirection.OUTPUT),))
     sink = definition("sink", (port("value", PortDirection.INPUT),))

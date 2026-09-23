@@ -48,3 +48,31 @@ def test_write_workflow_web_catalog_is_deterministic_json(tmp_path: Path) -> Non
     assert destination.read_text(encoding="utf-8") == (
         json.dumps(workflow_web_catalog(), indent=2, sort_keys=True) + "\n"
     )
+
+
+def test_workflow_web_catalog_exports_expandable_port_capacity() -> None:
+    nodes = _nodes(workflow_web_catalog()["groups"])
+    aggregate = next(node for node in nodes if node["id"] == "aggregate-lists-to-table")
+
+    assert aggregate["ports"] == [
+        {
+            "name": "column",
+            "label": "Column",
+            "direction": "input",
+            "data_type_id": "list[any]",
+            "data_type_label": "List Any",
+            "required": False,
+            "is_param": False,
+            "expandable": 128,
+        },
+        {
+            "name": "table",
+            "label": "Table",
+            "direction": "output",
+            "data_type_id": "table-document",
+            "data_type_label": "Table",
+            "required": True,
+            "is_param": False,
+            "expandable": 0,
+        },
+    ]

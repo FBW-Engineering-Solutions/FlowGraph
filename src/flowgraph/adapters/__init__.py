@@ -38,6 +38,7 @@ from flowgraph.adapters.simple_sources import (
     SET_VEC3D,
 )
 from flowgraph.adapters.sinks import AVAILABLE_NODES as SINKS_AVAILABLE_NODES
+from flowgraph.adapters.table_tools import AVAILABLE_NODES as TABLE_TOOLS_AVAILABLE_NODES
 from flowgraph.adapters.user_code import AVAILABLE_NODES as USER_CODE_AVAILABLE_NODES
 from flowgraph.adapters.workflow import AVAILABLE_NODES as WORKFLOW_AVAILABLE_NODES
 from flowgraph.adapters.workflow_interfaces import (
@@ -119,13 +120,12 @@ ADAPTERS = AdapterCatalog(
                 AdapterGroup("Mesh Ops", MESH_OPS_AVAILABLE_NODES),
                 AdapterGroup("Field Ops", FIELD_OPS_AVAILABLE_NODES),
                 AdapterGroup("File Conversion", (MESH_FILE_CONVERSION,)),
-                AdapterGroup(
-                    "Writers", (WRITE_MUSCAT, WRITE_MESHLANE, WRITE_MESHIO, WRITE_TABLE)
-                ),
+                AdapterGroup("Writers", (WRITE_MUSCAT, WRITE_MESHLANE, WRITE_MESHIO, WRITE_TABLE)),
             ),
         ),
         AdapterGroup("Controls", CONTROL_AVAILABLE_NODES),
         AdapterGroup("Image Tools", IMAGE_TOOLS_AVAILABLE_NODES),
+        AdapterGroup("Table Tools", TABLE_TOOLS_AVAILABLE_NODES),
         AdapterGroup("Code", USER_CODE_AVAILABLE_NODES),
         AdapterGroup("Workflow", WORKFLOW_INTERFACE_AVAILABLE_NODES + WORKFLOW_AVAILABLE_NODES),
         AdapterGroup("Sinks", SINKS_AVAILABLE_NODES),
