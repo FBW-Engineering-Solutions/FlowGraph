@@ -14,6 +14,7 @@ from flowgraph.adapters.mesh_ops import (
     DELAUNAY_3D_NODE,
     MERGE_TAGS_NODE,
     QUAD_TO_LIN_NODE,
+    REMESH_NODE,
     REMOVE_TAG_NODE,
     RENAME_TAG_NODE,
     TRANSFORM_NODE,
@@ -36,6 +37,61 @@ def test_mesh_transform_exposes_transform_and_direction_parameters() -> None:
     assert all(parameter.port is False for parameter in TRANSFORM_NODE.parameters[3:])
     assert TRANSFORM_NODE.input("keepNormalized") is None
     assert TRANSFORM_NODE.input("keepOrthogonal") is None
+
+
+def test_remesh_node_exposes_muscat_inputs_and_backend_options() -> None:
+    assert ADAPTERS.require("remesh") is REMESH_NODE
+    assert REMESH_NODE.icon == "mdi-vector-triangle"
+    assert [port.name for port in REMESH_NODE.inputs] == [
+        "mesh",
+        "levelset",
+        "solution",
+        "metric",
+    ]
+    assert REMESH_NODE.output("mesh").data_type is MESH_DOCUMENT
+    assert [(option.value, option.label) for option in REMESH_NODE.parameters[0].options] == [
+        ("MmgInMemory", "MMG in memory"),
+        ("mmg", "MMG"),
+    ]
+    assert [parameter.default for parameter in REMESH_NODE.parameters] == [
+        "MmgInMemory",
+        "{}",
+        "{}",
+    ]
+
+
+def test_remesh_node_passes_optional_inputs_and_json_options_to_muscat(monkeypatch) -> None:
+    source_mesh = Mesh()
+    source_mesh.SetNodes([[0, 0, 0], [1, 0, 0]], generateOriginalIDs=True)
+    source = MeshDocument(source_mesh)
+    captured = {}
+
+    def fake_remesh(**kwargs):
+        captured.update(kwargs)
+        return kwargs["mesh"]
+
+    monkeypatch.setattr("flowgraph.adapters.mesh_ops.MuscatRemesh", fake_remesh)
+    levelset = object()
+    solution = object()
+    metric = object()
+
+    result = REMESH_NODE.executor(
+        {"mesh": source, "levelset": levelset, "solution": solution, "metric": metric},
+        {
+            "backend": "mmg",
+            "remesherOptions": '{"hmin": 0.1}',
+            "backendOptions": '{"binary": false}',
+        },
+    )["mesh"]
+
+    assert isinstance(result, MeshDocument)
+    assert result is not source
+    assert captured["levelset"] is levelset
+    assert captured["solution"] is solution
+    assert captured["metric"] is metric
+    assert captured["remesher_options"] == {"hmin": 0.1}
+    assert captured["backEnd"] == "mmg"
+    assert captured["backEndOptions"] == {"binary": False}
 
 
 @pytest.mark.parametrize("node", [RENAME_TAG_NODE, MERGE_TAGS_NODE, REMOVE_TAG_NODE])

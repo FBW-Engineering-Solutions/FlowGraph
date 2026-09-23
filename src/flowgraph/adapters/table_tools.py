@@ -46,7 +46,7 @@ def _aggregate_lists_to_table(
 
 AGGREGATE_LISTS_TO_TABLE = NodeDefinition(
     id="aggregate-lists-to-table",
-    icon="mdi-table-column-plus-after",
+    icon="mdi-file-table-outline",
     label="Aggregate Lists to Table",
     description="Aggregates connected lists into table columns named after their source outputs.",
     ports=(

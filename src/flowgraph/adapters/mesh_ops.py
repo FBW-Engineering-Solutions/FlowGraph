@@ -1,5 +1,6 @@
 """Workflow nodes for mesh transformations and tag operations."""
 
+import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -10,10 +11,11 @@ from Muscat.MeshContainers.ElementsContainers import AllElements, ElementsContai
 from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter
 from Muscat.MeshContainers.Filters.FilterOperators import FilterOperatorBase
 from Muscat.MeshTools.MeshCreationTools import QuadToLin
+from Muscat.MeshTools.Remesh import Remesh as MuscatRemesh
 from Muscat.Types import MuscatIndex
 from scipy.spatial import Delaunay
 
-from flowgraph.adapters.data_types import MESH_DOCUMENT, MUSCAT_ELEMENT_FILTER, TRANSFORM_T
+from flowgraph.adapters.data_types import ANY, MESH_DOCUMENT, MUSCAT_ELEMENT_FILTER, TRANSFORM_T
 from flowgraph.application.workflow_core import (
     NodeDefinition,
     ParameterDefinition,
@@ -89,6 +91,33 @@ def _quad_to_lin(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Ma
         linearizedMiddlePoints=parameters.get("linearizedMiddlePoints", False),
     )
     return {"outputMesh": MeshDocument(mesh)}
+
+
+def _parse_remesh_options(value: Any) -> dict[str, Any]:
+    """Convert a JSON object parameter into Muscat remesher options."""
+    if value in (None, ""):
+        return {}
+    if isinstance(value, Mapping):
+        return dict(value)
+    parsed = json.loads(value)
+    if not isinstance(parsed, dict):
+        raise TypeError("Remesh options must be a JSON object")
+    return parsed
+
+
+def _remesh(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Remesh a document with Muscat and return a new canonical mesh document."""
+    source: MeshDocument = inputs["mesh"]
+    remeshed = MuscatRemesh(
+        mesh=source.mesh.View(),
+        levelset=inputs.get("levelset", source.mesh.nodeFields.get("levelset", None) ),
+        solution=inputs.get("solution", source.mesh.nodeFields.get("solution", None)),
+        metric=inputs.get("metric", source.mesh.nodeFields.get("metric", None)),
+        remesher_options=_parse_remesh_options(parameters.get("remesherOptions", "{}")),
+        backEnd=parameters.get("backend", "MmgInMemory"),
+        backEndOptions=_parse_remesh_options(parameters.get("backendOptions", "{}")),
+    )
+    return {"mesh": MeshDocument(remeshed)}
 
 
 _TAG_ENTITIES = ("element", "node")
@@ -350,11 +379,56 @@ QUAD_TO_LIN_NODE = NodeDefinition(
     executor=_quad_to_lin,
 )
 
+REMESH_NODE = NodeDefinition(
+    id="remesh",
+    icon="mdi-vector-triangle",
+    label="Remesh",
+    description="Remesh a Muscat mesh using the selected remeshing backend.",
+    ports=(
+        PortDefinition("mesh", PortDirection.INPUT, MESH_DOCUMENT, "Mesh"),
+        PortDefinition("levelset", PortDirection.INPUT, ANY, "Level set", required=False),
+        PortDefinition("solution", PortDirection.INPUT, ANY, "Solution", required=False),
+        PortDefinition("metric", PortDirection.INPUT, ANY, "Metric", required=False),
+        PortDefinition("mesh", PortDirection.OUTPUT, MESH_DOCUMENT, "Remeshed mesh"),
+    ),
+    parameters=(
+        ParameterDefinition(
+            "backend",
+            ParameterKind.STR_SELECT,
+            "Backend",
+            "MmgInMemory",
+            options=(
+                ParameterOption("MmgInMemory", "MMG in memory"),
+                ParameterOption("mmg", "MMG"),
+            ),
+            port=False,
+        ),
+        ParameterDefinition(
+            "remesherOptions",
+            ParameterKind.TEXT,
+            "Remesher options (JSON)",
+            "{}",
+            placeholder='{"hmin": 0.1}',
+            port=False,
+        ),
+        ParameterDefinition(
+            "backendOptions",
+            ParameterKind.TEXT,
+            "Backend options (JSON)",
+            "{}",
+            placeholder='{"binary": true}',
+            port=False,
+        ),
+    ),
+    executor=_remesh,
+)
+
 AVAILABLE_NODES = (
     TRANSFORM_NODE,
     APPLY_TRANSFORM_NODE,
     DELAUNAY_3D_NODE,
     QUAD_TO_LIN_NODE,
+    REMESH_NODE,
     RENAME_TAG_NODE,
     MERGE_TAGS_NODE,
     REMOVE_TAG_NODE,
