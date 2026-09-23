@@ -12,12 +12,14 @@ from flowgraph.adapters.image_tools import (
     AVAILABLE_NODES,
     CONVERT_IMAGE_MODE,
     CROP_IMAGE,
+    IMAGE_FLUENCY_METRICS,
     IMAGE_TO_MESH,
     PILLOW_TO_IMAGEJ,
     READ_IMAGE,
     RESIZE_IMAGE,
     ROTATE_IMAGE,
     WRITE_IMAGE,
+    ImageFluencyError,
     ImageLoadError,
     ImageOperationError,
     ImageWriteError,
@@ -63,7 +65,62 @@ def test_image_tools_are_registered_in_a_top_level_group() -> None:
         "rotate-image",
         "convert-image-mode",
         "image-to-mesh",
+        "image-fluency-metrics",
     ]
+
+
+def test_image_fluency_metrics_returns_directional_symmetry_outputs() -> None:
+    values = np.random.default_rng(42).integers(0, 256, size=(32, 32), dtype=np.uint8)
+    image = PillowImage.fromarray(values, mode="L")
+
+    result = IMAGE_FLUENCY_METRICS.executor(
+        {"image": image},
+        {
+            "complexity_rotate": False,
+            "self_similarity_full": False,
+            "symmetry_shift_range": 0.05,
+        },
+    )
+
+    assert set(result) == {
+        "contrast",
+        "complexity",
+        "self_similarity",
+        "symmetry_vertical",
+        "symmetry_horizontal",
+    }
+    assert all(isinstance(value, float) for value in result.values())
+    assert result["contrast"] > 0
+    assert 0 < result["complexity"]
+    assert 0 <= result["symmetry_vertical"] <= 1
+    assert 0 <= result["symmetry_horizontal"] <= 1
+
+
+
+def test_image_fluency_metrics_can_execute_in_a_workflow() -> None:
+    image = PillowImage.fromarray(np.tile(np.arange(32, dtype=np.uint8), (32, 1)), mode="L")
+    node = IMAGE_FLUENCY_METRICS.create_instance("metrics")
+
+    result = IMAGE_FLUENCY_METRICS.executor(
+        {"image": image},
+        node.parameters,
+    )
+
+    assert result["contrast"] == pytest.approx(np.std(np.asarray(image) / 255.0, ddof=1))
+
+
+def test_image_fluency_metrics_rejects_invalid_symmetry_shift_range() -> None:
+    image = PillowImage.new("L", (32, 32), 0)
+
+    with pytest.raises(ImageFluencyError, match="valid spatial frequencies"):
+        IMAGE_FLUENCY_METRICS.executor(
+            {"image": image},
+            {
+                "complexity_rotate": False,
+                "self_similarity_full": False,
+                "symmetry_shift_range": 0.05,
+            },
+        )
 
 
 def test_image_operation_parameters_are_exported_parameter_ports() -> None:

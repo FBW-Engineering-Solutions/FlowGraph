@@ -1,5 +1,7 @@
 """Workflow nodes that read, transform, write, and convert Pillow images."""
 
+import gzip
+import io
 import logging
 from collections.abc import Mapping
 from pathlib import Path
@@ -20,7 +22,7 @@ from flowgraph.application.workflow_core import (
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
-from .data_types import IMAGE, IMAGEJ, MESH_DOCUMENT, ParameterKind
+from .data_types import FLOAT, IMAGE, IMAGEJ, MESH_DOCUMENT, ParameterKind
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +47,10 @@ class ImageJConversionError(RuntimeError):
     """Raised when a Pillow image cannot be converted to an ImageJ NumPy array."""
 
 
+class ImageFluencyError(RuntimeError):
+    """Raised when image fluency metrics cannot be computed."""
+
+
 def _require_image(inputs: Mapping[str, Any]) -> Image:
     """Return the required Pillow image input or raise an actionable error."""
     image = inputs["image"]
@@ -61,6 +67,141 @@ def _pillow_to_imagej(
     if not isinstance(image, Image):
         raise ImageJConversionError("Image input must be a PIL.Image.Image instance")
     return {"image": np.array(image, copy=True)}
+
+
+def _metric_channels(image: Image) -> tuple[np.ndarray, ...]:
+    """Return image channels as float arrays, ignoring alpha channels."""
+    if image.mode == "L":
+        return (np.asarray(image, dtype=np.float64),)
+    rgb = np.asarray(image.convert("RGB"), dtype=np.float64)
+    return tuple(rgb[:, :, index] for index in range(3))
+
+
+def _rms_contrast(image: Image) -> float:
+    """Return the upstream imagefluency weighted per-channel RMS contrast."""
+    channels = _metric_channels(image)
+    weights = (1.0,) if len(channels) == 1 else (0.2989, 0.5870, 0.1140)
+    return float(
+        sum(weight * np.std(channel / 255.0, ddof=1) for weight, channel in zip(weights, channels))
+    )
+
+
+def _bmp_bytes(image: Image) -> bytes:
+    """Serialize an image to an uncompressed BMP for complexity measurement."""
+    buffer = io.BytesIO()
+    image.save(buffer, format="BMP")
+    return buffer.getvalue()
+
+
+def _compression_complexity(image: Image, rotate: bool) -> float:
+    """Return gzip-compressed BMP size divided by uncompressed BMP size."""
+    source = image if image.mode in {"L", "RGB"} else image.convert("RGB")
+    original = _bmp_bytes(source)
+    compressed_sizes = [len(gzip.compress(original, compresslevel=9, mtime=0))]
+    if rotate:
+        compressed_sizes.append(
+            len(gzip.compress(_bmp_bytes(source.rotate(90, expand=True)), compresslevel=9, mtime=0))
+        )
+    return float(min(compressed_sizes) / len(original))
+
+
+def _normalise_for_fft(channel: np.ndarray) -> np.ndarray:
+    """Convert a channel to finite floating-point values for the FFT."""
+    values = np.asarray(channel, dtype=np.float64)
+    if not np.all(np.isfinite(values)):
+        raise ImageFluencyError("Image contains non-finite pixel values")
+    return values
+
+
+def _self_similarity_channel(channel: np.ndarray, full: bool) -> float:
+    """Return the imagefluency-compatible log-log power-spectrum score."""
+    height, width = channel.shape
+    if min(height, width) < 22:
+        raise ImageFluencyError(
+            "Self-similarity requires an image with at least 22 pixels in both dimensions"
+        )
+    size = min(height, width)
+    if size % 2:
+        size -= 1
+    square = (
+        PillowImage.fromarray(np.asarray(channel, dtype=np.float32), mode="F").resize(
+            # Historical OpenImageR releases called this operation bilinear, but
+            # their 1536-to-1024 output is pixel-equivalent to Pillow's BOX filter.
+            (size, size),
+            resample=PillowImage.Resampling.BOX,
+        )
+        if height != width
+        else channel
+    )
+    values = _normalise_for_fft(np.asarray(square, dtype=np.float64))
+    spectrum = np.abs(np.fft.fftshift(np.fft.fft2(values))) ** 2
+    yy, xx = np.indices(spectrum.shape)
+    radius = np.rint(np.hypot(xx - size / 2, yy - size / 2)).astype(np.int32)
+    max_radius = size // 2
+    power = np.array(
+        [spectrum[radius == radius_value].mean() for radius_value in range(1, max_radius + 1)],
+        dtype=np.float64,
+    )
+    start, stop = (1, max_radius) if full else (10, min(max_radius, 256))
+    if stop < start or np.any(power[start - 1 : stop] <= 0):
+        raise ImageFluencyError("Image does not contain enough valid spatial frequencies")
+    frequencies = np.arange(start, stop + 1, dtype=np.float64)
+    slope = float(np.polyfit(np.log(frequencies), np.log(power[start - 1 : stop]), 1)[0])
+    return float(-abs(slope + 2.0))
+
+
+def _mirror_similarity(channel: np.ndarray, axis: str, shift_range: float) -> float:
+    """Return maximum absolute half-image correlation around shifted mirror axes."""
+    array = channel if axis == "vertical" else channel.T
+    width = array.shape[1]
+    if width < 4:
+        raise ImageFluencyError("Symmetry requires at least 4 pixels on both image dimensions")
+    maximum = 0.0
+    for shift in range(int(np.floor(width * shift_range)) + 1):
+        for view in (array[:, : width - shift], array[:, shift:]):
+            half = view.shape[1]
+            left = view[:, : half // 2].ravel()
+            right = view[:, -(half // 2) :][:, ::-1].ravel()
+            if np.std(left, ddof=1) == 0 or np.std(right, ddof=1) == 0:
+                raise ImageFluencyError("Symmetry cannot be computed from a constant image half")
+            maximum = max(maximum, abs(float(np.corrcoef(left, right)[0, 1])))
+    return maximum
+
+
+def _image_fluency_metrics(
+    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+) -> Mapping[str, Any]:
+    """Compute fluency metrics and directional mirror symmetry."""
+    image = _require_image(inputs)
+    shift_range = parameters["symmetry_shift_range"]
+    if (
+        isinstance(shift_range, bool)
+        or not isinstance(shift_range, (int, float))
+        or not 0 <= shift_range <= 1
+    ):
+        raise ImageFluencyError("Symmetry shift range must be a number between 0 and 1")
+    channels = _metric_channels(image)
+    weights = (1.0,) if len(channels) == 1 else (0.2989, 0.5870, 0.1140)
+    contrast = _rms_contrast(image)
+    self_similarity = sum(
+        weight * _self_similarity_channel(channel, parameters["self_similarity_full"])
+        for weight, channel in zip(weights, channels)
+    )
+    symmetry_vertical = sum(
+        weight * _mirror_similarity(channel, "vertical", float(shift_range))
+        for weight, channel in zip(weights, channels)
+    )
+    symmetry_horizontal = sum(
+        weight * _mirror_similarity(channel, "horizontal", float(shift_range))
+        for weight, channel in zip(weights, channels)
+    )
+    return {
+        "contrast": contrast,
+        "complexity": _compression_complexity(image, parameters["complexity_rotate"]),
+        "self_similarity": float(self_similarity),
+        "symmetry_vertical": float(symmetry_vertical),
+        "symmetry_horizontal": float(symmetry_horizontal),
+    }
 
 
 def _positive_integer(parameters: Mapping[str, Any], name: str) -> int:
@@ -410,6 +551,50 @@ IMAGE_TO_MESH = NodeDefinition(
 )
 
 
+IMAGE_FLUENCY_METRICS = NodeDefinition(
+    id="image-fluency-metrics",
+    icon="mdi-image-filter-vintage",
+    label="Image Fluency Metrics",
+    description=(
+        "Computes imagefluency-style contrast, compression complexity, self-similarity, "
+        "and vertical/horizontal mirror symmetry from a Pillow image."
+    ),
+    ports=(
+        PortDefinition("image", PortDirection.INPUT, IMAGE, "Pillow image"),
+        PortDefinition("contrast", PortDirection.OUTPUT, FLOAT, "Contrast"),
+        PortDefinition("complexity", PortDirection.OUTPUT, FLOAT, "Complexity"),
+        PortDefinition("self_similarity", PortDirection.OUTPUT, FLOAT, "Self-similarity"),
+        PortDefinition("symmetry_vertical", PortDirection.OUTPUT, FLOAT, "Vertical symmetry"),
+        PortDefinition("symmetry_horizontal", PortDirection.OUTPUT, FLOAT, "Horizontal symmetry"),
+    ),
+    executor=_image_fluency_metrics,
+    parameters=(
+        ParameterDefinition(
+            "complexity_rotate",
+            ParameterKind.BOOLEAN,
+            "Test rotated image for complexity",
+            False,
+            port=False,
+        ),
+        ParameterDefinition(
+            "self_similarity_full",
+            ParameterKind.BOOLEAN,
+            "Use full self-similarity frequency range",
+            False,
+            port=False,
+        ),
+        ParameterDefinition(
+            "symmetry_shift_range",
+            ParameterKind.FLOAT,
+            "Symmetry axis shift range",
+            0.05,
+            "0.0 to 1.0",
+            port=False,
+        ),
+    ),
+)
+
+
 AVAILABLE_NODES = (
     READ_IMAGE,
     PILLOW_TO_IMAGEJ,
@@ -419,4 +604,5 @@ AVAILABLE_NODES = (
     ROTATE_IMAGE,
     CONVERT_IMAGE_MODE,
     IMAGE_TO_MESH,
+    IMAGE_FLUENCY_METRICS,
 )
