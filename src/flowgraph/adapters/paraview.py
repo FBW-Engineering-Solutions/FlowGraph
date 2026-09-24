@@ -8,6 +8,7 @@ from typing import Any
 from flowgraph.adapters.readers import MESH_DOCUMENT
 from flowgraph.application.workflow_core import (
     DataType,
+    ExecContext,
     NodeDefinition,
     PortDefinition,
     PortDirection,
@@ -17,7 +18,9 @@ STRING = DataType("string", "Text", str)
 
 
 def SendMeshToParaView(
-    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
 
     data = {"command": "test", "value": 123}

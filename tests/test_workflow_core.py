@@ -15,6 +15,7 @@ from flowgraph.adapters.data_types import (
 from flowgraph.application.port_conversions import resolve_port_conversion
 from flowgraph.application.workflow_core import (
     DataType,
+    ExecContext,
     NodeDefinition,
     NodeExecutionError,
     NodeInstance,
@@ -175,6 +176,101 @@ def test_executor_propagates_named_values_fans_out_and_retains_outputs() -> None
 
     assert result.execution_order == ("source", "upper", "sink-a", "sink-b")
     assert result.node_outputs["upper"] == {"value": "MESH"}
+
+
+def test_executor_passes_capabilities_and_connected_output_ports_to_nodes() -> None:
+    contexts: dict[str, ExecContext] = {}
+
+    def source_executor(_inputs, _parameters, context):  # type: ignore[no-untyped-def]
+        contexts["source"] = context
+        return {"left": "left", "right": "right"}
+
+    def sink_executor(_inputs, _parameters, context):  # type: ignore[no-untyped-def]
+        contexts["sink"] = context
+        return {}
+
+    source = definition(
+        "source",
+        (port("left", PortDirection.OUTPUT), port("right", PortDirection.OUTPUT)),
+        source_executor,
+    )
+    sink = definition("sink", (port("value", PortDirection.INPUT),), sink_executor)
+    registry = registry_with(source, sink)
+    graph = WorkflowGraph(
+        [NodeInstance("source", "source"), NodeInstance("sink", "sink")],
+        [WorkflowEdge("source", "left", "sink", "value")],
+    )
+
+    WorkflowExecutor(registry, parallel_tasks=4, gpu_available=True).run(graph)
+
+    assert contexts["source"] == ExecContext(
+        parallel_tasks=4,
+        gpu_available=True,
+        connected_output_ports=frozenset({"left"}),
+    )
+    assert contexts["sink"] == ExecContext(
+        parallel_tasks=4,
+        gpu_available=True,
+        connected_output_ports=frozenset(),
+    )
+
+
+def test_executor_marks_exported_workflow_outputs_as_consumed() -> None:
+    contexts: list[ExecContext] = []
+    source = definition(
+        "source",
+        (port("value", PortDirection.OUTPUT),),
+        lambda _inputs, _parameters, context: contexts.append(context) or {"value": "ok"},
+    )
+    registry = registry_with(source)
+    graph = WorkflowGraph([NodeInstance("source", "source")])
+    graph.add_output("result", "source", "value", registry)
+
+    WorkflowExecutor(registry).run(graph)
+
+    assert contexts == [
+        ExecContext(connected_output_ports=frozenset({"value"})),
+    ]
+
+
+def test_executor_retains_fanout_inputs_and_calls() -> None:
+    calls: list[str] = []
+    source = definition(
+        "source",
+        (port("value", PortDirection.OUTPUT),),
+        lambda _inputs, parameters: {"value": parameters["value"]},
+    )
+
+    def uppercase(inputs, _parameters):  # type: ignore[no-untyped-def]
+        calls.append("upper")
+        return {"value": inputs["value"].upper()}
+
+    transform = definition(
+        "upper",
+        (port("value", PortDirection.INPUT), port("value", PortDirection.OUTPUT)),
+        uppercase,
+    )
+    seen: list[str] = []
+    sink = definition(
+        "sink",
+        (port("value", PortDirection.INPUT),),
+        lambda inputs, _parameters: seen.append(inputs["value"]) or {},
+    )
+    registry = registry_with(source, transform, sink)
+    graph = WorkflowGraph(
+        [
+            NodeInstance("source", "source", {"value": "mesh"}),
+            NodeInstance("upper", "upper"),
+            NodeInstance("sink-a", "sink"),
+            NodeInstance("sink-b", "sink"),
+        ]
+    )
+    graph.add_edge(WorkflowEdge("source", "value", "upper", "value"), registry)
+    graph.add_edge(WorkflowEdge("upper", "value", "sink-a", "value"), registry)
+    graph.add_edge(WorkflowEdge("upper", "value", "sink-b", "value"), registry)
+
+    result = WorkflowExecutor(registry).run(graph)
+
     assert result.node_inputs["sink-a"] == {"value": "MESH"}
     assert result.node_inputs["sink-b"] == {"value": "MESH"}
     assert seen == ["MESH", "MESH"]

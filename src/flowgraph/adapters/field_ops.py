@@ -14,6 +14,7 @@ from Muscat.MeshTools.MeshTools import GetElementsCenters
 
 from flowgraph.adapters.data_types import MESH_DOCUMENT
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     PortDefinition,
@@ -25,7 +26,9 @@ from .data_types import ParameterKind
 
 
 def _transfer_fields(
-    inputs: Mapping[str, Any], _parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Transfer all nodal fields from ``source_data`` onto ``target``."""
     source_mesh: Mesh = inputs["source_data"].mesh

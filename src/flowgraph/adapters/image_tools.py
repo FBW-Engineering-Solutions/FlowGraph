@@ -14,6 +14,7 @@ from PIL import UnidentifiedImageError
 from PIL.Image import Image
 
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     ParameterOption,
@@ -60,7 +61,9 @@ def _require_image(inputs: Mapping[str, Any]) -> Image:
 
 
 def _pillow_to_imagej(
-    inputs: Mapping[str, Any], _parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Convert a Pillow image to a detached NumPy array suitable for ImageJ."""
     image = inputs["image"]
@@ -169,7 +172,9 @@ def _mirror_similarity(channel: np.ndarray, axis: str, shift_range: float) -> fl
 
 
 def _image_fluency_metrics(
-    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Compute fluency metrics and directional mirror symmetry."""
     image = _require_image(inputs)
@@ -187,10 +192,15 @@ def _image_fluency_metrics(
         weight * _self_similarity_channel(channel, parameters["self_similarity_full"])
         for weight, channel in zip(weights, channels)
     )
-    symmetry_vertical = sum(
-        weight * _mirror_similarity(channel, "vertical", float(shift_range))
-        for weight, channel in zip(weights, channels)
-    )
+
+    if _exec_context is None or  "symmetry_vertical" in _exec_context.connected_output_ports:
+        symmetry_vertical = sum(
+            weight * _mirror_similarity(channel, "vertical", float(shift_range))
+            for weight, channel in zip(weights, channels)
+        )
+    else:
+        symmetry_vertical = np.nan
+
     symmetry_horizontal = sum(
         weight * _mirror_similarity(channel, "horizontal", float(shift_range))
         for weight, channel in zip(weights, channels)
@@ -248,7 +258,11 @@ def _validate_destination(parameters: Mapping[str, Any]) -> Path:
     return destination
 
 
-def _read_image(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _read_image(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Load an image with Pillow and detach its pixel data from the source file."""
     source = _validate_source(parameters)
     try:
@@ -262,7 +276,11 @@ def _read_image(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Ma
     return {"image": result}
 
 
-def _write_image(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _write_image(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Write a Pillow image using the format inferred from its destination extension."""
     destination = _validate_destination(parameters)
     image = inputs["image"]
@@ -279,7 +297,11 @@ def _write_image(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Ma
     return {}
 
 
-def _resize_image(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _resize_image(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Resize an image to a requested width and height using Lanczos resampling."""
     image = _require_image(inputs)
     width = _positive_integer(parameters, "width")
@@ -289,7 +311,11 @@ def _resize_image(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> M
     return {"image": result}
 
 
-def _crop_image(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _crop_image(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Crop an image to an in-bounds box described by left, top, right, and bottom."""
     image = _require_image(inputs)
     left = _nonnegative_integer(parameters, "left")
@@ -312,7 +338,11 @@ def _crop_image(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Map
     return {"image": result}
 
 
-def _rotate_image(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _rotate_image(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Rotate an image counter-clockwise by the requested number of degrees."""
     image = _require_image(inputs)
     angle = parameters["angle"]
@@ -327,7 +357,9 @@ def _rotate_image(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> M
 
 
 def _convert_image_mode(
-    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Convert an image to one of the supported common Pillow color modes."""
     image = _require_image(inputs)
@@ -353,7 +385,11 @@ def _node_colors(image: Image) -> np.ndarray:
     return np.ascontiguousarray(pixels.transpose(1, 0, 2).reshape(-1, pixels.shape[-1]))
 
 
-def _image_to_mesh(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _image_to_mesh(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Convert a Pillow image into a structured Muscat mesh with a ``Colors`` field."""
     image = inputs["image"]
     if not isinstance(image, Image):

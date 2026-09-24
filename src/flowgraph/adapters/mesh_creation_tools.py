@@ -24,6 +24,7 @@ from Muscat.MeshTools.MeshCreationTools import (
 
 from flowgraph.application.workflow_core import (
     DataType,
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     ParameterOption,
@@ -61,7 +62,9 @@ def _mesh_result(mesh) -> Mapping[str, Any]:
 
 
 def _create_uniform_bars(
-    _inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     return _mesh_result(
         CreateUniformMeshOfBars(
@@ -74,12 +77,18 @@ def _create_uniform_bars(
 
 
 def _create_triangles(
-    inputs: Mapping[str, Any], _parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     return _mesh_result(CreateMeshOfTriangles(inputs["points"], inputs["triangles"]))
 
 
-def _create_mesh(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _create_mesh(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     return _mesh_result(
         CreateMeshOf(
             inputs["points"], inputs["connectivity"], _element_type(parameters["elemName"])
@@ -87,7 +96,11 @@ def _create_mesh(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Ma
     )
 
 
-def _create_square(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _create_square(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     return _mesh_result(
         CreateSquare(
             dimensions=parameters.get("dimensions", [2, 2]),
@@ -98,7 +111,11 @@ def _create_square(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) ->
     )
 
 
-def _create_disk(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _create_disk(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     return _mesh_result(
         CreateDisk(
             nr=parameters.get("nr", 10),
@@ -112,7 +129,11 @@ def _create_disk(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> M
     )
 
 
-def _create_cube(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _create_cube(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     return _mesh_result(
         CreateCube(
             dimensions=parameters.get("dimensions", [2, 2, 2]),
@@ -124,7 +145,9 @@ def _create_cube(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> M
 
 
 def _create_mesh_from_cells_dict(
-    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     return _mesh_result(
         CreateMeshFromCellsDict(
@@ -139,20 +162,28 @@ def _create_mesh_from_cells_dict(
     )
 
 
-def _mesh_to_simplex(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _mesh_to_simplex(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     return _mesh_result(
         MeshToSimplex(inputs["mesh"].mesh, inPlace=parameters.get("inPlace", False))
     )
 
 
 def _to_quadratic_mesh(
-    inputs: Mapping[str, Any], _parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     return _mesh_result(ToQuadraticMesh(inputs["inputMesh"].mesh))
 
 
 def _quad_to_lin_creation(
-    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     return {
         "outputMesh": MeshDocument(
@@ -165,7 +196,11 @@ def _quad_to_lin_creation(
     }
 
 
-def _mirror_mesh(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _mirror_mesh(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     return _mesh_result(
         MirrorMesh(
             inputs["inmesh"].mesh,
@@ -178,12 +213,18 @@ def _mirror_mesh(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Ma
 
 
 def _create_zero_d_elements(
-    inputs: Mapping[str, Any], _parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     return {"elements": Create0DElementContainerForEveryPoint(inputs["mesh"].mesh)}
 
 
-def _subdivide_mesh(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _subdivide_mesh(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     return _mesh_result(SubDivideMesh(inputs["mesh"].mesh, level=parameters.get("level", 1)))
 
 

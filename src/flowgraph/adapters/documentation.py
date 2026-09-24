@@ -9,7 +9,7 @@ DOC_TITLE = NodeDefinition(
     label="Title",
     description="Just a Title",
     ports=(),
-    executor=lambda x, y: None,
+    executor=lambda x, y, _exec_context: None,
     parameters=(
         ParameterDefinition(
             name="title",
@@ -28,7 +28,7 @@ DOC_PARAGRAPH = NodeDefinition(
     label="Paragraph",
     description="Long-form documentation text",
     ports=(),
-    executor=lambda x, y: None,
+    executor=lambda x, y, _exec_context: None,
     parameters=(
         ParameterDefinition(
             name="text",

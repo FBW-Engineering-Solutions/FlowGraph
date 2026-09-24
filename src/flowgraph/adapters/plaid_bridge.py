@@ -5,6 +5,7 @@ from typing import Any
 
 from flowgraph.application.workflow_core import (
     DataType,
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     PortDefinition,
@@ -22,7 +23,9 @@ PLAID_OPTIONAL_TABLE = DataType("plaid-optional-table", "Optional Table", (dict,
 
 
 def _load_plaid_sample(
-    _inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Load one sample from a Plaid dataset stored on disk."""
     path = parameters.get("path", "")
@@ -60,7 +63,9 @@ LOAD_PLAID_DATASET = NodeDefinition(
 
 
 def _extract_plaid_sample(
-    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Convert one stored Plaid dataset item into a Plaid ``Sample``."""
     dataset_and_converters = inputs.get("dataset")
@@ -116,7 +121,9 @@ EXTRACT_PLAID_SAMPLE = NodeDefinition(
 
 
 def _extract_plaid_time_step(
-    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Extract one Plaid sample time step as a FlowGraph mesh document."""
     sample = inputs.get("sample")
@@ -154,7 +161,9 @@ EXTRACT_PLAID_TIME_STEP = NodeDefinition(
 
 
 def _extract_plaid_info(
-    inputs: Mapping[str, Any], _parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Expose each top-level attribute of a Plaid ``Infos`` object."""
     infos = inputs.get("infos")

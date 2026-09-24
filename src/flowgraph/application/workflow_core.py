@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
@@ -13,11 +14,14 @@ if TYPE_CHECKING:
     from flowgraph.application.port_conversions import PortConversion
 
 T = TypeVar("T")
-NodeExecutor = Callable[[Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any] | None]
+NodeExecutor = Callable[
+    [Mapping[str, Any], Mapping[str, Any], "ExecContext"], Mapping[str, Any] | None
+]
 PortResolver = Callable[[Mapping[str, Any]], tuple["PortDefinition", ...]]
 InstancePortResolver = Callable[["NodeInstance"], tuple["PortDefinition", ...]]
 InstanceExecutor = Callable[
-    ["NodeInstance", Mapping[str, Any], Mapping[str, Any], "NodeRegistry"], Mapping[str, Any] | None
+    ["NodeInstance", Mapping[str, Any], Mapping[str, Any], "NodeRegistry", "ExecContext"],
+    Mapping[str, Any] | None,
 ]
 EdgeAwareInstanceExecutor = Callable[
     [
@@ -26,6 +30,7 @@ EdgeAwareInstanceExecutor = Callable[
         Mapping[str, Any],
         "NodeRegistry",
         Mapping[str, "WorkflowEdge"],
+        "ExecContext",
     ],
     Mapping[str, Any] | None,
 ]
@@ -33,6 +38,38 @@ SubworkflowFactory = Callable[[], "WorkflowGraph"]
 WorkflowExecutorFunction = Callable[
     [Mapping[str, Any], Mapping[str, Any] | None], Mapping[str, Any]
 ]
+
+
+@dataclass(frozen=True)
+class ExecContext:
+    """Execution capabilities and graph-consumption metadata for one node run."""
+
+    parallel_tasks: int = 1
+    gpu_available: bool = False
+    connected_output_ports: frozenset[str] = frozenset()
+
+    def __post_init__(self) -> None:
+        if isinstance(self.parallel_tasks, bool) or not isinstance(self.parallel_tasks, int):
+            raise TypeError("parallel_tasks must be an integer")
+        if self.parallel_tasks < 1:
+            raise ValueError("parallel_tasks must be at least 1")
+        if not isinstance(self.gpu_available, bool):
+            raise TypeError("gpu_available must be a boolean")
+        if not isinstance(self.connected_output_ports, frozenset):
+            object.__setattr__(
+                self, "connected_output_ports", frozenset(self.connected_output_ports)
+            )
+
+
+def _invoke_executor(
+    executor: Callable[..., Mapping[str, Any] | None], *args: Any
+) -> Mapping[str, Any] | None:
+    """Invoke a new-context executor while retaining legacy callable compatibility."""
+    try:
+        inspect.signature(executor).bind(*args)
+    except TypeError:
+        return executor(*args[:-1])
+    return executor(*args)
 
 
 @dataclass(frozen=True)
@@ -289,16 +326,26 @@ class NodeDefinition:
         inputs: Mapping[str, Any],
         registry: NodeRegistry,
         input_edges: Mapping[str, WorkflowEdge] | None = None,
+        exec_context: ExecContext | None = None,
     ) -> Mapping[str, Any] | None:
         """Execute one instance through its specialized or regular executor."""
         parameters = MappingProxyType(instance.parameters)
+        context = exec_context or ExecContext()
         if self.edge_aware_instance_executor is not None:
-            return self.edge_aware_instance_executor(
-                instance, inputs, parameters, registry, input_edges or MappingProxyType({})
+            return _invoke_executor(
+                self.edge_aware_instance_executor,
+                instance,
+                inputs,
+                parameters,
+                registry,
+                input_edges or MappingProxyType({}),
+                context,
             )
         if self.instance_executor is not None:
-            return self.instance_executor(instance, inputs, parameters, registry)
-        return self.executor(inputs, parameters)
+            return _invoke_executor(
+                self.instance_executor, instance, inputs, parameters, registry, context
+            )
+        return _invoke_executor(self.executor, inputs, parameters, context)
 
     def create_instance(
         self,
@@ -1118,8 +1165,18 @@ class WorkflowRunResult:
 class WorkflowExecutor:
     """Execute a validated DAG synchronously and retain every node output."""
 
-    def __init__(self, registry: NodeRegistry) -> None:
+    def __init__(
+        self,
+        registry: NodeRegistry,
+        *,
+        parallel_tasks: int = 1,
+        gpu_available: bool = False,
+    ) -> None:
         self._registry = registry
+        self._exec_context = ExecContext(
+            parallel_tasks=parallel_tasks,
+            gpu_available=gpu_available,
+        )
 
     def run(
         self,
@@ -1146,8 +1203,12 @@ class WorkflowExecutor:
         resolved_inputs: dict[str, Mapping[str, Any]] = {}
         first_error: NodeExecutionError | None = None
         incoming = {node.id: [] for node in graph.nodes}
+        outgoing = {node.id: set() for node in graph.nodes}
         for edge in graph.edges:
             incoming[edge.target_node].append(edge)
+            outgoing[edge.source_node].add(edge.source_port)
+        for output_port in graph.outputs:
+            outgoing[output_port.node_id].add(output_port.node_port)
 
         for node_id in order:
             node = graph.require_node(node_id)
@@ -1226,11 +1287,16 @@ class WorkflowExecutor:
             # workflow reflect the value used for this execution.
             node.parameters.update(parameter_inputs)
             try:
+                exec_context = replace(
+                    self._exec_context,
+                    connected_output_ports=frozenset(outgoing[node_id]),
+                )
                 raw_outputs = definition.execute_instance(
                     node,
                     MappingProxyType(node_inputs),
                     self._registry,
                     MappingProxyType(input_edges),
+                    exec_context,
                 )
                 node_outputs = {} if raw_outputs is None else dict(raw_outputs)
             except WorkflowError as error:

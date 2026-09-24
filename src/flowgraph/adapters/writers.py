@@ -7,6 +7,7 @@ from typing import Any
 
 from flowgraph.adapters.readers import MESH_DOCUMENT
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     PortDefinition,
@@ -47,7 +48,11 @@ def _validate_destination(
     return destination
 
 
-def _write_muscat(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _write_muscat(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Write a mesh document using Muscat's extension-aware universal writer."""
 
     destination = _validate_destination(inputs, parameters, "Muscat")
@@ -68,7 +73,11 @@ def _write_muscat(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> M
     return {}
 
 
-def _write_meshio(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _write_meshio(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Convert a Muscat mesh through its meshio bridge and write it with meshio."""
     destination = _validate_destination(inputs, parameters, "meshio")
     document: MeshDocument = inputs["mesh"]
@@ -87,7 +96,11 @@ def _write_meshio(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> M
     return {}
 
 
-def _write_meshlane(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _write_meshlane(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Convert a Muscat mesh and write it with the optional MeshLane adapter."""
     destination = _validate_destination(inputs, parameters, "MeshLane")
     document: MeshDocument = inputs["mesh"]
@@ -118,7 +131,11 @@ def _write_meshlane(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) ->
     return {}
 
 
-def _write_table(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _write_table(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Write a table document to an Excel workbook with pandas."""
     configured_path = inputs.get("path", parameters.get("path", "output_pandas.xlsx"))
     destination = Path(configured_path).expanduser()
@@ -215,7 +232,9 @@ WRITE_TABLE = NodeDefinition(
             "/path/to/output.xlsx",
             file_patterns=("*.xlsx",),
         ),
-        ParameterDefinition("sheet_name", ParameterKind.TEXT, "Sheet name", "Sheet1", "Sheet1_name"),
+        ParameterDefinition(
+            "sheet_name", ParameterKind.TEXT, "Sheet name", "Sheet1", "Sheet1_name"
+        ),
         ParameterDefinition("header", ParameterKind.BOOLEAN, "Header", True, port=False),
     ),
 )

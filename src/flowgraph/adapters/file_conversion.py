@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     ParameterOption,
@@ -221,7 +222,9 @@ except ImportError:
 
 
 def mesh_file_conversion(
-    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Convert a mesh while preserving the explicit reader/writer algorithm.
 

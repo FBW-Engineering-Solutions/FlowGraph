@@ -10,6 +10,7 @@ from flowgraph.adapters.data_types import (
     TABLE_DOCUMENT,
 )
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     ParameterOption,
@@ -18,7 +19,11 @@ from flowgraph.application.workflow_core import (
 )
 
 
-def _consume_mesh(_inputs: Mapping[str, Any], _parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _consume_mesh(
+    _inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Terminate a mesh branch; the application renders this resolved input."""
     return {}
 
@@ -69,7 +74,11 @@ SHOW_IMAGE = NodeDefinition(
 )
 
 
-def _consume_value(_inputs: Mapping[str, Any], _parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _consume_value(
+    _inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Terminate a value branch; the application renders the resolved input."""
     return {}
 

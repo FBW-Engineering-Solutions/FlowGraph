@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     PortDefinition,
@@ -13,7 +14,11 @@ from flowgraph.application.workflow_core import (
 from .data_types import ANY, ParameterKind
 
 
-def _workflow_input(inputs: Mapping[str, Any], _parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _workflow_input(
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Pass a supplied workflow input through to downstream nodes."""
     return {"value": inputs["value"]}
 
@@ -43,7 +48,9 @@ WORKFLOW_INPUT = NodeDefinition(
 
 
 def _workflow_output(
-    _inputs: Mapping[str, Any], _parameters: Mapping[str, Any]
+    _inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Pass a value through to the public workflow output."""
     return {"value": _inputs["value"]}

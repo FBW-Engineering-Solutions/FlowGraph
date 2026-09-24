@@ -9,6 +9,7 @@ from Muscat.MeshContainers.Mesh import Mesh
 from flowgraph.adapters.data_types import VEC3DSTR
 from flowgraph.adapters.readers import MESH_DOCUMENT, TABLE_DOCUMENT
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     PortDefinition,
@@ -20,7 +21,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 def create_mesh_from_table(
-    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     import numpy as np
 

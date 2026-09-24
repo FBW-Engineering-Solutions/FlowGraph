@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     NodeInstance,
     NodeRegistry,
@@ -23,6 +24,7 @@ def _aggregate_lists_to_table(
     _parameters: Mapping[str, Any],
     _registry: NodeRegistry,
     input_edges: Mapping[str, WorkflowEdge],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Create a table whose columns are named after connected source output ports."""
     table: dict[str, list[Any]] = {}
@@ -60,7 +62,7 @@ AGGREGATE_LISTS_TO_TABLE = NodeDefinition(
         ),
         PortDefinition("table", PortDirection.OUTPUT, TABLE_DOCUMENT, "Table"),
     ),
-    executor=lambda _inputs, _parameters: {},
+    executor=lambda _inputs, _parameters, _exec_context: {},
     edge_aware_instance_executor=_aggregate_lists_to_table,
 )
 

@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     PortDefinition,
@@ -15,7 +16,11 @@ from flowgraph.application.workflow_core import (
 from .data_types import FLOAT, INTEGER, LIST_FLOAT, LIST_INT, LIST_STR, STRING, VEC3D, ParameterKind
 
 
-def _set_string(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _set_string(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Output the configured string value, including an empty string."""
     value = parameters.get("value", "")
     if not isinstance(value, str):
@@ -34,7 +39,11 @@ SET_STRING = NodeDefinition(
 )
 
 
-def _set_int(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _set_int(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Output the configured integer value without accepting booleans."""
     value = parameters.get("value", 0)
     if isinstance(value, bool) or not isinstance(value, int):
@@ -53,7 +62,11 @@ SET_INT = NodeDefinition(
 )
 
 
-def _set_float(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _set_float(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Output the configured finite floating-point value."""
     value = parameters.get("value", 0.0)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -75,7 +88,11 @@ SET_FLOAT = NodeDefinition(
 )
 
 
-def _set_vec3d(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _set_vec3d(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Output a configured finite three-dimensional vector."""
     components = tuple(parameters.get(axis, 0.0) for axis in ("x", "y", "z"))
     if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in components):
@@ -114,7 +131,11 @@ def _parse_list_parameter(parameters: Mapping[str, Any]) -> list[Any]:
     return value
 
 
-def _set_str_list(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _set_str_list(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Output a configured list of strings."""
     value = _parse_list_parameter(parameters)
     if any(not isinstance(item, str) for item in value):
@@ -135,7 +156,11 @@ SET_LIST_STR = NodeDefinition(
 )
 
 
-def _set_int_list(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _set_int_list(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Output a configured list of integers."""
     value = _parse_list_parameter(parameters)
     if any(isinstance(item, bool) or not isinstance(item, int) for item in value):
@@ -154,7 +179,11 @@ SET_LIST_INT = NodeDefinition(
 )
 
 
-def _set_float_list(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _set_float_list(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Output a configured finite list of floating-point values."""
     value = _parse_list_parameter(parameters)
     if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in value):

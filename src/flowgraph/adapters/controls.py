@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     PortDefinition,
@@ -51,7 +52,11 @@ def _slider_bounds(
     return minimum, maximum, value
 
 
-def _float_slider(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _float_slider(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Output the current finite floating-point slider value."""
     return {"value": _slider_bounds(parameters, integer=False)[2]}
 
@@ -72,7 +77,11 @@ FLOAT_SLIDER = NodeDefinition(
 )
 
 
-def _int_slider(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _int_slider(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Output the current integer slider value."""
     return {"value": _slider_bounds(parameters, integer=True)[2]}
 

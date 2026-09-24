@@ -17,6 +17,7 @@ from scipy.spatial import Delaunay
 
 from flowgraph.adapters.data_types import ANY, MESH_DOCUMENT, MUSCAT_ELEMENT_FILTER, TRANSFORM_T
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     ParameterOption,
@@ -28,7 +29,11 @@ from flowgraph.domain.mesh_document import MeshDocument
 from .data_types import ParameterKind
 
 
-def _transform_mesh(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _transform_mesh(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Build a :class:`Muscat.LinAlg.Transform.Transform` from node parameters."""
     res = Transform()
     res.keepNormalized = parameters.get("keepNormalized", True)
@@ -40,7 +45,11 @@ def _transform_mesh(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -
     return {"Transform": res}
 
 
-def _apply_transform(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _apply_transform(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Apply a Muscat transform to a mesh document without mutating its input."""
     document: MeshDocument = inputs["mesh"]
     transform: Transform = inputs["Transform"]
@@ -67,7 +76,11 @@ def _apply_transform(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -
     return {"mesh": transformed_document}
 
 
-def _delaunay_3d(inputs: Mapping[str, Any], _parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _delaunay_3d(
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Tetrahedralize a document's points while preserving node metadata."""
     source = inputs["meshDocument"]
     points = np.asarray(source.mesh.nodes)
@@ -82,7 +95,11 @@ def _delaunay_3d(inputs: Mapping[str, Any], _parameters: Mapping[str, Any]) -> M
     return {"meshDocument": MeshDocument(mesh)}
 
 
-def _quad_to_lin(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _quad_to_lin(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Convert a quadratic mesh document to a linear mesh document."""
     input_document: MeshDocument = inputs["inputMesh"]
     mesh = QuadToLin(
@@ -105,12 +122,16 @@ def _parse_remesh_options(value: Any) -> dict[str, Any]:
     return parsed
 
 
-def _remesh(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _remesh(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Remesh a document with Muscat and return a new canonical mesh document."""
     source: MeshDocument = inputs["mesh"]
     remeshed = MuscatRemesh(
         mesh=source.mesh.View(),
-        levelset=inputs.get("levelset", source.mesh.nodeFields.get("levelset", None) ),
+        levelset=inputs.get("levelset", source.mesh.nodeFields.get("levelset", None)),
         solution=inputs.get("solution", source.mesh.nodeFields.get("solution", None)),
         metric=inputs.get("metric", source.mesh.nodeFields.get("metric", None)),
         remesher_options=_parse_remesh_options(parameters.get("remesherOptions", "{}")),
@@ -199,7 +220,11 @@ def _remove_tag(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Map
     return {"mesh": document}
 
 
-def _create_tag(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _create_tag(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Create a tag containing the entities selected by an element filter."""
     document = _copy_document(inputs["mesh"])
     name = _validate_tag_name(parameters.get("tagName"), "tagName")

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     PortDefinition,
@@ -130,7 +131,11 @@ def _get_path(model: object, path: str) -> Any:
         raise ValueError(f"CoSApp output path {path!r} does not exist") from error
 
 
-def _execute_cosapp(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _execute_cosapp(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Construct, configure, execute, and export one CoSApp model instance."""
     input_paths = _path_mapping(parameters.get("inputs", "{}"), "inputs")
     output_paths = _path_mapping(parameters.get("outputs", "{}"), "outputs")

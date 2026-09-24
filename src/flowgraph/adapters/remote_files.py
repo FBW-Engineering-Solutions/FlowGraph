@@ -13,6 +13,7 @@ from urllib.request import urlopen
 
 from flowgraph.adapters.data_types import STRING, ParameterKind
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     PortDefinition,
@@ -72,7 +73,11 @@ def _url_suffix(url: str) -> str:
     return suffix if suffix and len(suffix) <= 20 else ".bin"
 
 
-def _download_url(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _download_url(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Download the configured URL to a persistent file in the system temporary directory."""
     url = parameters.get("url", "")
     if not isinstance(url, str) or not url.strip():

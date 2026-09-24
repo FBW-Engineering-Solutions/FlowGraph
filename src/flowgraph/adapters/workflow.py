@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     NodeInstance,
     NodeRegistry,
@@ -48,16 +49,20 @@ def _execute_workflow(
     inputs: Mapping[str, Any],
     _parameters: Mapping[str, Any],
     registry: NodeRegistry,
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Execute the child graph with values supplied to its public inputs."""
+    context = _exec_context or ExecContext()
     graph = instance.subworkflow
     if graph is None:
         raise ValueError("The nested workflow is not initialized")
     graph.sync_boundary_nodes(registry)
     injected = {port.node_id: {port.node_port: inputs[port.name]} for port in graph.inputs}
-    nested_result: WorkflowRunResult = WorkflowExecutor(registry).run(
-        graph, initial_inputs=injected
-    )
+    nested_result: WorkflowRunResult = WorkflowExecutor(
+        registry,
+        parallel_tasks=context.parallel_tasks,
+        gpu_available=context.gpu_available,
+    ).run(graph, initial_inputs=injected)
     outputs = {
         port.name: nested_result.node_outputs[port.node_id][port.node_port]
         for port in graph.outputs
@@ -102,12 +107,14 @@ def _execute_batch_workflow(
     inputs: Mapping[str, Any],
     _parameters: Mapping[str, Any],
     registry: NodeRegistry,
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Execute a child graph for each list entry and aggregate its public outputs.
 
     Lists define the batch dimension and must all have the same length. Scalar
     inputs broadcast to every child execution.
     """
+    context = _exec_context or ExecContext()
     graph = instance.subworkflow
     if graph is None:
         raise ValueError("The nested workflow is not initialized")
@@ -123,7 +130,11 @@ def _execute_batch_workflow(
     batch_size = lengths.pop()
     results: list[WorkflowRunResult] = []
     outputs = {port.name: [] for port in graph.outputs}
-    executor = WorkflowExecutor(registry)
+    executor = WorkflowExecutor(
+        registry,
+        parallel_tasks=context.parallel_tasks,
+        gpu_available=context.gpu_available,
+    )
     for index in range(batch_size):
         injected = {
             port.node_id: {
@@ -151,7 +162,7 @@ RUN_WORKFLOW = NodeDefinition(
     label="Run Full Workflow",
     description="Executes and exports the inputs and outputs of an editable nested workflow.",
     ports=(RUN_WORKFLOW_PORTS),
-    executor=lambda _inputs, _parameters: {},
+    executor=lambda _inputs, _parameters, _exec_context: {},
     instance_port_resolver=_nested_ports,
     instance_executor=_execute_workflow,
     subworkflow_factory=_empty_workflow,
@@ -164,7 +175,7 @@ BATCH_WORKFLOW = NodeDefinition(
     label="Batch Workflow",
     description="Executes an editable nested workflow once for each list entry.",
     ports=(BATCH_WORKFLOW_PORTS),
-    executor=lambda _inputs, _parameters: {},
+    executor=lambda _inputs, _parameters, _exec_context: {},
     instance_port_resolver=_batch_ports,
     instance_executor=_execute_batch_workflow,
     subworkflow_factory=_empty_workflow,

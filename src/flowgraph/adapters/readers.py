@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     PortDefinition,
@@ -58,7 +59,11 @@ def _validate_table_source(inputs: Mapping[str, Any], parameters: Mapping[str, A
     return source
 
 
-def _load_muscat(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _load_muscat(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Load *source* with Muscat's extension-aware universal mesh reader.
 
     The returned :class:`~flowgraph.domain.mesh_document.MeshDocument` is the
@@ -90,7 +95,11 @@ def _load_muscat(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Ma
     return {"mesh": MeshDocument(mesh=mesh)}
 
 
-def _load_meshio(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _load_meshio(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Load *source* with meshio and convert it through Muscat's bridge."""
     source = _validate_source(inputs, parameters, "meshio")
 
@@ -113,7 +122,11 @@ def _load_meshio(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Ma
     return {"mesh": MeshDocument(mesh=mesh)}
 
 
-def _load_meshlane(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _load_meshlane(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Load *source* with the optional MeshLane adapter."""
     source = _validate_source(inputs, parameters, "MeshLane")
 
@@ -148,7 +161,11 @@ def _load_meshlane(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> 
     return {"mesh": MeshDocument(mesh=mesh)}
 
 
-def load_csv(inputs: Mapping[str, Any], _parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def load_csv(
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """
     Load a CSV file and return a dictionary where the keys are column names and the values are numpy arrays.
 
@@ -171,7 +188,11 @@ def load_csv(inputs: Mapping[str, Any], _parameters: Mapping[str, Any]) -> Mappi
     return {"table": data_dict}
 
 
-def _read_table(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _read_table(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Read an Excel workbook into the canonical table-document mapping."""
     source = _validate_table_source(inputs, parameters)
     sheet_name = parameters.get("sheet_name", "Sheet1")

@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     NodeInstance,
     ParameterDefinition,
@@ -137,7 +138,9 @@ def _ports_for_instance(instance: NodeInstance) -> tuple[PortDefinition, ...]:
 
 
 def _execute_user_code(
-    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Compile and run the user's ``Execute`` function in a trusted local namespace."""
     code = parameters.get("code", DEFAULT_CODE)

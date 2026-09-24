@@ -10,6 +10,7 @@ from Muscat.MeshTools.MeshInspectionTools import ExtractElementsByElementFilter
 
 from flowgraph.adapters.readers import MESH_DOCUMENT
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     ParameterOption,
@@ -48,7 +49,9 @@ def _tag_list(parameters: Mapping[str, Any], name: str) -> list[str]:
 
 
 def _create_element_filter(
-    _inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Create a Muscat element filter from JSON-serializable selections."""
     raw_dimensions = _parameter_list(parameters, "dimensionality")
@@ -136,7 +139,11 @@ CREATE_MUSCAT_ELEMENT_FILTER = NodeDefinition(
 )
 
 
-def _filter_mesh(inputs: Mapping[str, Any], _parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _filter_mesh(
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Extract the elements selected by a Muscat filter into a new document."""
     document: MeshDocument = inputs["mesh"]
     element_filter: ElementFilter | FilterOperatorBase = inputs["filter"]

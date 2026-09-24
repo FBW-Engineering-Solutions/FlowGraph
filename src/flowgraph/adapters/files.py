@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeDefinition,
     ParameterDefinition,
     PortDefinition,
@@ -15,7 +16,11 @@ from flowgraph.application.workflow_core import (
 from .data_types import LIST_STR, STRING, ParameterKind
 
 
-def _select_file(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+def _select_file(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
     """Output the configured local file path."""
     path = parameters.get("path", "")
     if not isinstance(path, str):
@@ -46,7 +51,9 @@ SELECT_FILE = NodeDefinition(
 
 
 def _select_server_file(
-    _inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """Output the configured uploaded-file path."""
     path = parameters.get("file name", "")
@@ -114,7 +121,9 @@ def _compile_filename_patterns(
 
 
 def _read_directory_files(
-    inputs: Mapping[str, Any], parameters: Mapping[str, Any]
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
     """List immediate regular-file names in a directory after regex filtering."""
     directory = Path(inputs.get("path", parameters.get("path", ""))).expanduser()
