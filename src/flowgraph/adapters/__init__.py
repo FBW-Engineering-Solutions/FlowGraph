@@ -26,6 +26,7 @@ from flowgraph.adapters.readers import (
     LOAD_MESHIO,
     LOAD_MESHLANE,
     LOAD_MUSCAT,
+    READ_TABLE,
 )
 from flowgraph.adapters.remote_files import DOWNLOAD_URL
 from flowgraph.adapters.simple_sources import (
@@ -109,7 +110,7 @@ ADAPTERS = AdapterCatalog(
             subgroups=(
                 AdapterGroup(
                     "Readers",
-                    (LOAD_MUSCAT, LOAD_MESHIO, LOAD_MESHLANE, LOAD_CSV),
+                    (LOAD_MUSCAT, LOAD_MESHIO, LOAD_MESHLANE, LOAD_CSV, READ_TABLE),
                 ),
                 AdapterGroup("Mesh Gens", (CSV_TO_MESH,)),
                 AdapterGroup("Mesh Creation", MESH_CREATION_AVAILABLE_NODES),

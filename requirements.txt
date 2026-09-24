@@ -8,3 +8,4 @@ pandas
 h5py
 numpy>=1.24
 pillow>=10.0
+openpyxl>=3.1.5

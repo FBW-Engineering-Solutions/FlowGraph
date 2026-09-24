@@ -25,6 +25,10 @@ class MeshLoadError(RuntimeError):
     """Raised when a selected mesh cannot be loaded by a reader adapter."""
 
 
+class TableReadError(RuntimeError):
+    """Raised when a table document cannot be read by a reader adapter."""
+
+
 def _validate_source(
     inputs: Mapping[str, Any], parameters: Mapping[str, Any], reader_name: str
 ) -> Path:
@@ -41,6 +45,16 @@ def _validate_source(
         raise MeshLoadError(
             f"Mesh file has no extension; {reader_name} cannot select a reader: {source}"
         )
+    return source
+
+
+def _validate_table_source(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Path:
+    """Return a usable table source path or raise a table-specific error."""
+    configured_path = inputs.get("path", parameters.get("path", ""))
+    source = Path(configured_path).expanduser()
+
+    if not source.is_file():
+        raise TableReadError(f"Table file does not exist or is not a file: {source}")
     return source
 
 
@@ -157,6 +171,24 @@ def load_csv(inputs: Mapping[str, Any], _parameters: Mapping[str, Any]) -> Mappi
     return {"table": data_dict}
 
 
+def _read_table(inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Read an Excel workbook into the canonical table-document mapping."""
+    source = _validate_table_source(inputs, parameters)
+    sheet_name = parameters.get("sheet_name", "Sheet1")
+
+    try:
+        import pandas as pd
+
+        dataframe = pd.read_excel(source, sheet_name=sheet_name)
+        data = dataframe.to_dict(orient="list")
+    except Exception as error:
+        LOGGER.exception("Pandas failed while reading %s", source)
+        raise TableReadError(f"Pandas could not read '{source}': {error}") from error
+
+    LOGGER.info("Pandas read table document from %s", source.resolve())
+    return {"data": data}
+
+
 LOAD_MUSCAT = NodeDefinition(
     id="load-muscat",
     icon="/__flowgraph_ui/LOAD_MUSCAT.svg",
@@ -212,4 +244,27 @@ LOAD_CSV = NodeDefinition(
         PortDefinition("table", PortDirection.OUTPUT, TABLE_DOCUMENT, "Table"),
     ),
     executor=load_csv,
+)
+
+
+READ_TABLE = NodeDefinition(
+    id="read-table",
+    icon="mdi-file-table-outline",
+    label="Read Table (Pandas)",
+    description="Reads an Excel workbook into a table document with pandas.",
+    ports=(PortDefinition("data", PortDirection.OUTPUT, TABLE_DOCUMENT, "Data"),),
+    executor=_read_table,
+    parameters=(
+        ParameterDefinition(
+            "path",
+            ParameterKind.FILE,
+            "File path",
+            "input_pandas.xlsx",
+            "/path/to/input.xlsx",
+            file_patterns=("*.xlsx",),
+        ),
+        ParameterDefinition(
+            "sheet_name", ParameterKind.TEXT, "Sheet name", "Sheet1", "Sheet1_name"
+        ),
+    ),
 )

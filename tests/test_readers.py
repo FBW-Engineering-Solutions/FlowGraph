@@ -6,11 +6,13 @@ import meshio
 import pytest
 
 from flowgraph.adapters import ADAPTERS
-from flowgraph.adapters.data_types import FILE, LIST_STR
+from flowgraph.adapters.data_types import FILE, LIST_STR, TABLE_DOCUMENT
 from flowgraph.adapters.files import READ_DIRECTORY_FILES, DirectoryReadError
 from flowgraph.adapters.readers import (
     LOAD_MESHIO,
     LOAD_MESHLANE,
+    READ_TABLE,
+    TableReadError,
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
@@ -30,6 +32,46 @@ def test_load_meshio_converts_mesh_through_muscat_bridge(tmp_path: Path) -> None
     assert isinstance(document, MeshDocument)
     assert document.mesh.GetNumberOfNodes() == 3
     assert document.mesh.GetNumberOfElements() == 1
+
+
+def test_read_table_reads_an_excel_workbook(tmp_path: Path) -> None:
+    import pandas as pd
+
+    source = tmp_path / "input.xlsx"
+    pd.DataFrame({"name": ["Ada", "Grace"], "age": [36, 28]}).to_excel(
+        source, index=False, sheet_name="Employees"
+    )
+
+    outputs = READ_TABLE.executor({}, {"path": source, "sheet_name": "Employees"})
+
+    assert outputs == {"data": {"name": ["Ada", "Grace"], "age": [36, 28]}}
+
+
+def test_read_table_uses_default_sheet_name(tmp_path: Path) -> None:
+    import pandas as pd
+
+    source = tmp_path / "input.xlsx"
+    pd.DataFrame({"name": ["Ada"], "age": [36]}).to_excel(source, index=False)
+
+    outputs = READ_TABLE.executor({}, {"path": source})
+
+    assert outputs == {"data": {"name": ["Ada"], "age": [36]}}
+
+
+def test_read_table_rejects_missing_source(tmp_path: Path) -> None:
+    with pytest.raises(TableReadError, match="does not exist or is not a file"):
+        READ_TABLE.executor({}, {"path": tmp_path / "missing.xlsx"})
+
+
+def test_read_table_exposes_symmetric_table_configuration() -> None:
+    assert ADAPTERS.require("read-table") is READ_TABLE
+    assert READ_TABLE.output("data").data_type is TABLE_DOCUMENT
+    assert [
+        (parameter.name, parameter.default, parameter.port) for parameter in READ_TABLE.parameters
+    ] == [
+        ("path", "input_pandas.xlsx", True),
+        ("sheet_name", "Sheet1", True),
+    ]
 
 
 def test_load_meshio_uses_configured_path_parameter_when_unconnected(tmp_path: Path) -> None:
