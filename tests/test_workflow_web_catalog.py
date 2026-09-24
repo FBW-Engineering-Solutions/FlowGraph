@@ -76,3 +76,23 @@ def test_workflow_web_catalog_exports_expandable_port_capacity() -> None:
             "expandable": 0,
         },
     ]
+
+
+def test_workflow_web_catalog_exports_plot_table_sink() -> None:
+    nodes = _nodes(workflow_web_catalog()["groups"])
+    plot_table = next(node for node in nodes if node["id"] == "plot-table")
+
+    assert plot_table["label"] == "Plot Table"
+    assert plot_table["presentation"] == "plot-table"
+    assert plot_table["ports"] == [
+        {
+            "name": "table",
+            "label": "Table",
+            "direction": "input",
+            "data_type_id": "table-document",
+            "data_type_label": "Table",
+            "required": True,
+            "is_param": False,
+            "expandable": 0,
+        },
+    ]

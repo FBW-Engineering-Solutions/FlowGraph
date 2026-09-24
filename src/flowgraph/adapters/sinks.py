@@ -1,7 +1,14 @@
 from collections.abc import Mapping
 from typing import Any
 
-from flowgraph.adapters.data_types import ANY, BOOLEAN, IMAGE, MESH_DOCUMENT, STRING
+from flowgraph.adapters.data_types import (
+    ANY,
+    BOOLEAN,
+    IMAGE,
+    MESH_DOCUMENT,
+    STRING,
+    TABLE_DOCUMENT,
+)
 from flowgraph.application.workflow_core import (
     NodeDefinition,
     ParameterDefinition,
@@ -77,4 +84,15 @@ DISPLAY_VALUE = NodeDefinition(
     presentation="value",
 )
 
-AVAILABLE_NODES = (TO_3D_VIEW, SHOW_IMAGE, DISPLAY_VALUE)
+PLOT_TABLE = NodeDefinition(
+    id="plot-table",
+    icon="mdi-chart-line",
+    label="Plot Table",
+    description="Plots numeric table columns in the workflow view.",
+    ports=(PortDefinition("table", PortDirection.INPUT, TABLE_DOCUMENT, "Table"),),
+    executor=_consume_value,
+    presentation="plot-table",
+)
+
+
+AVAILABLE_NODES = (TO_3D_VIEW, SHOW_IMAGE, DISPLAY_VALUE, PLOT_TABLE)
