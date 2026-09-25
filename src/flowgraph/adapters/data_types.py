@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 from Muscat.LinAlg.Transform import Transform
 from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter
@@ -5,6 +7,7 @@ from Muscat.MeshContainers.Filters.FilterOperators import FilterOperatorBase
 from PIL.Image import Image
 
 from flowgraph.application.workflow_core import DataType
+from flowgraph.domain.filepath import FilePath
 from flowgraph.domain.mesh_document import MeshDocument
 
 ANY = DataType("any", "Any", object)
@@ -17,7 +20,9 @@ LIST_STR = DataType("list[str]", "List Text", list[str])
 LIST_INT = DataType("list[int]", "List Ints", list[int])
 LIST_FLOAT = DataType("list[float]", "List Floats", list[float])
 LIST_ANY = DataType("list[any]", "List Any", list)
-FILE = DataType("filename", "Path", str)
+FILE = DataType("filename", "FilePath", FilePath)
+
+DIRECTORY = DataType("dirname", "Path", Path)
 
 MESH_DOCUMENT = DataType("mesh-document", "Mesh document", MeshDocument)
 TABLE_DOCUMENT = DataType("table-document", "Table", dict)

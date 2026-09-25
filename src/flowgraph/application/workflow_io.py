@@ -19,6 +19,7 @@ from flowgraph.application.workflow_core import (
     WorkflowRunResult,
     WorkflowValidationError,
 )
+from flowgraph.domain.filepath import FilePath
 from flowgraph.resources import package_resource_path
 
 WORKFLOW_FORMAT = "flowgraph-workflow"
@@ -306,7 +307,9 @@ def _resolve_testdata_value(value: Any, testdata_root: Path) -> Any:
 
 
 def _serialize_testdata_value(value: Any, testdata_root: Path) -> Any:
-    """Replace packaged testdata paths with the portable ``{testdata}`` token."""
+    """Return a JSON-compatible value, replacing packaged paths with a token."""
+    if isinstance(value, FilePath):
+        return _serialize_testdata_value(str(value), testdata_root)
     if isinstance(value, str):
         path = Path(value).expanduser()
         try:

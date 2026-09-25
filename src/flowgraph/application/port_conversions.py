@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from flowgraph.adapters.data_types import IMAGE, IMAGEJ
+from flowgraph.adapters.data_types import FLOAT, IMAGE, IMAGEJ, INTEGER, STRING, VEC3D
 from flowgraph.application.workflow_core import DataType
+from flowgraph.domain.filepath import FilePath
 
 
 @dataclass(frozen=True)
@@ -34,8 +36,16 @@ FLOAT_TO_LIST_FLOAT = PortConversion(
     "float", "list[float]", "Float → list[float]", lambda value: [value]
 )
 
-PATH_TO_STR = PortConversion("filename", "string", "filename → Text", str)
-STR_TO_PATH = PortConversion("string", "filename", "Text → filename", str)
+# FILE_TO_PPATH = PortConversion("FilePath", "string", "FilePath → Text", str)
+# PPATH_TO_FILE = PortConversion("string", "FilePath", "Text → FilePath", File)
+
+
+FILE_TO_STR = PortConversion("filename", "string", "FilePath → Text", str)
+STR_TO_FILE = PortConversion("string", "filename", "Text → FilePath", FilePath)
+
+
+PATH_TO_STR = PortConversion("dirname", "string", "dirname → Text", str)
+STR_TO_PATH = PortConversion("string", "dirname", "Text → dirname", Path)
 
 VEC3D_TO_LIST = PortConversion(
     "VEC3D", "list[float]", "Tex3D Vector → list[float]", lambda x: list(x)
@@ -60,6 +70,8 @@ PORT_CONVERSIONS = (
     STR_TO_PATH,
     VEC3D_TO_LIST,
     PILLOW_TO_IMAGEJ,
+    FILE_TO_STR,
+    STR_TO_FILE,
 )
 
 
@@ -72,3 +84,25 @@ _CONVERSIONS_BY_TYPE_IDS = {
 def resolve_port_conversion(source: DataType[Any], target: DataType[Any]) -> PortConversion | None:
     """Return the explicitly registered conversion from *source* to *target*, if any."""
     return _CONVERSIONS_BY_TYPE_IDS.get((source.id, target.id))
+
+
+_SOURCE_DATA_TYPES = {
+    STRING.id: STRING,
+    INTEGER.id: INTEGER,
+    FLOAT.id: FLOAT,
+    VEC3D.id: VEC3D,
+    IMAGE.id: IMAGE,
+}
+
+
+def resolve_value_conversion(value: Any, target: DataType[Any]) -> PortConversion | None:
+    """Return a registered conversion for a runtime value and target type."""
+    if target.accepts(value):
+        return None
+    for conversion in PORT_CONVERSIONS:
+        if conversion.target_type_id != target.id:
+            continue
+        source = _SOURCE_DATA_TYPES.get(conversion.source_type_id)
+        if source is not None and source.accepts(value):
+            return conversion
+    return None

@@ -7,7 +7,7 @@ from Muscat.MeshContainers.ElementsContainers import StructuredElementsContainer
 from PIL import Image as PillowImage
 
 from flowgraph.adapters import ADAPTERS
-from flowgraph.adapters.data_types import BOOLEAN, FILE, FLOAT, IMAGE, IMAGEJ, INTEGER
+from flowgraph.adapters.data_types import BOOLEAN, FILE, FLOAT, IMAGE, IMAGEJ, INTEGER, FilePath
 from flowgraph.adapters.image_tools import (
     AVAILABLE_NODES,
     CONVERT_IMAGE_MODE,
@@ -407,6 +407,7 @@ def test_read_image_connects_to_image_to_mesh_in_a_workflow(tmp_path: Path) -> N
     graph.add_edge(WorkflowEdge("source-path", "value", "read", "path"), registry)
     graph.add_edge(WorkflowEdge("read", "image", "convert", "image"), registry)
 
+    print(graph.nodes[0])
     result = WorkflowExecutor(registry).run(graph)
     mesh = result.node_outputs["convert"]["mesh"].mesh
 
@@ -466,8 +467,8 @@ def test_image_file_parameter_ports_override_configured_paths(tmp_path: Path) ->
     result = WorkflowExecutor(registry).run(graph)
 
     assert destination.is_file()
-    assert result.node_inputs["read"] == {"path": str(source)}
+    assert result.node_inputs["read"] == {"path": FilePath(source)}
     assert result.node_inputs["write"] == {
         "image": result.node_outputs["read"]["image"],
-        "filename": str(destination),
+        "filename": FilePath(destination),
     }

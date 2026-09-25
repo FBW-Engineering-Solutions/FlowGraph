@@ -101,7 +101,7 @@ def test_cli_inspection_lists_disconnected_nodes_before_connected_tree() -> None
   (O) value - Any
    │
    │ (load-muscat)[mesh_loader] Read Mesh (Muscat)
-   └─(P) path - Path
+   └─(P) path - FilePath
      (O) mesh - Mesh document
       │
       │ (workflow-input)[output] Workflow Input
@@ -110,7 +110,7 @@ def test_cli_inspection_lists_disconnected_nodes_before_connected_tree() -> None
       │ (O) value - Any
       │  │
       │  │ (write-muscat)[mesh_writer] Write Mesh (Muscat)
-      │  └─(P) path - Path
+      │  └─(P) path - FilePath
       └────(I) mesh - Mesh document"""
     assert text.split("Workflow:\n", 1)[1] == expected_workflow
 
@@ -190,12 +190,12 @@ def test_cli_inspection_lists_shared_target_inputs_before_outputs() -> None:
   (O) path - Text
    │
    │ (read-image)[read-image_3] Read Image (Pillow)
-   └─(P) path - Path
+   └─(P) path - FilePath
      (O) image - Image
       │
       │ (float-slider)[float-slider_1] Float Slider
-      │ (P) min - Float: 0
-      │ (P) max - Float: 180
+      │ (P) min - Float: 0.0
+      │ (P) max - Float: 180.0
       │ (P) value - Float: 33.27
       │ (O) value - Float
       │  │

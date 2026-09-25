@@ -127,6 +127,39 @@ def test_definition_factory_creates_independent_configured_instances() -> None:
     assert source.default_parameters == {"settings": {"value": "default"}}
 
 
+def test_definition_factory_converts_parameter_values_to_declared_types() -> None:
+    configured = NodeDefinition(
+        id="configured",
+        icon="",
+        label="Configured",
+        ports=(),
+        executor=lambda _inputs, _parameters: {},
+        parameters=(ParameterDefinition("value", FLOAT, "Value", 1),),
+    )
+    overrides = {"value": 7}
+
+    instance = configured.create_instance("configured", parameters=overrides)
+
+    assert instance.parameters == {"value": 7.0}
+    assert overrides == {"value": 7}
+    assert configured.parameters[0].default == 1
+
+
+def test_definition_factory_preserves_values_already_matching_parameter_types() -> None:
+    configured = NodeDefinition(
+        id="configured",
+        icon="",
+        label="Configured",
+        ports=(),
+        executor=lambda _inputs, _parameters: {},
+        parameters=(ParameterDefinition("value", FLOAT, "Value", 1.0),),
+    )
+
+    instance = configured.create_instance("configured", parameters={"value": 2.5})
+
+    assert instance.parameters == {"value": 2.5}
+
+
 def test_registry_factory_delegates_to_registered_definition() -> None:
     source = definition("source", (port("value", PortDirection.OUTPUT),))
     registry = registry_with(source)

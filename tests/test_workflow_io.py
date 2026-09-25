@@ -184,6 +184,23 @@ def test_workflow_loader_resolves_testdata_paths_without_changing_json() -> None
     assert payload["nodes"][0]["parameters"]["path"] == "{testdata}/FlowGraph.stl"
 
 
+def test_workflow_export_serializes_typed_file_parameters_as_paths() -> None:
+    registry = create_node_registry()
+    workflow = WorkflowGraph(
+        [
+            registry.create_instance(
+                "read-image",
+                "source",
+                parameters={"path": "/tmp/input.png"},
+            )
+        ]
+    )
+
+    exported = workflow_to_dict(workflow)
+
+    assert exported["nodes"][0]["parameters"]["path"] == "/tmp/input.png"
+
+
 def test_workflow_export_replaces_packaged_testdata_paths_with_token() -> None:
     workflow = workflow_from_json(
         json.dumps(

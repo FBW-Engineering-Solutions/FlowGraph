@@ -16,7 +16,7 @@ from flowgraph.application.workflow_core import (
     PortDirection,
 )
 
-from .data_types import ANY, FILE, STRING
+from .data_types import ANY, FILE, STRING, FilePath
 
 COSAPP_RESULT_PORT = PortDefinition("result", PortDirection.OUTPUT, ANY, "CoSApp system")
 
@@ -70,8 +70,11 @@ def _validate_output_paths(output_paths: Mapping[str, str]) -> None:
 
 def _load_model(module_path: object, factory_name: object) -> Any:
     """Load and construct a root CoSApp ``System`` from a trusted Python file."""
-    if not isinstance(module_path, str) or not module_path.strip():
+    if isinstance(module_path, FilePath):
+        module_path = str(module_path)
+    if not module_path.strip():
         raise ValueError("The CoSApp model file must be a non-empty Python file path")
+
     if not isinstance(factory_name, str) or not factory_name.strip():
         raise ValueError("The CoSApp factory name must be a non-empty attribute name")
 

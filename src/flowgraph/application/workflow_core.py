@@ -359,6 +359,17 @@ class NodeDefinition:
         configured_parameters = deepcopy(dict(self.default_parameters))
         if parameters is not None:
             configured_parameters.update(deepcopy(dict(parameters)))
+
+        from flowgraph.application.port_conversions import resolve_value_conversion
+
+        for parameter in self.parameters:
+            if parameter.name not in configured_parameters:
+                continue
+            value = configured_parameters[parameter.name]
+            conversion = resolve_value_conversion(value, parameter.kind)
+            if conversion is not None:
+                configured_parameters[parameter.name] = conversion.convert(value)
+
         return NodeInstance(
             id=instance_id,
             definition_id=self.id,
