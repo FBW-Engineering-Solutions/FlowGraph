@@ -193,7 +193,7 @@ def _image_fluency_metrics(
         for weight, channel in zip(weights, channels)
     )
 
-    if _exec_context is None or  "symmetry_vertical" in _exec_context.connected_output_ports:
+    if _exec_context is None or "symmetry_vertical" in _exec_context.connected_output_ports:
         symmetry_vertical = sum(
             weight * _mirror_similarity(channel, "vertical", float(shift_range))
             for weight, channel in zip(weights, channels)

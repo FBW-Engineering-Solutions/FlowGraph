@@ -96,7 +96,6 @@ def test_image_fluency_metrics_returns_directional_symmetry_outputs() -> None:
     assert 0 <= result["symmetry_horizontal"] <= 1
 
 
-
 def test_image_fluency_metrics_can_execute_in_a_workflow() -> None:
     image = PillowImage.fromarray(np.tile(np.arange(32, dtype=np.uint8), (32, 1)), mode="L")
     node = IMAGE_FLUENCY_METRICS.create_instance("metrics")
