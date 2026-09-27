@@ -82,16 +82,22 @@ body {
   border-color: var(--flowgraph-doc-line);
 }
 
+@media (min-width: 76.25em) {
+  .md-grid {
+    max-width: 80rem;
+  }
+}
+
 .md-content__inner {
-  max-width: 960px;
+  max-width: 64rem;
   margin: 0 auto;
-  padding: 2.5rem clamp(1rem, 4vw, 3rem) 4rem;
+  padding: 2.5rem clamp(1rem, 2vw, 2rem) 4rem;
 }
 
 .md-content__inner > h1:first-child {
   margin-top: 0.5rem;
-  font-size: clamp(2.2rem, 5vw, 4.3rem);
-  line-height: 1.05;
+  font-size: clamp(1.9rem, 3vw, 3rem);
+  line-height: 1.15;
   letter-spacing: -0.055em;
 }
 
@@ -183,7 +189,7 @@ body {
   }
 
   .md-content__inner > h1:first-child {
-    font-size: 2rem;
+    font-size: 1.8rem;
   }
 }
 

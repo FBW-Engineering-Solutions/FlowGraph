@@ -76,6 +76,7 @@ behavior.
 
 ## Documentation and support
 
+- [FlowGraph documentation](https://flowgraph.readthedocs.io/en/latest/)
 - The website documentation lives in `doc/` (outside the Python package).
   To build the Read the Docs site locally, run
   `uv run --with zensical zensical build -f zensical.toml` from this repository.
