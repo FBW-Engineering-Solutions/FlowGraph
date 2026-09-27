@@ -1,0 +1,199 @@
+:root {
+  --flowgraph-doc-deep: #09111f;
+  --flowgraph-doc-panel: #101b2d;
+  --flowgraph-doc-line: #263852;
+  --flowgraph-doc-line-strong: #314661;
+  --flowgraph-doc-ink: #e8edf6;
+  --flowgraph-doc-cyan: #38bdf8;
+  --flowgraph-doc-teal: #22d3ee;
+  --md-primary-fg-color: #38bdf8;
+  --md-primary-fg-color--light: #7dd3fc;
+  --md-primary-fg-color--dark: #0ea5e9;
+  --md-accent-fg-color: #22d3ee;
+  --md-default-bg-color: #09111f;
+  --md-default-fg-color: #e8edf6;
+  --md-default-fg-color--light: #9eabc0;
+  --md-default-fg-color--lighter: #7488a3;
+  --md-default-fg-color--lightest: #263852;
+  --md-code-bg-color: #0e1829;
+  --md-code-fg-color: #d9e4f5;
+  --md-typeset-a-color: #38bdf8;
+}
+
+[data-md-color-scheme="default"] {
+  --md-default-bg-color: #f6f9fc;
+  --md-default-fg-color: #172235;
+  --md-default-fg-color--light: #52627a;
+  --md-default-fg-color--lighter: #71819a;
+  --md-default-fg-color--lightest: #d7e0eb;
+  --md-code-bg-color: #e9eff6;
+  --md-code-fg-color: #172235;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-hue: 215deg;
+  --md-default-bg-color: #09111f;
+  --md-default-bg-color--light: #101b2d;
+  --md-default-bg-color--lighter: #121f33;
+  --md-default-bg-color--lightest: #263852;
+  --md-code-bg-color: #0e1829;
+}
+
+body {
+  background-image: linear-gradient(rgb(38 56 82 / 12%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(38 56 82 / 12%) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.md-header {
+  background: rgb(9 17 31 / 94%);
+  border-bottom: 1px solid var(--flowgraph-doc-line);
+  backdrop-filter: blur(16px);
+}
+
+.md-tabs {
+  background: var(--flowgraph-doc-panel);
+  border-bottom: 1px solid var(--flowgraph-doc-line);
+}
+
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+}
+
+.md-header__title,
+.md-tabs__link,
+.md-nav__title {
+  font-weight: 700;
+}
+
+.md-main {
+  background: rgb(9 17 31 / 88%);
+}
+
+.md-sidebar__scrollwrap,
+.md-nav--primary .md-nav__title {
+  background: rgb(16 27 45 / 72%);
+}
+
+.md-sidebar {
+  border-color: var(--flowgraph-doc-line);
+}
+
+.md-content__inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2.5rem clamp(1rem, 4vw, 3rem) 4rem;
+}
+
+.md-content__inner > h1:first-child {
+  margin-top: 0.5rem;
+  font-size: clamp(2.2rem, 5vw, 4.3rem);
+  line-height: 1.05;
+  letter-spacing: -0.055em;
+}
+
+.md-content__inner > h1:first-child::before {
+  display: block;
+  margin-bottom: 1rem;
+  color: var(--flowgraph-doc-cyan);
+  content: "FLOWGRAPH DOCUMENTATION";
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.md-typeset h2 {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--flowgraph-doc-line);
+  color: var(--flowgraph-doc-ink);
+  letter-spacing: -0.025em;
+}
+
+.md-typeset h3 {
+  color: var(--flowgraph-doc-cyan);
+}
+
+.md-typeset a {
+  text-decoration-color: rgb(56 189 248 / 40%);
+  text-underline-offset: 0.18em;
+}
+
+.md-typeset a:hover {
+  color: var(--flowgraph-doc-teal);
+}
+
+.md-typeset code {
+  border: 1px solid var(--flowgraph-doc-line);
+  border-radius: 4px;
+}
+
+.md-typeset pre,
+.md-typeset .highlight {
+  border: 1px solid var(--flowgraph-doc-line-strong);
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 18%);
+}
+
+.md-typeset pre > code {
+  border: 0;
+}
+
+.md-typeset table:not([class]) {
+  display: table;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--flowgraph-doc-line);
+  border-radius: 8px;
+}
+
+.md-typeset table:not([class]) th {
+  color: var(--flowgraph-doc-ink);
+  background: var(--flowgraph-doc-panel);
+}
+
+.md-typeset blockquote,
+.md-typeset .admonition {
+  border-left-color: var(--flowgraph-doc-cyan);
+  background: rgb(16 27 45 / 78%);
+}
+
+.md-typeset img {
+  border: 1px solid var(--flowgraph-doc-line-strong);
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 20%);
+}
+
+.md-footer {
+  background: #070d17;
+  border-top: 1px solid var(--flowgraph-doc-line);
+}
+
+.md-top {
+  color: var(--flowgraph-doc-cyan);
+}
+
+@media (max-width: 680px) {
+  .md-content__inner {
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  .md-content__inner > h1:first-child {
+    font-size: 2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

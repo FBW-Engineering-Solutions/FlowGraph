@@ -76,6 +76,9 @@ behavior.
 
 ## Documentation and support
 
+- The website documentation lives in `doc/` (outside the Python package).
+  To build the Read the Docs site locally, run
+  `uv run --with zensical zensical build -f zensical.toml` from this repository.
 - [`Architecture`](docs/architecture.md) describes the core boundaries and workflow
   model.
 - [`Support Policy`](docs/policies/support-policy.md) describes supported environments and

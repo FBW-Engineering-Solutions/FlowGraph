@@ -1,0 +1,99 @@
+[project]
+site_name = "FlowGraph Documentation"
+site_description = "Build, validate, and execute typed workflows locally with FlowGraph."
+site_author = "FBW Engineering Solutions"
+site_dir = "site"
+docs_dir = "doc"
+repo_url = "https://github.com/FBW-Engineering-Solutions/FlowGraph_Public_Space"
+repo_name = "FlowGraph Public Space"
+copyright = "Copyright &copy; 2026 FBW Engineering Solutions"
+nav = [
+  { "Home" = "index.md" },
+  { "Getting Started" = [
+    { "Overview" = "getting-started/overview.md" },
+    { "Installation" = "getting-started/installation.md" },
+    { "First Project" = "getting-started/first-project.md" },
+  ] },
+  { "User Guide" = [
+    { "Interface" = "user-guide/interface.md" },
+    { "Importing Data" = "user-guide/importing-data.md" },
+    { "Workflows" = "user-guide/workflows.md" },
+    { "Visualization" = "user-guide/visualization.md" },
+    { "Troubleshooting" = "user-guide/troubleshooting.md" },
+  ] },
+  { "Reference" = [
+    { "Workflow Nodes" = "reference/nodes.md" },
+    { "Edge Conversions" = "reference/edge-conversions.md" },
+    { "Adapter Node Catalog" = "reference/adapters/index.md" },
+    { "Inputs" = "reference/adapters/inputs.md" },
+    { "Files" = "reference/adapters/file.md" },
+    { "Readers" = "reference/adapters/readers.md" },
+    { "Mesh Generation" = "reference/adapters/mesh-gens.md" },
+    { "Mesh Creation" = "reference/adapters/mesh-creation-tools.md" },
+    { "File Conversion" = "reference/adapters/file-conversion.md" },
+    { "Filters" = "reference/adapters/filters.md" },
+    { "Mesh Operations" = "reference/adapters/mesh-ops.md" },
+    { "Field Operations" = "reference/adapters/field-ops.md" },
+    { "Writers" = "reference/adapters/writers.md" },
+    { "Sinks" = "reference/adapters/sinks.md" },
+    { "Documentation Nodes" = "reference/adapters/doc.md" },
+    { "GUI Nodes" = "reference/adapters/gui.md" },
+    { "Controls" = "reference/adapters/controls.md" },
+    { "Image Tools" = "reference/adapters/image-tools.md" },
+    { "Table Tools" = "reference/adapters/table-tools.md" },
+    { "Workflow Nodes" = "reference/adapters/workflow.md" },
+    { "Code Nodes" = "reference/adapters/code.md" },
+    { "CoSApp" = "reference/adapters/cosapp.md" },
+    { "Plaid" = "reference/adapters/plaid.md" },
+    { "Keyboard Shortcuts" = "reference/shortcuts.md" },
+    { "Third-Party Notices" = "reference/third-party-notices.md" },
+  ] },
+]
+extra_css = ["_assets/stylesheets/extra.css"]
+
+[project.theme]
+language = "en"
+logo = "_assets/images/JF-Logo.svg"
+favicon = "_assets/images/JF-Logo.svg"
+features = [
+  "content.code.copy",
+  "content.code.select",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.path",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+  "toc.follow",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to light mode"
+
+[project.markdown_extensions]
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+tables = {}
+toc.permalink = true
+pymdownx.details = {}
+pymdownx.highlight.anchor_linenums = true
+pymdownx.highlight.line_spans = "__span"
+pymdownx.highlight.pygments_lang_class = true
+pymdownx.inlinehilite = {}
+pymdownx.magiclink = {}
+pymdownx.superfences = {}
+pymdownx.tabbed.alternate_style = true
+pymdownx.tasklist.custom_checkbox = true

@@ -83,3 +83,16 @@ pythonpath = [".", "src"]
 target-version = "py311"
 line-length = 100
 
+#[tool.uv.sources]
+#muscat = { git = "https://gitlab.com/drti/muscat.git", rev = "ParMmg" }
+##micromamba install -n uv_muscat_build_packages scotch mmgsuite=*=h* kokkos=*=h*
+## uv pip install ipywidgets
+## uv pip install jupyterlab
+##export OMP_PROC_BIND=spread
+##export OMP_PLACES=threads
+##LD_LIBRARY_PATH=/home/fbw/.local/share/mamba/envs/uv_muscat_build_packages/lib/ uv run jupyter lab
+
+#[tool.uv]
+#config-settings-package = {muscat = {"cmake.args" = ["-DCMAKE_PREFIX_PATH=/home/fbw/.local/share/mamba/envs/uv_muscat_build_packages/lib/cmake/",
+#"-DSCOTCH_ROOT=/home/fbw/.local/share/mamba/envs/uv_muscat_build_packages/"
+#]}}

@@ -5,6 +5,71 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+from flowgraph.adapters import ADAPTERS
+
+
+def test_website_documents_every_registered_adapter_node() -> None:
+    """Catch missing node IDs and adapter families in the website reference."""
+    root = Path(__file__).parents[1]
+    reference = root / "doc" / "reference" / "adapters"
+    pages = {
+        "Scalars": "inputs.md",
+        "Lists/Vectors": "inputs.md",
+        "Files": "file.md",
+        "Readers": "readers.md",
+        "Mesh Gens": "mesh-gens.md",
+        "Mesh Creation": "mesh-creation-tools.md",
+        "Filters": "filters.md",
+        "Mesh Ops": "mesh-ops.md",
+        "Field Ops": "field-ops.md",
+        "File Conversion": "file-conversion.md",
+        "Writers": "writers.md",
+        "Controls": "controls.md",
+        "Image Tools": "image-tools.md",
+        "Table Tools": "table-tools.md",
+        "Code": "code.md",
+        "Workflow": "workflow.md",
+        "Sinks": "sinks.md",
+        "Doc": "doc.md",
+        "CoSApp": "cosapp.md",
+        "Plaid": "plaid.md",
+    }
+    nav = tomllib.loads((root / "zensical.toml").read_text(encoding="utf-8"))
+    reference_nav = next(
+        entry["Reference"] for entry in nav["project"]["nav"] if "Reference" in entry
+    )
+    linked_pages = {path for entry in reference_nav for path in entry.values()}
+    assert all(f"reference/adapters/{page}" in linked_pages for page in pages.values())
+
+    missing = []
+    for group in ADAPTERS.groups:
+        for subgroup in group.subgroups or (group,):
+            page = reference / pages[subgroup.label]
+            markdown = page.read_text(encoding="utf-8")
+            for definition in subgroup.node_definitions:
+                # Composite workflow nodes are explained alongside their controls.
+                content = (
+                    (reference / "controls.md").read_text(encoding="utf-8")
+                    if definition.subworkflow_factory is not None
+                    else markdown
+                )
+                if f"`{definition.id}`" not in content:
+                    missing.append((subgroup.label, definition.id, page.name))
+    assert not missing, f"Undocumented adapter nodes: {missing}"
+
+
+def test_website_documentation_is_not_packaged_by_core() -> None:
+    """Keep the website source under doc/ and out of the Python distribution."""
+    root = Path(__file__).parents[1]
+    metadata = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    package_data = metadata["tool"]["setuptools"]["package-data"]["flowgraph"]
+
+    assert not any("documentation" in pattern for pattern in package_data)
+    assert not (root / "src" / "flowgraph" / "documentation_content").exists()
+    site = tomllib.loads((root / "zensical.toml").read_text(encoding="utf-8"))
+    assert root / site["project"]["docs_dir"] == root / "doc"
+    assert (root / "doc" / "index.md").is_file()
+
 
 def test_core_metadata_excludes_desktop_dependencies_and_entry_points() -> None:
     """Keep GUI dependencies out of the core distribution and publish BSD metadata."""
