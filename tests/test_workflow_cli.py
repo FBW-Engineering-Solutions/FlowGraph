@@ -9,9 +9,11 @@ import pytest
 
 from flowgraph.adapters.controls import FLOAT_SLIDER
 from flowgraph.adapters.image_tools import READ_IMAGE, ROTATE_IMAGE
+from flowgraph.adapters.imagej import IMAGEJ_SCRIPT, IMAGEJ_SCRIPT_FILE
 from flowgraph.adapters.remote_files import DOWNLOAD_URL
 from flowgraph.adapters.simple_sources import SET_STRING
 from flowgraph.adapters.sinks import SHOW_IMAGE
+from flowgraph.adapters.user_code import USER_FUNCTION
 from flowgraph.adapters.workflow import RUN_WORKFLOW
 from flowgraph.adapters.workflow_interfaces import WORKFLOW_INPUT, WORKFLOW_OUTPUT
 from flowgraph.application.node_registry import create_node_registry
@@ -66,6 +68,7 @@ def test_cli_assignment_parsers_decode_json_and_validate_shape() -> None:
 def test_cli_inspection_lists_public_interface_and_directed_edges() -> None:
     text = format_workflow_inspection(_published_workflow(), create_node_registry())
 
+    assert "Warning:" not in text
     assert "Inputs:\n  value: Any (input.value)" in text
     assert "Outputs:\n  result: Any (output.value)" in text
     assert "(workflow-input)[input] Workflow Input" in text
@@ -234,6 +237,42 @@ def test_cli_inspection_renders_nested_workflows() -> None:
     assert "(run-workflow)[nested] Run Full Workflow" in text
     assert "  subworkflow:" in text
     assert "    (set-string)[child-source] String Input" in text
+
+
+@pytest.mark.parametrize("definition", [IMAGEJ_SCRIPT, IMAGEJ_SCRIPT_FILE, USER_FUNCTION])
+def test_cli_inspection_warns_about_arbitrary_code(definition) -> None:
+    workflow = WorkflowGraph([definition.create_instance("code")])
+
+    text = format_workflow_inspection(workflow, create_node_registry())
+
+    assert "Warning: This workflow contains nodes that execute arbitrary code:" in text
+    assert f"  ({definition.id})[code] {definition.label}" in text
+    assert "Review and trust this code before running the workflow." in text
+    assert text.index("Warning:") < text.index("Workflow:")
+
+
+def test_cli_inspection_warns_about_nested_arbitrary_code_nodes() -> None:
+    child = WorkflowGraph([USER_FUNCTION.create_instance("python")])
+    composite = RUN_WORKFLOW.create_instance("nested")
+    composite.subworkflow = child
+    workflow = WorkflowGraph([IMAGEJ_SCRIPT.create_instance("groovy"), composite])
+
+    text = format_workflow_inspection(workflow, create_node_registry())
+
+    assert text.count("Warning:") == 1
+    assert "  (imagej-script)[groovy] ImageJ Groovy Script" in text
+    assert "  (user-function)[nested/python] User Function" in text
+
+
+def test_cli_inspect_command_warns_about_saved_arbitrary_code(tmp_path: Path, capsys) -> None:
+    path = tmp_path / "workflow.json"
+    save_workflow(WorkflowGraph([USER_FUNCTION.create_instance("python")]), path)
+
+    assert main(("inspect", str(path))) == 0
+    output = capsys.readouterr()
+    assert "Warning: This workflow contains nodes that execute arbitrary code:" in output.out
+    assert "  (user-function)[python] User Function" in output.out
+    assert output.err == ""
 
 
 def test_cli_execution_injects_published_inputs(tmp_path: Path) -> None:

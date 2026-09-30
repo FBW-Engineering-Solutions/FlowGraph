@@ -23,6 +23,9 @@ class WorkflowCliError(ValueError):
     """Raised when command-line workflow arguments or output cannot be handled."""
 
 
+_ARBITRARY_CODE_NODE_IDS = frozenset({"imagej-script", "imagej-script-file", "user-function"})
+
+
 def parse_assignment(value: str, *, option: str) -> tuple[str, Any]:
     """Parse a ``name=value`` command-line assignment.
 
@@ -102,12 +105,33 @@ def format_workflow_inspection(workflow: WorkflowGraph, registry: NodeRegistry) 
     else:
         lines.append("  (none)")
 
+    code_nodes = _arbitrary_code_nodes(workflow, registry)
+    if code_nodes:
+        lines.append("Warning: This workflow contains nodes that execute arbitrary code:")
+        lines.extend(f"  {node}" for node in code_nodes)
+        lines.append("  Review and trust this code before running the workflow.")
+
     lines.append("Workflow:")
     if not workflow.nodes:
         lines.append("  (empty)")
     else:
         lines.extend(_format_graph(workflow, registry, indent="  "))
     return "\n".join(lines)
+
+
+def _arbitrary_code_nodes(
+    workflow: WorkflowGraph, registry: NodeRegistry, *, prefix: str = ""
+) -> list[str]:
+    """List arbitrary-code nodes, including those inside nested workflows."""
+    found: list[str] = []
+    for node in workflow.nodes:
+        address = f"{prefix}{node.id}"
+        if node.definition_id in _ARBITRARY_CODE_NODE_IDS:
+            label = registry.require(node.definition_id).label
+            found.append(f"({node.definition_id})[{address}] {label}")
+        if node.subworkflow is not None:
+            found.extend(_arbitrary_code_nodes(node.subworkflow, registry, prefix=f"{address}/"))
+    return found
 
 
 def _format_graph(workflow: WorkflowGraph, registry: NodeRegistry, *, indent: str) -> list[str]:
