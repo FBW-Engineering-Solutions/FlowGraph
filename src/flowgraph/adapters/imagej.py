@@ -21,7 +21,13 @@ from flowgraph.domain.filepath import FilePath
 
 from .data_types import ANY, BOOLEAN, FILE, FLOAT, IMAGEJ, INTEGER, STRING, ParameterKind
 
-FIJI_VERSION = "sc.fiji:fiji:2.14.0"
+# Fiji's Scala and JavaScript scripting plugins need these runtimes on Java 21.
+# Pin the tested Fiji release so its transitive plugins remain compatible.
+FIJI_ENDPOINTS = (
+    "sc.fiji:fiji:2.18.0",
+    "org.scala-lang:scala-library:2.13.10",
+    "org.openjdk.nashorn:nashorn-core:15.7",
+)
 DEFAULT_CODE = """#@ Dataset image
 #@output Dataset result
 
@@ -134,7 +140,14 @@ def _execute_script(
     except ImportError as error:
         raise RuntimeError("ImageJ scripts require the optional pyimagej package") from error
 
-    ij = imagej.init(FIJI_VERSION, mode="headless")
+    import scyjava
+
+    # Fiji includes plugins compiled for Java 21. ScyJava otherwise
+    # downloads Java 11 by default, even when a newer system Java is installed.
+    if not scyjava.jvm_started():
+        scyjava.config.set_java_constraints(fetch="auto", version="21")
+
+    ij = imagej.init(list(FIJI_ENDPOINTS), mode="headless")
     args: dict[str, Any] = {}
     for port, declared_type in declarations:
         if port.direction is not PortDirection.INPUT or port.name not in inputs:

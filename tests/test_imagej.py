@@ -148,9 +148,61 @@ def test_script_executes_with_converted_inputs_and_named_outputs(
     assert result["title"] == "done"
 
 
-def assert_init(version: str, mode: str) -> None:
-    assert version == "sc.fiji:fiji:2.14.0"
+def assert_init(version: list[str], mode: str) -> None:
+    assert version == [
+        "sc.fiji:fiji:2.18.0",
+        "org.scala-lang:scala-library:2.13.10",
+        "org.openjdk.nashorn:nashorn-core:15.7",
+    ]
     assert mode == "headless"
+
+
+@pytest.mark.parametrize("already_started", [False, True])
+def test_imagej_selects_java_21_before_initialization(
+    monkeypatch: pytest.MonkeyPatch, already_started: bool
+) -> None:
+    calls: list[tuple[object, ...]] = []
+    monkeypatch.setitem(
+        sys.modules,
+        "scyjava",
+        SimpleNamespace(
+            jvm_started=lambda: already_started,
+            config=SimpleNamespace(
+                set_java_constraints=lambda **kwargs: calls.append(("constraints", kwargs))
+            ),
+        ),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "imagej",
+        SimpleNamespace(
+            init=lambda version, mode: (
+                calls.append(("init", version, mode)),
+                SimpleNamespace(
+                    py=SimpleNamespace(
+                        run_script=lambda *_args: {"status": "ok"}, from_java=lambda value: value
+                    )
+                ),
+            )[1]
+        ),
+    )
+
+    assert IMAGEJ_SCRIPT.executor({}, {"code": "#@output String status\nstatus = 'ok'"}) == {
+        "status": "ok"
+    }
+    assert calls == (
+        [("constraints", {"fetch": "auto", "version": "21"})] if not already_started else []
+    ) + [
+        (
+            "init",
+            [
+                "sc.fiji:fiji:2.18.0",
+                "org.scala-lang:scala-library:2.13.10",
+                "org.openjdk.nashorn:nashorn-core:15.7",
+            ],
+            "headless",
+        )
+    ]
 
 
 def test_missing_declared_output_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
