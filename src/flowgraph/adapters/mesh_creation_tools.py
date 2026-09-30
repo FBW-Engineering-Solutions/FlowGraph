@@ -241,6 +241,7 @@ def _mesh_input_output(input_name: str, output_name: str = "mesh") -> tuple[Port
 
 CREATE_UNIFORM_MESH_OF_BARS_NODE = NodeDefinition(
     id="create-uniform-mesh-of-bars",
+    requirements=("py:muscat",),
     icon="mdi-vector-line",
     label="Create Uniform Mesh Of Bars",
     description="Create a uniform Muscat mesh of bars.",
@@ -258,6 +259,7 @@ CREATE_UNIFORM_MESH_OF_BARS_NODE = NodeDefinition(
 
 CREATE_MESH_OF_TRIANGLES_NODE = NodeDefinition(
     id="create-mesh-of-triangles",
+    requirements=("py:muscat",),
     icon="mdi-triangle-outline",
     label="Create Mesh Of Triangles",
     description="Create a Muscat triangular mesh from points and connectivity.",
@@ -271,6 +273,7 @@ CREATE_MESH_OF_TRIANGLES_NODE = NodeDefinition(
 
 CREATE_MESH_OF_NODE = NodeDefinition(
     id="create-mesh-of",
+    requirements=("py:muscat",),
     icon="mdi-shape-outline",
     label="Create Mesh Of",
     description="Create a homogeneous Muscat mesh from points and connectivity.",
@@ -293,6 +296,7 @@ CREATE_MESH_OF_NODE = NodeDefinition(
 
 CREATE_SQUARE_NODE = NodeDefinition(
     id="create-square",
+    requirements=("py:muscat",),
     icon="mdi-grid",
     label="Create Square",
     description="Create a structured Muscat square mesh.",
@@ -310,6 +314,7 @@ CREATE_SQUARE_NODE = NodeDefinition(
 
 CREATE_DISK_NODE = NodeDefinition(
     id="create-disk",
+    requirements=("py:muscat",),
     icon="mdi-circle-outline",
     label="Create Disk",
     description="Create a structured Muscat disk-sector mesh.",
@@ -330,6 +335,7 @@ CREATE_DISK_NODE = NodeDefinition(
 
 CREATE_CUBE_NODE = NodeDefinition(
     id="create-cube",
+    requirements=("py:muscat",),
     icon="mdi-cube-outline",
     label="Create Cube",
     description="Create a structured Muscat cube mesh.",
@@ -345,6 +351,7 @@ CREATE_CUBE_NODE = NodeDefinition(
 
 CREATE_MESH_FROM_CELLS_DICT_NODE = NodeDefinition(
     id="create-mesh-from-cells-dict",
+    requirements=("py:muscat",),
     icon="mdi-code-braces-box",
     label="Create Mesh From Cells Dict",
     description="Create a Muscat mesh from points and a dictionary of cells.",
@@ -371,6 +378,7 @@ CREATE_MESH_FROM_CELLS_DICT_NODE = NodeDefinition(
 
 MESH_TO_SIMPLEX_NODE = NodeDefinition(
     id="mesh-to-simplex",
+    requirements=("py:muscat",),
     icon="mdi-vector-triangle",
     label="Mesh To Simplex",
     description="Convert a Muscat mesh to simplex elements.",
@@ -380,6 +388,7 @@ MESH_TO_SIMPLEX_NODE = NodeDefinition(
 
 TO_QUADRATIC_MESH_NODE = NodeDefinition(
     id="to-quadratic-mesh",
+    requirements=("py:muscat",),
     icon="mdi-vector-square-plus",
     label="To Quadratic Mesh",
     description="Convert a linear Muscat mesh to quadratic elements.",
@@ -389,6 +398,7 @@ TO_QUADRATIC_MESH_NODE = NodeDefinition(
 
 QUAD_TO_LIN_CREATION_NODE = NodeDefinition(
     id="quad-to-lin-creation",
+    requirements=("py:muscat",),
     icon="mdi-vector-square-remove",
     label="To Linear Mesh",
     description="Convert a quadratic Muscat mesh to linear elements.",
@@ -414,6 +424,7 @@ QUAD_TO_LIN_CREATION_NODE = NodeDefinition(
 
 MIRROR_MESH_NODE = NodeDefinition(
     id="mirror-mesh",
+    requirements=("py:muscat",),
     icon="mdi-mirror-rectangle",
     label="Mirror Mesh",
     description="Create a mirrored copy of a Muscat mesh across selected planes.",
@@ -435,6 +446,7 @@ MIRROR_MESH_NODE = NodeDefinition(
 
 CREATE_0D_ELEMENTS_NODE = NodeDefinition(
     id="create-0d-elements-for-every-point",
+    requirements=("py:muscat",),
     icon="mdi-vector-point",
     label="Create 0D Elements For Every Point",
     description="Create a Muscat point-element container for every mesh point.",
@@ -447,6 +459,7 @@ CREATE_0D_ELEMENTS_NODE = NodeDefinition(
 
 SUBDIVIDE_MESH_NODE = NodeDefinition(
     id="subdivide-mesh",
+    requirements=("py:muscat",),
     icon="mdi-vector-split",
     label="Subdivide Mesh",
     description="Subdivide a Muscat mesh one or more times.",

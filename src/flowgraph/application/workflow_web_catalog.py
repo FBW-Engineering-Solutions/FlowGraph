@@ -84,6 +84,7 @@ def _node_to_dict(definition: NodeDefinition) -> dict[str, Any]:
         "description": definition.description,
         "color": definition.color,
         "presentation": definition.presentation,
+        "requirements": list(definition.requirements),
         "ports": [_port_to_dict(port) for port in definition.ports],
         "parameters": [_parameter_to_dict(parameter) for parameter in definition.parameters],
         "creates_subworkflow": definition.subworkflow_factory is not None,

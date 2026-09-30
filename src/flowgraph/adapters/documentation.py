@@ -5,6 +5,7 @@ from flowgraph.application.workflow_core import NodeDefinition, ParameterDefinit
 
 DOC_TITLE = NodeDefinition(
     id="title-doc",
+    requirements=(),
     icon="",
     label="Title",
     description="Just a Title",
@@ -24,6 +25,7 @@ DOC_TITLE = NodeDefinition(
 
 DOC_PARAGRAPH = NodeDefinition(
     id="paragraph-doc",
+    requirements=(),
     icon="",
     label="Paragraph",
     description="Long-form documentation text",

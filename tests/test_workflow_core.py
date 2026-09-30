@@ -59,6 +59,22 @@ def registry_with(*definitions: NodeDefinition) -> NodeRegistry:
     return registry
 
 
+def test_node_definition_requirements_are_optional_immutable_metadata() -> None:
+    plain = definition("plain", ())
+    with_requirements = NodeDefinition(
+        id="external",
+        icon="",
+        label="External",
+        ports=(),
+        executor=lambda _inputs, _parameters: {},
+        requirements=("py:numpy", "native:grep", "os:win"),
+    )
+
+    assert plain.requirements == ()
+    assert with_requirements.requirements == ("py:numpy", "native:grep", "os:win")
+    assert with_requirements.create_instance("example").definition_id == "external"
+
+
 def test_workflow_graph_rename_updates_edges_and_rejects_duplicate_ids() -> None:
     graph = WorkflowGraph(
         [NodeInstance("source", "source"), NodeInstance("sink", "sink")],

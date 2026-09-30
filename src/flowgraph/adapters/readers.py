@@ -212,6 +212,7 @@ def _read_table(
 
 LOAD_MUSCAT = NodeDefinition(
     id="load-muscat",
+    requirements=("py:muscat",),
     icon="/__flowgraph_ui/LOAD_MUSCAT.svg",
     label="Read Mesh (Muscat)",
     description="Loads a file path into the canonical mesh document.",
@@ -227,6 +228,7 @@ LOAD_MUSCAT = NodeDefinition(
 
 LOAD_MESHIO = NodeDefinition(
     id="load-meshio",
+    requirements=("py:muscat", "py:meshio"),
     icon="/__flowgraph_ui/LOAD_MESHIO.svg",
     label="Read Mesh (MeshIO)",
     description="Loads a file with meshio through Muscat's meshio bridge.",
@@ -242,6 +244,7 @@ LOAD_MESHIO = NodeDefinition(
 
 LOAD_MESHLANE = NodeDefinition(
     id="load-meshlane",
+    requirements=("py:muscat", "py:meshlane"),
     icon="/__flowgraph_ui/LOAD_MESHLANE.svg",
     label="Read Mesh (MeshLane)",
     description="Loads a file with the optional MeshLane adapter.",
@@ -257,6 +260,7 @@ LOAD_MESHLANE = NodeDefinition(
 
 LOAD_CSV = NodeDefinition(
     id="load-csv",
+    requirements=("py:pandas", "py:numpy"),
     icon="mdi-file-table-outline",
     label="Read Table (Pandas)",
     description="Loads a csv file with the optional Panda adapter.",
@@ -270,6 +274,7 @@ LOAD_CSV = NodeDefinition(
 
 READ_TABLE = NodeDefinition(
     id="read-table",
+    requirements=("py:pandas", "py:openpyxl"),
     icon="mdi-file-table-outline",
     label="Read Table (Pandas)",
     description="Reads an Excel workbook into a table document with pandas.",

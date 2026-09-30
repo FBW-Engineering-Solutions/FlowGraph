@@ -28,7 +28,8 @@ FlowGraph separates the reusable description of a node from the node placed in a
 workflow:
 
 - A **node definition** is the catalog entry. It supplies the node's name,
-  description, icon, executor, ports, parameter schema, and default values.
+  description, icon, executor, ports, parameter schema, default values, and
+  direct execution requirements.
 - A **node instance** is one occurrence of that definition in a workflow. It has
   its own instance ID, canvas position, and configured parameter values. Two
   instances of the same definition can therefore use different files or values.
@@ -36,6 +37,24 @@ workflow:
 The definition determines what a node *can* accept and produce. The instance
 determines how that particular node is configured and where it appears on the
 canvas.
+
+### Execution requirements
+
+Every node definition has a `requirements` tuple, exported as a list in the web
+catalog. Entries use `py:<package>` for an installable Python distribution
+(for example `py:pillow`, whose import name is `PIL`), `native:<command>` for
+a required command-line executable, or `os:<platform>` for a platform restriction
+(for example `os:win` or `os:web`). An empty list means the node has no *additional*
+direct execution requirements beyond FlowGraph's runtime; it does not mean that
+FlowGraph itself has no dependencies. Requirements are descriptive metadata, not
+an automatic installation or execution check. They do not list transitive packages.
+
+The static list cannot describe dependencies selected by a parameter or supplied
+by user code: for example, the `remesh` node may need an MMG backend when that
+backend is selected, and `user-function` may import arbitrary Python packages.
+Composite workflow nodes inherit the requirements of their child nodes at run
+time. `download-url` runs on both desktop Python and supported Pyodide setups, so
+it has no single OS restriction.
 
 ## Ports
 

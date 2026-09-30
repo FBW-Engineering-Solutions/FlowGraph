@@ -30,6 +30,7 @@ def _set_string(
 
 SET_STRING = NodeDefinition(
     id="set-string",
+    requirements=(),
     icon="mdi-text-box-outline",
     label="String Input",
     description="Outputs a configured text value.",
@@ -53,6 +54,7 @@ def _set_int(
 
 SET_INT = NodeDefinition(
     id="set-int",
+    requirements=(),
     icon="mdi-numeric-1-box-outline",
     label="Integer Input",
     description="Outputs a configured integer value.",
@@ -79,6 +81,7 @@ def _set_float(
 
 SET_FLOAT = NodeDefinition(
     id="set-float",
+    requirements=(),
     icon="mdi-decimal-comma",
     label="Float Input",
     description="Outputs a configured floating-point value.",
@@ -106,6 +109,7 @@ def _set_vec3d(
 
 SET_VEC3D = NodeDefinition(
     id="set-vec3d",
+    requirements=(),
     icon="mdi-axis-arrow",
     label="3D Vector Input",
     description="Outputs a configured three-dimensional vector.",
@@ -145,6 +149,7 @@ def _set_str_list(
 
 SET_LIST_STR = NodeDefinition(
     id="set-list[str]",
+    requirements=(),
     icon="mdi-format-list-bulleted-square",
     label="String List Input",
     description="Outputs a configured list of str.",
@@ -170,6 +175,7 @@ def _set_int_list(
 
 SET_LIST_INT = NodeDefinition(
     id="set-list[int]",
+    requirements=(),
     icon="mdi-format-list-numbered",
     label="Integer List Input",
     description="Outputs a configured list of int.",
@@ -196,6 +202,7 @@ def _set_float_list(
 
 SET_LIST_FLOAT = NodeDefinition(
     id="set-list[float]",
+    requirements=(),
     icon="mdi-format-list-numbered-rtl",
     label="Float List Input",
     description="Outputs a configured list of float.",

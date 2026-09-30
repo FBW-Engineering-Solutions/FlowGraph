@@ -41,6 +41,7 @@ def create_mesh_from_table(
 
 CSV_TO_MESH = NodeDefinition(
     id="csv-to-mesh",
+    requirements=("py:muscat", "py:numpy"),
     icon="mdi-table-merge-cells",
     label="Table to Mesh",
     description="Create a mesh from a table.",

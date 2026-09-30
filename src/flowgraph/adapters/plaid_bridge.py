@@ -50,6 +50,7 @@ def _load_plaid_sample(
 
 LOAD_PLAID_DATASET = NodeDefinition(
     id="load-plaid-dataset",
+    requirements=("py:pyplaid",),
     icon="mdi-database-arrow-down-outline",
     label="Load Plaid Dataset",
     description="Loads dataset from a Plaid dataset on disk.",
@@ -104,6 +105,7 @@ def _extract_plaid_sample(
 
 EXTRACT_PLAID_SAMPLE = NodeDefinition(
     id="extract-plaid-sample",
+    requirements=("py:pyplaid",),
     icon="mdi-database-search-outline",
     label="Extract Plaid sample",
     description="Converts one item from a loaded Plaid dataset into a Plaid Sample.",
@@ -148,6 +150,7 @@ def _extract_plaid_time_step(
 
 EXTRACT_PLAID_TIME_STEP = NodeDefinition(
     id="extract-plaid-time-step",
+    requirements=("py:pyplaid", "py:muscat", "py:pycgns"),
     icon="mdi-calendar-clock-outline",
     label="Extract Plaid time step",
     description="Converts one Plaid sample time step into a FlowGraph mesh document.",
@@ -182,6 +185,7 @@ def _extract_plaid_info(
 
 EXTRACT_PLAID_INFO = NodeDefinition(
     id="extract-plaid-info",
+    requirements=("py:pyplaid",),
     icon="mdi-information-outline",
     label="Extract Plaid info",
     description="Exposes the top-level attributes of a Plaid dataset info object.",

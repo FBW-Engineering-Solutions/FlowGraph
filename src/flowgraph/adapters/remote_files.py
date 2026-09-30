@@ -108,6 +108,7 @@ def _download_url(
 
 DOWNLOAD_URL = NodeDefinition(
     id="download-url",
+    requirements=(),
     icon="mdi-cloud-upload-outline",
     label="Download URL",
     description="Downloads an HTTP(S) URL to a temporary file and outputs its local path.",

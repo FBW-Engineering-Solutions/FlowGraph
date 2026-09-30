@@ -284,6 +284,7 @@ def _tag_node(node_id: str, label: str, executor, parameters) -> NodeDefinition:
     }
     return NodeDefinition(
         id=node_id,
+        requirements=("py:muscat",),
         icon=icons[label],
         label=label,
         description=f"{label} for node or element tags.",
@@ -302,6 +303,7 @@ REMOVE_TAG_NODE = _tag_node("remove-tag", "Remove Tag", _remove_tag, _tag_parame
 
 CREATE_TAG_NODE = NodeDefinition(
     id="create-tag",
+    requirements=("py:muscat",),
     icon="mdi-tag-plus-outline",
     label="Create Tag",
     description="Creates a node or element tag from an element filter.",
@@ -325,6 +327,7 @@ CREATE_TAG_NODE = NodeDefinition(
 
 TRANSFORM_NODE = NodeDefinition(
     id="transform",
+    requirements=("py:muscat",),
     icon="mdi-axis-arrow-lock",
     label="Mesh Transform",
     description="Creates a Muscat coordinate transformation.",
@@ -345,6 +348,7 @@ TRANSFORM_NODE = NodeDefinition(
 
 APPLY_TRANSFORM_NODE = NodeDefinition(
     id="apply-transform",
+    requirements=("py:muscat", "py:numpy"),
     icon="mdi-vector-combine",
     label="Apply Transform",
     description="Applies a coordinate transformation to a mesh.",
@@ -366,6 +370,7 @@ APPLY_TRANSFORM_NODE = NodeDefinition(
 
 DELAUNAY_3D_NODE = NodeDefinition(
     id="delaunay-3d",
+    requirements=("py:muscat", "py:numpy", "py:scipy"),
     icon="mdi-vector-triangle",
     label="Delaunay 3D",
     description="Create a 3D tetrahedralization from the mesh document's points.",
@@ -378,6 +383,7 @@ DELAUNAY_3D_NODE = NodeDefinition(
 
 QUAD_TO_LIN_NODE = NodeDefinition(
     id="quad-to-lin",
+    requirements=("py:muscat",),
     icon="mdi-vector-square-remove",
     label="Quad To Lin",
     description="Convert quadratic mesh elements to linear elements.",
@@ -406,6 +412,7 @@ QUAD_TO_LIN_NODE = NodeDefinition(
 
 REMESH_NODE = NodeDefinition(
     id="remesh",
+    requirements=("py:muscat",),
     icon="mdi-vector-triangle",
     label="Remesh",
     description="Remesh a Muscat mesh using the selected remeshing backend.",

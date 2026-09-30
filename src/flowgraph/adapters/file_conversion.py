@@ -343,6 +343,7 @@ def mesh_file_conversion(
 
 MESH_FILE_CONVERSION = NodeDefinition(
     id="convert-mesh-file-format",
+    requirements=("py:muscat", "py:meshio"),
     icon="mdi--file-swap",
     label="Convert Mesh File Format",
     description="Read and write a mesh (and solutions if supported) to a new format file",

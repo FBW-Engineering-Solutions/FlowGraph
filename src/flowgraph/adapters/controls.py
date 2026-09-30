@@ -63,6 +63,7 @@ def _float_slider(
 
 FLOAT_SLIDER = NodeDefinition(
     id="float-slider",
+    requirements=(),
     icon="mdi-tune-vertical",
     label="Float Slider",
     description="Outputs a floating-point value selected with a slider.",
@@ -88,6 +89,7 @@ def _int_slider(
 
 INT_SLIDER = NodeDefinition(
     id="int-slider",
+    requirements=(),
     icon="mdi-tune-vertical",
     label="Integer Slider",
     description="Outputs an integer value selected with a slider.",

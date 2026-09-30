@@ -25,6 +25,7 @@ def _workflow_input(
 
 WORKFLOW_INPUT = NodeDefinition(
     id="workflow-input",
+    requirements=(),
     icon="mdi-import",
     label="Workflow Input",
     description="Defines a named public input for the workflow.",
@@ -58,6 +59,7 @@ def _workflow_output(
 
 WORKFLOW_OUTPUT = NodeDefinition(
     id="workflow-output",
+    requirements=(),
     icon="mdi-export",
     label="Workflow Output",
     description="Defines a named public output for the workflow.",

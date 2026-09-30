@@ -155,6 +155,7 @@ def _execute_cosapp(
 
 COSAPP_WORKFLOW = NodeDefinition(
     id="cosapp-workflow",
+    requirements=("py:cosapp",),
     icon="mdi-play-network-outline",
     label="CoSApp Workflow",
     description="Executes a trusted external CoSApp System and exports declared result paths.",

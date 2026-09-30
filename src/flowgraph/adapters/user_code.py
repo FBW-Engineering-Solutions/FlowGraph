@@ -175,6 +175,7 @@ def _execute_user_code(
 
 USER_FUNCTION = NodeDefinition(
     id="user-function",
+    requirements=(),
     icon="mdi-code-braces",
     label="User Function",
     description="Runs trusted local Python code defining a typed Execute function.",

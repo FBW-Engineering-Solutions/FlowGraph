@@ -199,7 +199,7 @@ class WorkflowPort:
 
 @dataclass(frozen=True)
 class NodeDefinition:
-    """Reusable behavior and port contract for a kind of workflow node."""
+    """Reusable behavior, port contract, and direct execution requirements for a node."""
 
     id: str
     icon: str
@@ -216,6 +216,7 @@ class NodeDefinition:
     edge_aware_instance_executor: EdgeAwareInstanceExecutor | None = None
     subworkflow_factory: SubworkflowFactory | None = None
     color: str | None = None
+    requirements: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
 

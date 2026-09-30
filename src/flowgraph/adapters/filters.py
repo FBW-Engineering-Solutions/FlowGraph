@@ -90,6 +90,7 @@ def _create_element_filter(
 
 CREATE_MUSCAT_ELEMENT_FILTER = NodeDefinition(
     id="create-muscat-element-filter",
+    requirements=("py:muscat",),
     icon="mdi-filter-cog-outline",
     label="Element Selector",
     description="Creates an element filter by dimensionality, element type, and tags.",
@@ -163,6 +164,7 @@ def _filter_mesh(
 
 FILTER_MESH_WITH_MUSCAT = NodeDefinition(
     id="filter-mesh-muscat",
+    requirements=("py:muscat",),
     icon="mdi-filter-outline",
     label="Filter Mesh",
     description="Extracts mesh elements selected by a Muscat element filter.",

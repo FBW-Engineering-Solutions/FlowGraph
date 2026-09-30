@@ -90,6 +90,7 @@ def _transfer_fields(
 
 
 TRANSFER_FIELDS_NODE = NodeDefinition(
+    requirements=("py:muscat", "py:numpy"),
     id="transfer-fields",
     icon="mdi-swap-horizontal-bold",
     label="Transfer Fields",

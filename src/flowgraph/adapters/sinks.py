@@ -30,6 +30,7 @@ def _consume_mesh(
 
 TO_3D_VIEW = NodeDefinition(
     id="mesh-sink",
+    requirements=(),
     icon="mdi-cube-scan",
     label="To 3D View",
     description="Displays an input mesh document in the 3D view.",
@@ -65,6 +66,7 @@ TO_3D_VIEW = NodeDefinition(
 
 SHOW_IMAGE = NodeDefinition(
     id="local-view",
+    requirements=(),
     icon="mdi-image-outline",
     label="Show Image",
     description="Displays an image in a viewport within this node.",
@@ -85,6 +87,7 @@ def _consume_value(
 
 DISPLAY_VALUE = NodeDefinition(
     id="show-value",
+    requirements=(),
     icon="mdi-text-box-outline",
     label="Show Value",
     description="Displays the string representation of any input value on the workflow.",
@@ -95,6 +98,7 @@ DISPLAY_VALUE = NodeDefinition(
 
 PLOT_TABLE = NodeDefinition(
     id="plot-table",
+    requirements=(),
     icon="mdi-chart-line",
     label="Plot Table",
     description="Plots numeric table columns in the workflow view.",

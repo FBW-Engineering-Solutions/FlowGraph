@@ -181,6 +181,7 @@ def _execute_file(
 
 IMAGEJ_SCRIPT = NodeDefinition(
     id="imagej-script",
+    requirements=("py:pyimagej", "py:numpy"),
     icon="mdi-image-filter-center-focus",
     label="ImageJ Groovy Script",
     description="Runs trusted Groovy code entered in the editor; #@ declarations define ports.",
@@ -193,6 +194,7 @@ IMAGEJ_SCRIPT = NodeDefinition(
 
 IMAGEJ_SCRIPT_FILE = NodeDefinition(
     id="imagej-script-file",
+    requirements=("py:pyimagej", "py:numpy"),
     icon="mdi-file-code-outline",
     label="ImageJ Groovy Script File",
     description="Runs a Groovy file in Fiji; #@ declarations define ports.",

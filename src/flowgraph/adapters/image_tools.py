@@ -436,6 +436,7 @@ _COLOR_MODE_OPTIONS = {
 
 READ_IMAGE = NodeDefinition(
     id="read-image",
+    requirements=("py:pillow",),
     icon="mdi-image-arrow-down-outline",
     label="Read Image (Pillow)",
     description="Loads an image file into a Pillow image.",
@@ -456,6 +457,7 @@ READ_IMAGE = NodeDefinition(
 
 PILLOW_TO_IMAGEJ = NodeDefinition(
     id="pillow-to-imagej",
+    requirements=("py:pillow", "py:numpy"),
     icon="mdi-image-sync-outline",
     label="Pillow To ImageJ",
     description="Converts a Pillow image to a detached NumPy array for ImageJ-compatible processing.",
@@ -469,6 +471,7 @@ PILLOW_TO_IMAGEJ = NodeDefinition(
 
 WRITE_IMAGE = NodeDefinition(
     id="write-image",
+    requirements=("py:pillow",),
     icon="mdi-image-arrow-up-outline",
     label="Write Image (Pillow)",
     description="Writes a Pillow image using the output filename extension.",
@@ -489,6 +492,7 @@ WRITE_IMAGE = NodeDefinition(
 
 RESIZE_IMAGE = NodeDefinition(
     id="resize-image",
+    requirements=("py:pillow",),
     icon="mdi-arrow-expand-all",
     label="Resize Image",
     description="Resizes a Pillow image to a target width and height.",
@@ -506,6 +510,7 @@ RESIZE_IMAGE = NodeDefinition(
 
 CROP_IMAGE = NodeDefinition(
     id="crop-image",
+    requirements=("py:pillow",),
     icon="mdi-crop",
     label="Crop Image",
     description="Crops a Pillow image to an in-bounds rectangular region.",
@@ -525,6 +530,7 @@ CROP_IMAGE = NodeDefinition(
 
 ROTATE_IMAGE = NodeDefinition(
     id="rotate-image",
+    requirements=("py:pillow",),
     icon="mdi-rotate-right",
     label="Rotate Image",
     description="Rotates a Pillow image counter-clockwise by an angle in degrees.",
@@ -542,6 +548,7 @@ ROTATE_IMAGE = NodeDefinition(
 
 CONVERT_IMAGE_MODE = NodeDefinition(
     id="convert-image-mode",
+    requirements=("py:pillow",),
     icon="mdi-palette-outline",
     label="Convert Image Mode",
     description="Converts a Pillow image to a selected color mode.",
@@ -567,6 +574,7 @@ CONVERT_IMAGE_MODE = NodeDefinition(
 
 IMAGE_TO_MESH = NodeDefinition(
     id="image-to-mesh",
+    requirements=("py:pillow", "py:numpy", "py:muscat"),
     icon="mdi-image-filter-center-focus-weak",
     label="Image To Mesh",
     description="Converts a Pillow image to a structured mesh with a Colors field.",
@@ -589,6 +597,7 @@ IMAGE_TO_MESH = NodeDefinition(
 
 IMAGE_FLUENCY_METRICS = NodeDefinition(
     id="image-fluency-metrics",
+    requirements=("py:pillow", "py:numpy"),
     icon="mdi-image-filter-vintage",
     label="Image Fluency Metrics",
     description=(

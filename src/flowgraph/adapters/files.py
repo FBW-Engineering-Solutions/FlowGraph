@@ -32,6 +32,7 @@ def _select_file(
 
 SELECT_FILE = NodeDefinition(
     id="select-file",
+    requirements=(),
     icon="mdi-file-find-outline",
     label="Select file",
     description="Outputs a selected local file path as text without reading the file.",
@@ -66,6 +67,7 @@ def _select_server_file(
 
 SELECT_SERVER_FILE = NodeDefinition(
     id="select-server-file",
+    requirements=(),
     icon="mdi-cloud-upload-outline",
     label="Select uploaded file",
     description="Outputs a selected server file path as text without reading the file.",
@@ -149,6 +151,7 @@ def _read_directory_files(
 
 READ_DIRECTORY_FILES = NodeDefinition(
     id="read-directory-files",
+    requirements=(),
     icon="mdi-file-find-outline",
     label="Read Directory Files",
     description="Lists immediate file names in a directory with optional regular-expression filters.",

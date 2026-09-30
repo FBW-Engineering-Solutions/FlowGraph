@@ -158,6 +158,7 @@ def _empty_workflow() -> WorkflowGraph:
 
 RUN_WORKFLOW = NodeDefinition(
     id="run-workflow",
+    requirements=(),
     icon="mdi-play-network-outline",
     label="Run Full Workflow",
     description="Executes and exports the inputs and outputs of an editable nested workflow.",
@@ -171,6 +172,7 @@ RUN_WORKFLOW = NodeDefinition(
 
 BATCH_WORKFLOW = NodeDefinition(
     id="batch-workflow",
+    requirements=(),
     icon="mdi-format-list-numbered",
     label="Batch Workflow",
     description="Executes an editable nested workflow once for each list entry.",

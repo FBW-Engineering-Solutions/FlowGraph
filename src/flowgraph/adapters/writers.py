@@ -173,6 +173,7 @@ def _write_table(
 
 WRITE_MUSCAT = NodeDefinition(
     id="write-muscat",
+    requirements=("py:muscat",),
     icon="mdi-file-export-outline",
     label="Write Mesh (Muscat)",
     description="Writes the canonical mesh document to a filename selected by extension.",
@@ -188,6 +189,7 @@ WRITE_MUSCAT = NodeDefinition(
 
 WRITE_MESHIO = NodeDefinition(
     id="write-meshio",
+    requirements=("py:muscat", "py:meshio"),
     icon="mdi-file-swap-outline",
     label="Write Mesh (MeshIO)",
     description="Writes the canonical mesh document with meshio through Muscat's bridge.",
@@ -203,6 +205,7 @@ WRITE_MESHIO = NodeDefinition(
 
 WRITE_MESHLANE = NodeDefinition(
     id="write-meshlane",
+    requirements=("py:muscat", "py:meshlane"),
     icon="mdi-file-swap-outline",
     label="Write Mesh (MeshLane)",
     description="Writes the canonical mesh document with the optional MeshLane adapter.",
@@ -218,6 +221,7 @@ WRITE_MESHLANE = NodeDefinition(
 
 WRITE_TABLE = NodeDefinition(
     id="write-table",
+    requirements=("py:pandas", "py:openpyxl"),
     icon="mdi-file-table-outline",
     label="Write Table (Pandas)",
     description="Writes a table document to an Excel workbook with pandas.",
