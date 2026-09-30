@@ -6,12 +6,14 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import numpy as np
+from Muscat.MeshTools.MeshCreationTools import CreateCube, CreateSquare
 from PIL import Image as PillowImage
 
 from flowgraph.adapters.simple_sources import SET_STRING
 from flowgraph.adapters.workflow_interfaces import WORKFLOW_OUTPUT
 from flowgraph.application.node_registry import create_node_registry
-from flowgraph.application.wasm_execution import execute_workflow_json
+from flowgraph.application.wasm_execution import _display_meshes, execute_workflow_json
 from flowgraph.application.workflow_core import WorkflowEdge, WorkflowGraph
 from flowgraph.application.workflow_io import workflow_to_dict
 
@@ -88,6 +90,73 @@ def test_execute_workflow_json_returns_png_preview_for_show_image() -> None:
     assert preview["height"] == 2
     assert preview["mode"] == "RGBA"
     assert preview["data"].startswith("iVBOR")
+
+
+def test_display_meshes_projects_surface_without_changing_the_input() -> None:
+    from flowgraph.domain.mesh_document import MeshDocument
+
+    mesh = CreateCube(dimensions=[3, 3, 3])
+    mesh.nodeFields["temperature"] = np.arange(mesh.GetNumberOfNodes(), dtype=float)
+    mesh.nodeFields["velocity"] = np.tile([3.0, 4.0, 0.0], (mesh.GetNumberOfNodes(), 1))
+    original_count = mesh.GetNumberOfElements()
+    document = MeshDocument(mesh)
+    registry = create_node_registry()
+    workflow = WorkflowGraph([registry.create_instance("mesh-sink", "view")])
+
+    preview = _display_meshes(workflow, {"view": {"mesh": document}})["view"]
+
+    assert len(preview["i"]) == len(preview["j"]) == len(preview["k"]) > 0
+    assert len(preview["x"]) == len(preview["y"]) == len(preview["z"])
+    assert all(
+        0 <= index < len(preview["x"]) for index in preview["i"] + preview["j"] + preview["k"]
+    )
+    assert sorted(preview["fields"]["temperature"]) == list(range(mesh.GetNumberOfNodes()))
+    assert preview["fields"]["velocity"] == [5.0] * len(preview["x"])
+    assert "flowgraph_node_id" not in preview["fields"]
+    assert mesh.GetNumberOfElements() == original_count
+    assert "temperature" in mesh.nodeFields
+
+
+def test_display_meshes_handles_planar_mesh_and_skips_other_nodes() -> None:
+    from flowgraph.domain.mesh_document import MeshDocument
+
+    registry = create_node_registry()
+    workflow = WorkflowGraph(
+        [
+            registry.create_instance("mesh-sink", "view"),
+            registry.create_instance("show-value", "other"),
+        ]
+    )
+    document = MeshDocument(CreateSquare(dimensions=[2, 2]))
+
+    previews = _display_meshes(
+        workflow,
+        {
+            "view": {"mesh": document},
+            "other": {"value": document},
+        },
+    )
+
+    assert len(previews["view"]["i"]) == 2
+    assert previews["view"]["z"] == [0.0] * 4
+    assert "other" not in previews
+
+
+def test_execute_workflow_json_returns_mesh_preview_for_sink() -> None:
+    registry = create_node_registry()
+    workflow = WorkflowGraph(
+        [
+            registry.create_instance("create-square", "source"),
+            registry.create_instance("mesh-sink", "view"),
+        ]
+    )
+    workflow.add_edge(WorkflowEdge("source", "mesh", "view", "mesh"), registry)
+
+    response = json.loads(execute_workflow_json(json.dumps(workflow_to_dict(workflow))))
+
+    assert response["status"] == "ok"
+    assert len(response["display_meshes"]["view"]["i"]) == 2
+    assert response["nodes"]["inputs"]["view"]["mesh"]["type"] == "MeshDocument"
 
 
 def test_execute_workflow_json_serializes_invalid_requests_as_errors() -> None:

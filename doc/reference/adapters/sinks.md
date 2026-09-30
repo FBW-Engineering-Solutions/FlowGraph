@@ -13,10 +13,11 @@ description: Nodes that consume data in application views.
 Requires `mesh: Mesh document` and has no outputs. The node displays the
 canonical mesh in the 3D view. UI-only parameters are `color_field=""` (solid
 color), `show_representation=True`, and `show_axis_grid=False`. The color-field
-menu lists named point and cell arrays with one to four components. One-component
-arrays use scalar lookup-table coloring; two-, three-, and four-component arrays
-use VTK direct colors, supporting luminance/alpha, RGB, and RGBA fields such as
-`Colors`.
+menu lists finite numeric nodal fields. Multi-component nodal fields are colored
+by their vector magnitude. Elemental fields and direct RGB/RGBA colors are not
+yet available in the browser's Plotly surface preview. The WASM runtime returns
+triangulated surface coordinates and field values only for connected `mesh-sink`
+nodes; it does not serialize the full mesh into the browser.
 
 ## Show Image (`local-view`)
 

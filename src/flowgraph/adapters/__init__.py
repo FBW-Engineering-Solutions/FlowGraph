@@ -17,6 +17,7 @@ from flowgraph.adapters.filters import (
     FILTER_MESH_WITH_MUSCAT,
 )
 from flowgraph.adapters.image_tools import AVAILABLE_NODES as IMAGE_TOOLS_AVAILABLE_NODES
+from flowgraph.adapters.imagej import AVAILABLE_NODES as IMAGEJ_AVAILABLE_NODES
 from flowgraph.adapters.mesh_creation_tools import AVAILABLE_NODES as MESH_CREATION_AVAILABLE_NODES
 from flowgraph.adapters.mesh_generations import CSV_TO_MESH
 from flowgraph.adapters.mesh_ops import AVAILABLE_NODES as MESH_OPS_AVAILABLE_NODES
@@ -127,7 +128,7 @@ ADAPTERS = AdapterCatalog(
         AdapterGroup("Controls", CONTROL_AVAILABLE_NODES),
         AdapterGroup("Image Tools", IMAGE_TOOLS_AVAILABLE_NODES),
         AdapterGroup("Table Tools", TABLE_TOOLS_AVAILABLE_NODES),
-        AdapterGroup("Code", USER_CODE_AVAILABLE_NODES),
+        AdapterGroup("Code", USER_CODE_AVAILABLE_NODES + IMAGEJ_AVAILABLE_NODES),
         AdapterGroup("Workflow", WORKFLOW_INTERFACE_AVAILABLE_NODES + WORKFLOW_AVAILABLE_NODES),
         AdapterGroup("Sinks", SINKS_AVAILABLE_NODES),
         AdapterGroup("Doc", DOCUMENTATION_AVAILABLE_NODES),

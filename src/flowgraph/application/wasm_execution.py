@@ -9,6 +9,11 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+from Muscat.MeshTools.MeshInspectionTools import ExtractElementsByElementFilter
+from Muscat.MeshTools.MeshModificationTools import ComputeSkin
+from Muscat.MeshTools.MeshTetrahedrization import Tetrahedrization
+from Muscat.Simple import ED, ElementFilter
 from PIL.Image import Image
 
 from flowgraph.application.node_registry import create_node_registry
@@ -20,6 +25,7 @@ from flowgraph.application.workflow_core import (
     WorkflowRunResult,
 )
 from flowgraph.application.workflow_io import workflow_from_json
+from flowgraph.domain.mesh_document import MeshDocument
 
 _REGISTRY = None
 
@@ -46,6 +52,7 @@ def execute_workflow_json(workflow_json: str) -> str:
             "nodes": _serialize_result(result),
             "display_inputs": _display_result(result.node_inputs),
             "display_images": _display_images(result.node_inputs),
+            "display_meshes": _display_meshes(workflow, result.node_inputs),
             "projection": format_workflow_inspection(workflow, registry),
         }
     except Exception as error:  # noqa: BLE001 - the worker boundary serializes all failures
@@ -90,6 +97,69 @@ def _display_images(
             }
         if node_previews:
             previews[str(node_id)] = node_previews
+    return previews
+
+
+def _display_meshes(workflow: Any, values: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    """Project only 3D-view sink inputs into Plotly-ready surface triangles."""
+    previews: dict[str, Any] = {}
+    for node in workflow.nodes:
+        if node.definition_id != "mesh-sink":
+            continue
+        document = values.get(node.id, {}).get("mesh")
+        if not isinstance(document, MeshDocument):
+            continue
+        try:
+            mesh = document.mesh
+            # Work on a view; neither skin extraction nor triangulation may mutate the input.
+            surface = mesh.View()
+            surface.elemFields = {}
+            ComputeSkin(mesh=surface, inPlace=True)
+            surface = ExtractElementsByElementFilter(
+                surface, ElementFilter(dimensionality=2), copy=False
+            )
+            triangles = Tetrahedrization(surface)
+            faces = triangles.GetElementsOfType(ED.Triangle_3).connectivity
+            if not faces.size:
+                previews[node.id] = {"error": "The mesh has no renderable surface triangles."}
+                continue
+
+            points = triangles.nodes
+            preview: dict[str, Any] = {
+                "x": points[:, 0].tolist(),
+                "y": points[:, 1].tolist(),
+                "z": (points[:, 2] if points.shape[1] > 2 else np.zeros(len(points))).tolist(),
+                "i": faces[:, 0].tolist(),
+                "j": faces[:, 1].tolist(),
+                "k": faces[:, 2].tolist(),
+                "fields": {},
+            }
+            # Muscat's skin/triangulation does not carry nodeFields across. The
+            # originalIDNodes arrays trace each output vertex back to the input mesh.
+            indices = np.asarray(surface.originalIDNodes)[np.asarray(triangles.originalIDNodes)]
+            for name, data in mesh.nodeFields.items():
+                if name.startswith("flowgraph_"):
+                    continue
+                array = np.asarray(data)
+                if (
+                    array.ndim == 0
+                    or array.shape[0] != mesh.GetNumberOfNodes()
+                    or not np.issubdtype(array.dtype, np.number)
+                    or np.issubdtype(array.dtype, np.complexfloating)
+                ):
+                    continue
+                if array.ndim == 1:
+                    scalar = array
+                elif array.ndim == 2 and array.shape[1] >= 1:
+                    scalar = array[:, 0] if array.shape[1] == 1 else np.linalg.norm(array, axis=1)
+                else:
+                    continue
+                values_for_vertices = scalar[indices]
+                if np.all(np.isfinite(values_for_vertices)):
+                    preview["fields"][name] = values_for_vertices.tolist()
+            previews[node.id] = preview
+        except Exception as error:  # noqa: BLE001 - do not fail an otherwise successful workflow
+            previews[node.id] = {"error": f"Mesh preview unavailable: {error}"}
     return previews
 
 
