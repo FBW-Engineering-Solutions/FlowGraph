@@ -57,8 +57,11 @@ Run a workflow with published inputs:
 ```bash
 uv run flowgraph run workflow.json \
   --input mesh_path=/data/input.stl \
-  --input threshold=0.5
+  -i threshold=0.5
 ```
+
+`-i` is the short form of `--input`. Repeat either option for each published
+input; you can mix both forms in the same command.
 
 Override a node parameter for one run without changing the saved JSON:
 

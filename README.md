@@ -27,9 +27,13 @@ The `flowgraph` command is headless and has no GUI runtime dependency:
 ```bash
 uv run flowgraph inspect workflow.json
 uv run flowgraph run workflow.json --input name=value
+uv run flowgraph run workflow.json -i name=value
 uv run flowgraph run workflow.json --override node-id.parameter=value
 uv run flowgraph run workflow.json --json-output results.json
 ```
+
+Use `--input` or its short form `-i` for each published workflow input; repeat
+the option to provide multiple inputs.
 
 Workflows use the versioned `flowgraph-workflow` JSON format. Core validation and
 execution are UI-independent.

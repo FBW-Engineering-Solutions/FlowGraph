@@ -285,6 +285,17 @@ def test_cli_execution_injects_published_inputs(tmp_path: Path) -> None:
     assert workflow.outputs[0].name == "result"
 
 
+@pytest.mark.parametrize("option", ("--input", "-i"))
+def test_cli_run_accepts_input_option(tmp_path: Path, capsys, option: str) -> None:
+    workflow_path = tmp_path / "workflow.json"
+    save_workflow(_published_workflow(), workflow_path)
+
+    assert main(("run", str(workflow_path), option, "value=runtime")) == 0
+    output = capsys.readouterr()
+    assert output.out == "Outputs:\n  result: 'runtime'\n"
+    assert output.err == ""
+
+
 def test_cli_run_applies_parameter_override_and_writes_json(tmp_path: Path, capsys) -> None:
     workflow_path = tmp_path / "workflow.json"
     output_path = tmp_path / "result.json"

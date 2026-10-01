@@ -33,6 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("workflow", type=str, help="workflow JSON file")
     run_parser.add_argument(
         "--input",
+        "-i",
         action="append",
         default=[],
         metavar="NAME=VALUE",

@@ -85,7 +85,10 @@ file:
 ```bash
 uv run flowgraph run workflow.json \
   --input in_filename=input.stl \
-  --input out_filename=output.geo
+  -i out_filename=output.geo
 ```
+
+`-i` is an alias for `--input`. Use either form repeatedly to set multiple
+published workflow inputs.
 
 Continue with [your first project](first-project.md).

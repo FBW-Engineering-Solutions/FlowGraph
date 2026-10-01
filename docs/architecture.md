@@ -71,9 +71,13 @@ execution without requiring a graphical environment:
 ```bash
 flowgraph inspect workflow.json
 flowgraph run workflow.json --input name=value
+flowgraph run workflow.json -i name=value
 flowgraph run workflow.json --override node-id.parameter=value
 flowgraph run workflow.json --json-output results.json
 ```
+
+`-i` is an alias for `--input`; either option can be repeated for multiple
+published inputs.
 
 ## External-client interfaces
 

@@ -18,7 +18,11 @@ The generated `flowgraph` wheel exposes:
 ```bash
 flowgraph inspect workflow.json
 flowgraph run workflow.json --input name=value --override node.parameter=value
+flowgraph run workflow.json -i name=value --override node.parameter=value
 ```
+
+`-i` is an alias for `--input`, and either option can be repeated for multiple
+published workflow inputs.
 
 `uv build` produces the source distribution and a platform-independent,
 pure-Python wheel. No Cython compiler, native extension build, or platform wheel
