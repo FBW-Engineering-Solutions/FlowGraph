@@ -77,6 +77,8 @@ behavior.
 ## Documentation and support
 
 - [FlowGraph documentation](https://flowgraph.readthedocs.io/en/latest/)
+- [Built-in node catalog](doc/reference/adapters/index.md) and
+  [Python custom-node guide](doc/user-guide/custom-nodes.md).
 - The website documentation lives in `doc/` (outside the Python package).
   To build the Read the Docs site locally, run
   `uv run --with zensical zensical build -f zensical.toml` from this repository.

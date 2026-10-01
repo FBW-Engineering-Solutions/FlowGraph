@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -56,6 +59,29 @@ def test_website_documents_every_registered_adapter_node() -> None:
                 if f"`{definition.id}`" not in content:
                     missing.append((subgroup.label, definition.id, page.name))
     assert not missing, f"Undocumented adapter nodes: {missing}"
+
+
+def test_custom_node_guide_example_executes(tmp_path: Path) -> None:
+    """Keep the public Python node recipe executable, including its JSON round trip."""
+    root = Path(__file__).parents[1]
+    guide = (root / "doc" / "user-guide" / "custom-nodes.md").read_text(encoding="utf-8")
+    examples = [part.split("\n```", 1)[0] for part in guide.split("```python\n")[1:]]
+    script = "\n".join(examples)
+    completed = subprocess.run(
+        [sys.executable, "-c", script], cwd=tmp_path, capture_output=True, text=True, check=True
+    )
+    assert completed.stdout.strip() == "21"
+    assert (tmp_path / "scaled-workflow.json").is_file()
+    catalog = json.loads((tmp_path / "node-catalog.json").read_text(encoding="utf-8"))
+    assert catalog["groups"][-1]["label"] == "My Nodes"
+    assert catalog["groups"][-1]["nodes"][0]["id"] == "scale-integer"
+
+
+def test_custom_node_guide_is_in_site_navigation() -> None:
+    root = Path(__file__).parents[1]
+    nav = tomllib.loads((root / "zensical.toml").read_text(encoding="utf-8"))["project"]["nav"]
+    guide_nav = next(entry["User Guide"] for entry in nav if "User Guide" in entry)
+    assert any("user-guide/custom-nodes.md" in item.values() for item in guide_nav)
 
 
 def test_website_documentation_is_not_packaged_by_core() -> None:

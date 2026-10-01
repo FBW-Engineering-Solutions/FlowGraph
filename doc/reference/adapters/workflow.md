@@ -8,8 +8,8 @@ description: Nodes that define a workflow's public inputs and outputs.
 
 # Workflow nodes
 
-The **Workflow** menu contains the orange boundary nodes used to define the
-public interface of a workflow.
+The **Workflow** menu contains orange boundary nodes used to define the public
+interface of a workflow and composite nodes that execute child workflows.
 
 ## Workflow Input
 
@@ -34,3 +34,17 @@ typed interface is propagated to parent **Run Full Workflow** nodes, preventing
 incompatible parent connections before execution.
 
 Names must be non-empty and unique within their respective input or output list.
+
+## Run Full Workflow (`run-workflow`)
+
+Owns an editable child graph. The child's published inputs and outputs become
+named, typed ports on the parent node; its `result: Any` output contains the
+child's complete `WorkflowRunResult`. See [Control nodes](controls.md) for how
+to edit and execute the nested graph.
+
+## Batch Workflow (`batch-workflow`)
+
+Executes the child graph once per item in list inputs and broadcasts scalar
+inputs. Published child outputs become lists, and `result: Any` holds the list
+of per-item `WorkflowRunResult` values. List inputs must have equal lengths;
+at least one input must be a list. See [Control nodes](controls.md) for details.

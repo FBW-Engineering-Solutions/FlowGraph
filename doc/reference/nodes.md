@@ -129,6 +129,10 @@ node editor without becoming a connectable workflow input.
 
 ## Execution and outputs
 
+See [Create and Run Python Nodes](../user-guide/custom-nodes.md) for a complete
+Python example that defines, registers, connects, executes, and saves a custom
+node. The [adapter catalog](adapters/index.md) documents the built-in definitions.
+
 ## Adapter catalog
 
 The built-in nodes are grouped in the editor by adapter family. The complete

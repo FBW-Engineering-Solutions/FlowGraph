@@ -159,6 +159,9 @@ flexible interface when the internal graph does not determine one type.
 consumed by each node. Runtime overrides are not written back to the workflow
 file. To use a custom node catalog, create a `NodeRegistry` and pass it through
 the keyword-only `registry` argument.
+See [Create and Run Python Nodes](custom-nodes.md) for a runnable example of
+defining a node, registering it alongside the built-ins, and wiring it into a
+Python workflow.
 
 For a workflow that is already built in Python, use `execute_workflow(workflow,
 registry)` instead. The [Workflow Nodes](../reference/nodes.md) reference

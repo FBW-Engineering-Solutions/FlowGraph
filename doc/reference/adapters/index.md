@@ -11,6 +11,8 @@ description: Reference for every node exposed by each FlowGraph adapter group.
 Adapter groups provide the built-in nodes shown in the **Nodes** menu. Each page
 below documents every node in one group, including its stable definition ID,
 connection ports, parameters, defaults, and important runtime behavior.
+For definitions created in your own Python code, see
+[Create and Run Python Nodes](../../user-guide/custom-nodes.md).
 
 - [Inputs](inputs.md)
 - [Files](file.md)

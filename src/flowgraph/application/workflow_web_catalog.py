@@ -18,19 +18,28 @@ WEB_CATALOG_FORMAT = "flowgraph-web-node-catalog"
 WEB_CATALOG_VERSION = 1
 
 
-def workflow_web_catalog() -> dict[str, Any]:
+def workflow_web_catalog(*, extra_groups: tuple[AdapterGroup, ...] = ()) -> dict[str, Any]:
     """Return a JSON-compatible, non-executable description of the workflow catalog.
 
     The result intentionally excludes node executors, port resolvers, runtime Python
     types, and all other callable behavior. A static editor may use it to author and
     structurally validate workflow JSON, but it cannot execute a workflow from it.
+    Additional groups are appended after the built-in groups. Definition IDs must
+    be unique across the entire catalog.
     """
+    groups = ADAPTERS.groups + tuple(extra_groups)
+    ids: set[str] = set()
+    for group in groups:
+        for definition in group.all_node_definitions():
+            if definition.id in ids:
+                raise ValueError(f"Duplicate web catalog node definition: {definition.id!r}")
+            ids.add(definition.id)
     catalog = {
         "format": WEB_CATALOG_FORMAT,
         "version": WEB_CATALOG_VERSION,
         "workflow_format": WORKFLOW_FORMAT,
         "workflow_format_version": WORKFLOW_FORMAT_VERSION,
-        "groups": [_group_to_dict(group) for group in ADAPTERS.groups],
+        "groups": [_group_to_dict(group) for group in groups],
         "conversions": [
             {
                 "source_type_id": conversion.source_type_id,
@@ -44,13 +53,17 @@ def workflow_web_catalog() -> dict[str, Any]:
     return catalog
 
 
-def write_workflow_web_catalog(path: str | Path) -> Path:
+def write_workflow_web_catalog(
+    path: str | Path, *, extra_groups: tuple[AdapterGroup, ...] = ()
+) -> Path:
     """Write the deterministic static-editor catalog JSON to *path*.
 
     Parameters
     ----------
     path:
         Destination JSON file. Its parent directory must already exist.
+    extra_groups:
+        Additional adapter groups to include after the built-in catalog groups.
 
     Returns
     -------
@@ -61,7 +74,9 @@ def write_workflow_web_catalog(path: str | Path) -> Path:
     if not destination.parent.is_dir():
         raise ValueError(f"Web catalog output directory does not exist: {destination.parent}")
     destination.write_text(
-        json.dumps(workflow_web_catalog(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(workflow_web_catalog(extra_groups=extra_groups), indent=2, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
     )
     return destination.resolve()
 

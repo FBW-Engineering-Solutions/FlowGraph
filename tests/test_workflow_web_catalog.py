@@ -5,7 +5,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from flowgraph.adapters import ADAPTERS
+import pytest
+
+from flowgraph.adapters import ADAPTERS, AdapterGroup
+from flowgraph.adapters.simple_sources import SET_INT
+from flowgraph.application.workflow_core import NodeDefinition
 from flowgraph.application.workflow_io import WORKFLOW_FORMAT, WORKFLOW_FORMAT_VERSION
 from flowgraph.application.workflow_web_catalog import (
     WEB_CATALOG_FORMAT,
@@ -81,6 +85,42 @@ def test_write_workflow_web_catalog_is_deterministic_json(tmp_path: Path) -> Non
     assert destination.read_text(encoding="utf-8") == (
         json.dumps(workflow_web_catalog(), indent=2, sort_keys=True) + "\n"
     )
+
+
+def test_extra_groups_export_custom_metadata_without_executors(tmp_path: Path) -> None:
+    custom = NodeDefinition(
+        id="custom-int",
+        icon="mdi-numeric",
+        label="Custom Integer",
+        description="A user-defined integer source.",
+        ports=tuple(port for port in SET_INT.ports if not port.is_param),
+        executor=SET_INT.executor,
+        parameters=SET_INT.parameters,
+    )
+    group = AdapterGroup("My Nodes", subgroups=(AdapterGroup("Numbers", (custom,)),))
+    destination = tmp_path / "node-catalog.json"
+    write_workflow_web_catalog(destination, extra_groups=(group,))
+    exported = json.loads(destination.read_text(encoding="utf-8"))
+
+    assert exported["groups"][:-1] == workflow_web_catalog()["groups"]
+    assert exported["groups"][-1]["label"] == "My Nodes"
+    node = exported["groups"][-1]["subgroups"][0]["nodes"][0]
+    assert node["id"] == "custom-int"
+    built_in_int = next(
+        node for node in _nodes(workflow_web_catalog()["groups"]) if node["id"] == "set-int"
+    )
+    assert node["ports"] == built_in_int["ports"]
+    assert "executor" not in node
+
+
+def test_extra_groups_reject_duplicate_built_in_ids(tmp_path: Path) -> None:
+    destination = tmp_path / "node-catalog.json"
+    with pytest.raises(ValueError, match="Duplicate web catalog node definition: 'set-int'"):
+        write_workflow_web_catalog(
+            destination,
+            extra_groups=(AdapterGroup("Extra", subgroups=(AdapterGroup("Nested", (SET_INT,)),)),),
+        )
+    assert not destination.exists()
 
 
 def test_workflow_web_catalog_exports_expandable_port_capacity() -> None:

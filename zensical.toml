@@ -18,6 +18,7 @@ nav = [
     { "Interface" = "user-guide/interface.md" },
     { "Importing Data" = "user-guide/importing-data.md" },
     { "Workflows" = "user-guide/workflows.md" },
+    { "Create and Run Python Nodes" = "user-guide/custom-nodes.md" },
     { "Visualization" = "user-guide/visualization.md" },
     { "Troubleshooting" = "user-guide/troubleshooting.md" },
   ] },

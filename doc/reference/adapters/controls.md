@@ -14,10 +14,10 @@ render the corresponding editor.
 
 Available nodes:
 
-- `float-slider`
-- `int-slider`
-- `run-workflow`
-- `batch-workflow`
+- [Float Slider (`float-slider`)](gui.md)
+- [Integer Slider (`int-slider`)](gui.md)
+- [Run Full Workflow (`run-workflow`)](#run-full-workflow-run-workflow)
+- [Batch Workflow (`batch-workflow`)](#batch-workflow-batch-workflow)
 
 ## Run Full Workflow (`run-workflow`)
 
