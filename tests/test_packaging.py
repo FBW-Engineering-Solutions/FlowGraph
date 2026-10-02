@@ -9,6 +9,7 @@ import tomllib
 from pathlib import Path
 
 from flowgraph.adapters import ADAPTERS
+from flowgraph.version import __version__
 
 
 def test_website_documents_every_registered_adapter_node() -> None:
@@ -161,3 +162,19 @@ def test_conda_recipe_tracks_the_published_python_package() -> None:
     for dependency in project["dependencies"]:
         package_name = dependency.split(">", 1)[0].split("=", 1)[0].strip()
         assert f"- {package_name}" in recipe
+
+
+def test_release_version_is_consistent() -> None:
+    """Keep the runtime, lockfile, and release notes in sync with package metadata."""
+    root = Path(__file__).parents[1]
+    version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+        "version"
+    ]
+    lock = tomllib.loads((root / "uv.lock").read_text(encoding="utf-8"))
+    local_package = next(package for package in lock["package"] if package["name"] == "flowgraph")
+
+    assert __version__ == version
+    assert local_package["version"] == version
+    assert f"New in version {version}:" in (root / "docs" / "changelog.md").read_text(
+        encoding="utf-8"
+    )

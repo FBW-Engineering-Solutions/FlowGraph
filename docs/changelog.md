@@ -1,4 +1,4 @@
-New in version Master:
+New in version 0.1.5:
 **********************
 **********************
 
