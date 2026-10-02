@@ -42,6 +42,7 @@ dependencies = [
 [project.optional-dependencies]
 imagej = [
   "pyimagej",
+  "scyjava",
 ]
 dev = [
   "pytest>=8.0",

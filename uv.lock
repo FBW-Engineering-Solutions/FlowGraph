@@ -901,6 +901,7 @@ dev = [
 ]
 imagej = [
     { name = "pyimagej" },
+    { name = "scyjava" },
 ]
 ml = [
     { name = "pyplaid" },
@@ -925,6 +926,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "scipy", specifier = ">=1.10" },
+    { name = "scyjava", marker = "extra == 'imagej'" },
     { name = "vtk", specifier = ">=9.2" },
 ]
 provides-extras = ["imagej", "dev", "ml", "cosapp", "ci"]
