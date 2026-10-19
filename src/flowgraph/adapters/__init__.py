@@ -31,6 +31,7 @@ from flowgraph.adapters.readers import (
 )
 from flowgraph.adapters.remote_files import DOWNLOAD_URL
 from flowgraph.adapters.simple_sources import (
+    SET_BOOLEAN,
     SET_FLOAT,
     SET_INT,
     SET_LIST_FLOAT,
@@ -96,7 +97,7 @@ ADAPTERS = AdapterCatalog(
         AdapterGroup(
             "Inputs",
             subgroups=(
-                AdapterGroup("Scalars", (SET_STRING, SET_INT, SET_FLOAT)),
+                AdapterGroup("Scalars", (SET_STRING, SET_BOOLEAN, SET_INT, SET_FLOAT)),
                 AdapterGroup(
                     "Lists/Vectors", (SET_LIST_STR, SET_LIST_INT, SET_LIST_FLOAT, SET_VEC3D)
                 ),

@@ -14,6 +14,7 @@ optional; an unconnected port uses the configured default.
 | Node (ID) | Output | Parameters and defaults |
 | --- | --- | --- |
 | **String Input** (`set-string`) | `value: Text` | `value`: `""` |
+| **Boolean Input** (`set-boolean`) | `value: Boolean` | `value`: `false` |
 | **Integer Input** (`set-int`) | `value: Integer` | `value`: `0` |
 | **Float Input** (`set-float`) | `value: Float` | `value`: `0.0` |
 | **3D Vector Input** (`set-vec3d`) | `value: 3D Vector` | `x`, `y`, `z`: `0.0` |

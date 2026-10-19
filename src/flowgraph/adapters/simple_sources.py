@@ -13,7 +13,17 @@ from flowgraph.application.workflow_core import (
     PortDirection,
 )
 
-from .data_types import FLOAT, INTEGER, LIST_FLOAT, LIST_INT, LIST_STR, STRING, VEC3D, ParameterKind
+from .data_types import (
+    BOOLEAN,
+    FLOAT,
+    INTEGER,
+    LIST_FLOAT,
+    LIST_INT,
+    LIST_STR,
+    STRING,
+    VEC3D,
+    ParameterKind,
+)
 
 
 def _set_string(
@@ -37,6 +47,30 @@ SET_STRING = NodeDefinition(
     ports=(PortDefinition("value", PortDirection.OUTPUT, STRING, "Value"),),
     executor=_set_string,
     parameters=(ParameterDefinition("value", ParameterKind.TEXT, "Value", "", "Enter text"),),
+)
+
+
+def _set_boolean(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Output the configured boolean value."""
+    value = parameters.get("value", False)
+    if not isinstance(value, bool):
+        raise TypeError("The configured boolean value must be a boolean")
+    return {"value": value}
+
+
+SET_BOOLEAN = NodeDefinition(
+    id="set-boolean",
+    requirements=(),
+    icon="mdi-toggle-switch-outline",
+    label="Boolean Input",
+    description="Outputs a configured boolean value.",
+    ports=(PortDefinition("value", PortDirection.OUTPUT, BOOLEAN, "Value"),),
+    executor=_set_boolean,
+    parameters=(ParameterDefinition("value", ParameterKind.BOOLEAN, "Value", False),),
 )
 
 
@@ -226,6 +260,7 @@ def _select_file(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> M
 
 AVAILABLE_NODES = (
     SET_STRING,
+    SET_BOOLEAN,
     SET_INT,
     SET_FLOAT,
     SET_VEC3D,
