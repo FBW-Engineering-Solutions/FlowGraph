@@ -38,6 +38,8 @@ from flowgraph.adapters.simple_sources import (
     SET_LIST_INT,
     SET_LIST_STR,
     SET_STRING,
+    SET_VEC2D,
+    SET_VEC2DI,
     SET_VEC3D,
 )
 from flowgraph.adapters.sinks import AVAILABLE_NODES as SINKS_AVAILABLE_NODES
@@ -99,7 +101,8 @@ ADAPTERS = AdapterCatalog(
             subgroups=(
                 AdapterGroup("Scalars", (SET_STRING, SET_BOOLEAN, SET_INT, SET_FLOAT)),
                 AdapterGroup(
-                    "Lists/Vectors", (SET_LIST_STR, SET_LIST_INT, SET_LIST_FLOAT, SET_VEC3D)
+                    "Lists/Vectors",
+                    (SET_LIST_STR, SET_LIST_INT, SET_LIST_FLOAT, SET_VEC2D, SET_VEC2DI, SET_VEC3D),
                 ),
                 AdapterGroup(
                     "Files",

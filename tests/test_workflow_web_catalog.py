@@ -50,7 +50,7 @@ def test_workflow_web_catalog_exports_registered_nodes_without_executors() -> No
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 
-    assert len(nodes) == len(ADAPTERS.node_definitions) == 78
+    assert len(nodes) == len(ADAPTERS.node_definitions) == 80
     assert all(isinstance(node["requirements"], list) for node in nodes.values())
     assert all(
         isinstance(requirement, str)
@@ -89,6 +89,44 @@ def test_workflow_web_catalog_exports_boolean_input() -> None:
     assert node["parameters"][0]["kind_id"] == "boolean"
     assert node["parameters"][0]["default"] is False
     assert node["parameters"][0]["port"] is True
+
+
+def test_workflow_web_catalog_exports_2d_vector_input() -> None:
+    nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
+    node = nodes["set-vec2d"]
+
+    assert node["label"] == "2D Vector Input"
+    assert node["requirements"] == []
+    assert [(port["name"], port["direction"], port["data_type_id"]) for port in node["ports"]] == [
+        ("value", "output", "VEC2D"),
+        ("x", "input", "float"),
+        ("y", "input", "float"),
+    ]
+    assert [(param["name"], param["default"]) for param in node["parameters"]] == [
+        ("x", 0.0),
+        ("y", 0.0),
+    ]
+
+
+def test_workflow_web_catalog_exports_2d_integer_vector_input() -> None:
+    nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
+    node = nodes["set-vec2di"]
+
+    assert node["label"] == "2D Integer Vector Input"
+    assert node["requirements"] == []
+    assert [(port["name"], port["direction"], port["data_type_id"]) for port in node["ports"]] == [
+        ("value", "output", "VEC2DI"),
+        ("x", "input", "integer"),
+        ("y", "input", "integer"),
+    ]
+    assert [(param["name"], param["default"]) for param in node["parameters"]] == [
+        ("x", 0),
+        ("y", 0),
+    ]
+    dimension_port = next(
+        port for port in nodes["create-square"]["ports"] if port["name"] == "dimensions"
+    )
+    assert dimension_port["data_type_id"] == "VEC2DI"
 
 
 def test_write_workflow_web_catalog_is_deterministic_json(tmp_path: Path) -> None:

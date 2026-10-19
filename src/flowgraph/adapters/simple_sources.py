@@ -21,6 +21,8 @@ from .data_types import (
     LIST_INT,
     LIST_STR,
     STRING,
+    VEC2D,
+    VEC2DI,
     VEC3D,
     ParameterKind,
 )
@@ -122,6 +124,64 @@ SET_FLOAT = NodeDefinition(
     ports=(PortDefinition("value", PortDirection.OUTPUT, FLOAT, "Value"),),
     executor=_set_float,
     parameters=(ParameterDefinition("value", ParameterKind.FLOAT, "Value", 0.0, "0.0"),),
+)
+
+
+def _set_vec2d(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Output a configured finite two-dimensional vector."""
+    components = tuple(parameters.get(axis, 0.0) for axis in ("x", "y"))
+    if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in components):
+        raise TypeError("The configured vector components must be numeric")
+
+    vector = [float(value) for value in components]
+    if not all(math.isfinite(value) for value in vector):
+        raise ValueError("The configured vector components must be finite")
+    return {"value": list(vector)}
+
+
+SET_VEC2D = NodeDefinition(
+    id="set-vec2d",
+    requirements=(),
+    icon="mdi-axis-arrow",
+    label="2D Vector Input",
+    description="Outputs a configured two-dimensional vector.",
+    ports=(PortDefinition("value", PortDirection.OUTPUT, VEC2D, "Value"),),
+    executor=_set_vec2d,
+    parameters=(
+        ParameterDefinition("x", ParameterKind.FLOAT, "X", 0.0, "0.0"),
+        ParameterDefinition("y", ParameterKind.FLOAT, "Y", 0.0, "0.0"),
+    ),
+)
+
+
+def _set_vec2di(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Output a configured two-dimensional integer vector."""
+    components = [parameters.get(axis, 0) for axis in ("x", "y")]
+    if any(isinstance(value, bool) or not isinstance(value, int) for value in components):
+        raise TypeError("The configured integer vector components must be integers")
+    return {"value": components}
+
+
+SET_VEC2DI = NodeDefinition(
+    id="set-vec2di",
+    requirements=(),
+    icon="mdi-axis-arrow",
+    label="2D Integer Vector Input",
+    description="Outputs a configured two-dimensional integer vector.",
+    ports=(PortDefinition("value", PortDirection.OUTPUT, VEC2DI, "Value"),),
+    executor=_set_vec2di,
+    parameters=(
+        ParameterDefinition("x", ParameterKind.INTEGER, "X", 0, "0"),
+        ParameterDefinition("y", ParameterKind.INTEGER, "Y", 0, "0"),
+    ),
 )
 
 
@@ -263,6 +323,8 @@ AVAILABLE_NODES = (
     SET_BOOLEAN,
     SET_INT,
     SET_FLOAT,
+    SET_VEC2D,
+    SET_VEC2DI,
     SET_VEC3D,
     SET_LIST_STR,
     SET_LIST_INT,
