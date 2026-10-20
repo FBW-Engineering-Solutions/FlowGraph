@@ -5,17 +5,22 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+import numpy as np
+
 from flowgraph.application.workflow_core import (
     ExecContext,
     NodeDefinition,
     NodeInstance,
     NodeRegistry,
+    ParameterDefinition,
+    ParameterOption,
     PortDefinition,
     PortDirection,
     WorkflowEdge,
 )
+from flowgraph.domain.mesh_document import MeshDocument
 
-from .data_types import LIST_ANY, TABLE_DOCUMENT
+from .data_types import LIST_ANY, MESH_DOCUMENT, TABLE_DOCUMENT, ParameterKind
 
 
 def _aggregate_lists_to_table(
@@ -67,6 +72,57 @@ AGGREGATE_LISTS_TO_TABLE = NodeDefinition(
     edge_aware_instance_executor=_aggregate_lists_to_table,
 )
 
-AVAILABLE_NODES = (AGGREGATE_LISTS_TO_TABLE,)
 
-__all__ = ["AGGREGATE_LISTS_TO_TABLE", "AVAILABLE_NODES"]
+def _mesh_to_table(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Copy node or cell fields into a table with one row per mesh entity."""
+    document: MeshDocument = inputs["mesh"]
+    entity = parameters.get("entity", "node")
+    if entity == "node":
+        fields = document.mesh.nodeFields
+        count = document.mesh.GetNumberOfNodes()
+    elif entity == "cell":
+        fields = document.mesh.elemFields
+        count = document.mesh.GetNumberOfElements()
+    else:
+        raise ValueError(f"entity must be 'node' or 'cell', got {entity!r}")
+
+    table: dict[str, list[Any]] = {}
+    for name, field in fields.items():
+        values = np.asarray(field)
+        if values.ndim == 0 or len(values) != count:
+            raise ValueError(f"{entity} field {name!r} must have {count} rows")
+        table[name] = values.tolist()
+    return {"table": table}
+
+
+MESH_TO_TABLE = NodeDefinition(
+    id="mesh-to-table",
+    requirements=("py:muscat", "py:numpy"),
+    icon="mdi-table-arrow-right",
+    label="Mesh to Table",
+    description="Copy node or cell fields from a mesh document into a table.",
+    ports=(
+        PortDefinition("mesh", PortDirection.INPUT, MESH_DOCUMENT, "Mesh"),
+        PortDefinition("table", PortDirection.OUTPUT, TABLE_DOCUMENT, "Table"),
+    ),
+    executor=_mesh_to_table,
+    parameters=(
+        ParameterDefinition(
+            "entity",
+            ParameterKind.STR_SELECT,
+            "Data location",
+            "node",
+            options=(ParameterOption("node", "Node data"), ParameterOption("cell", "Cell data")),
+            port=False,
+        ),
+    ),
+)
+
+
+AVAILABLE_NODES = (AGGREGATE_LISTS_TO_TABLE, MESH_TO_TABLE)
+
+__all__ = ["AGGREGATE_LISTS_TO_TABLE", "AVAILABLE_NODES", "MESH_TO_TABLE"]
