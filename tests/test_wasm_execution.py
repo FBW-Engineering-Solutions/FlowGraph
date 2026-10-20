@@ -12,9 +12,14 @@ from PIL import Image as PillowImage
 
 from flowgraph.adapters.simple_sources import SET_STRING
 from flowgraph.adapters.workflow_interfaces import WORKFLOW_OUTPUT
+from flowgraph.application import wasm_execution
 from flowgraph.application.node_registry import create_node_registry
 from flowgraph.application.wasm_execution import _display_meshes, execute_workflow_json
-from flowgraph.application.workflow_core import WorkflowEdge, WorkflowGraph
+from flowgraph.application.workflow_core import (
+    NodeDefinition,
+    WorkflowEdge,
+    WorkflowGraph,
+)
 from flowgraph.application.workflow_io import workflow_to_dict
 
 
@@ -165,6 +170,36 @@ def test_execute_workflow_json_serializes_invalid_requests_as_errors() -> None:
     assert response["status"] == "error"
     assert response["error"]["type"] == "WorkflowPersistenceError"
     assert "not valid JSON" in response["error"]["message"]
+
+
+def test_execute_workflow_json_reports_failing_node_and_original_line(monkeypatch) -> None:
+    def failing_node(_inputs, _parameters):
+        raise ValueError("dimension mismatch")
+
+    registry = create_node_registry()
+    registry.register(
+        NodeDefinition(
+            id="failing-test-node",
+            icon="",
+            label="Failing Test Node",
+            ports=(),
+            executor=failing_node,
+        )
+    )
+    workflow = WorkflowGraph([registry.create_instance("failing-test-node", "transfer-fields-13")])
+    monkeypatch.setattr(wasm_execution, "_REGISTRY", registry)
+    response = json.loads(execute_workflow_json(json.dumps(workflow_to_dict(workflow))))
+
+    assert response["status"] == "error"
+    detail = response["error"]
+    assert detail["type"] == "NodeExecutionError"
+    assert detail["node_id"] == "transfer-fields-13"
+    assert detail["definition_id"] == "failing-test-node"
+    assert "dimension mismatch" in detail["message"]
+    assert 'raise ValueError("dimension mismatch")' in detail["traceback"]
+    assert "test_wasm_execution.py" in detail["traceback"]
+    assert "ValueError: dimension mismatch" in detail["traceback"]
+    assert "The above exception was the direct cause" in detail["traceback"]
 
 
 def test_wasm_execution_uses_the_complete_core_node_registry() -> None:

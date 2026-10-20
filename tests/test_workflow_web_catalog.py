@@ -50,7 +50,7 @@ def test_workflow_web_catalog_exports_registered_nodes_without_executors() -> No
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 
-    assert len(nodes) == len(ADAPTERS.node_definitions) == 80
+    assert len(nodes) == len(ADAPTERS.node_definitions) == 81
     assert all(isinstance(node["requirements"], list) for node in nodes.values())
     assert all(
         isinstance(requirement, str)
@@ -73,6 +73,23 @@ def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> Non
         "py:pyplaid",
         "py:muscat",
         "py:pycgns",
+    ]
+
+
+def test_workflow_web_catalog_exports_mesh_to_table_with_internal_selector() -> None:
+    nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
+    node = nodes["mesh-to-table"]
+
+    assert [(port["name"], port["direction"], port["data_type_id"]) for port in node["ports"]] == [
+        ("mesh", "input", "mesh-document"),
+        ("table", "output", "table-document"),
+    ]
+    assert node["parameters"][0]["name"] == "entity"
+    assert node["parameters"][0]["default"] == "node"
+    assert node["parameters"][0]["port"] is False
+    assert [option["value"] for option in node["parameters"][0]["options"]] == [
+        "node",
+        "cell",
     ]
 
 

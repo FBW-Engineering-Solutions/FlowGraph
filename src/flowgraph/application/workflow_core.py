@@ -1270,6 +1270,7 @@ class WorkflowExecutor:
                                 node.definition_id,
                                 f"conversion {conversion.label} failed for {edge.id}: {error}",
                             )
+                            first_error.__cause__ = error
                         input_error = True
                         continue
                 target_port = definition.input_for_instance(edge.target_port, node)
@@ -1320,6 +1321,7 @@ class WorkflowExecutor:
             except Exception as error:  # noqa: BLE001
                 if first_error is None:
                     first_error = NodeExecutionError(node.id, node.definition_id, str(error))
+                    first_error.__cause__ = error
                 continue
             try:
                 self._validate_outputs(node, definition, node_outputs)

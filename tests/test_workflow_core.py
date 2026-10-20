@@ -611,6 +611,9 @@ def test_malformed_outputs_and_executor_failures_include_node_context(
 
     assert caught.value.node_id == "configured-source"
     assert caught.value.definition_id == "source"
+    if message == "division by zero":
+        assert isinstance(caught.value.__cause__, ZeroDivisionError)
+        assert caught.value.__cause__.__traceback__ is not None
 
 
 def test_node_execution_error_preserves_only_the_validated_completed_prefix() -> None:

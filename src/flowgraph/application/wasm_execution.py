@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import traceback
 from base64 import b64encode
 from collections.abc import Mapping
 from io import BytesIO
@@ -167,8 +168,15 @@ def _error_response(error: Exception) -> dict[str, Any]:
     """Convert an execution or validation failure into a stable response."""
     response: dict[str, Any] = {
         "status": "error",
-        "error": {"type": type(error).__name__, "message": str(error)},
+        "error": {
+            "type": type(error).__name__,
+            "message": str(error),
+            "traceback": "".join(traceback.format_exception(error)),
+        },
     }
+    if isinstance(error, NodeExecutionError):
+        response["error"]["node_id"] = error.node_id
+        response["error"]["definition_id"] = error.definition_id
     if isinstance(error, NodeExecutionError) and error.partial_result is not None:
         response["partial"] = _serialize_result(error.partial_result)
     if isinstance(error, WorkflowError) and getattr(error, "issues", None):
