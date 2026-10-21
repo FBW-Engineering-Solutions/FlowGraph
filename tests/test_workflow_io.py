@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from flowgraph.adapters.simple_sources import SET_STRING
+from flowgraph.adapters.user_code import USER_FUNCTION
 from flowgraph.adapters.workflow import BATCH_WORKFLOW, RUN_WORKFLOW
 from flowgraph.adapters.workflow_interfaces import WORKFLOW_INPUT, WORKFLOW_OUTPUT
 from flowgraph.application.node_registry import create_node_registry
@@ -45,6 +46,69 @@ def test_workflow_json_round_trip_preserves_domain_graph(tmp_path: Path) -> None
         destination.read_text()
         == json.dumps(workflow_to_dict(workflow), indent=2, sort_keys=True) + "\n"
     )
+
+
+@pytest.mark.parametrize(
+    "code",
+    (
+        "",
+        "def Execute() -> tuple[Any]:\n    return (1,)",
+        "\ndef Execute() -> tuple[Any]:\n\n    return (1,)\n    \n",
+        "def Execute() -> tuple[Any]:\r\n    return (1,)\r\n",
+        "line with {testdata}/foo\n",
+        "{testdata}/foo\n",
+        "\n",
+        "\n\n",
+        "one line",
+        "line ending with slash \\\nnext line",
+    ),
+)
+def test_user_function_code_lines_round_trip(tmp_path: Path, code: str) -> None:
+    registry = create_node_registry()
+    workflow = WorkflowGraph([USER_FUNCTION.create_instance("python", parameters={"code": code})])
+    destination = tmp_path / "python.json"
+
+    save_workflow(workflow, destination)
+    payload = json.loads(destination.read_text(encoding="utf-8"))
+
+    assert payload["nodes"][0]["parameters"]["code"] == code.split("\n")
+    assert load_workflow(destination, registry).require_node("python").parameters["code"] == code
+    assert workflow_to_dict(workflow_from_dict(payload, registry)) == payload
+
+
+def test_legacy_string_code_and_nested_code_arrays_load() -> None:
+    registry = create_node_registry()
+    code = "def Execute() -> tuple[Any]:\n    return (1,)\n"
+    inner = WorkflowGraph([USER_FUNCTION.create_instance("inner", parameters={"code": code})])
+    outer = RUN_WORKFLOW.create_instance("outer")
+    outer.subworkflow = inner
+    payload = workflow_to_dict(WorkflowGraph([outer]))
+
+    assert payload["nodes"][0]["subworkflow"]["nodes"][0]["parameters"]["code"] == code.split("\n")
+    assert (
+        workflow_from_dict(payload, registry)
+        .require_node("outer")
+        .subworkflow.require_node("inner")
+        .parameters["code"]
+        == code
+    )
+    payload["nodes"][0]["subworkflow"]["nodes"][0]["parameters"]["code"] = code
+    assert (
+        workflow_from_dict(payload, registry)
+        .require_node("outer")
+        .subworkflow.require_node("inner")
+        .parameters["code"]
+        == code
+    )
+
+
+@pytest.mark.parametrize("code", ([], [42], ["line\nother"], ["ok", None], 42, None))
+def test_user_function_rejects_invalid_code_lines(code: object) -> None:
+    payload = workflow_to_dict(WorkflowGraph([USER_FUNCTION.create_instance("python")]))
+    payload["nodes"][0]["parameters"]["code"] = code
+
+    with pytest.raises(WorkflowPersistenceError, match="Code for node 'python'"):
+        workflow_from_dict(payload, create_node_registry())
 
 
 @pytest.mark.parametrize("filename", ("SimpleReadMesh.json", "AllFilters.json"))

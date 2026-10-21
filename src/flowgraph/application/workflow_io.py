@@ -50,7 +50,13 @@ def _workflow_to_dict(workflow: WorkflowGraph, ancestors: set[int]) -> dict[str,
                 "id": node.id,
                 "definition_id": node.definition_id,
                 "parameters": {
-                    name: _serialize_testdata_value(value, testdata_root)
+                    name: (
+                        value.split("\n")
+                        if node.definition_id == "user-function"
+                        and name == "code"
+                        and isinstance(value, str)
+                        else _serialize_testdata_value(value, testdata_root)
+                    )
                     for name, value in node.parameters.items()
                 },
                 "position": {"x": node.x, "y": node.y},
@@ -242,6 +248,18 @@ def _parse_node(
         raise WorkflowPersistenceError(
             f"Parameters for node {node_id!r} must be an object with string keys"
         )
+    if definition_id == "user-function" and "code" in parameters:
+        code = parameters["code"]
+        if isinstance(code, list):
+            if not code or any(not isinstance(line, str) or "\n" in line for line in code):
+                raise WorkflowPersistenceError(
+                    f"Code for node {node_id!r} must be a non-empty array of lines without newlines"
+                )
+            parameters = {**parameters, "code": "\n".join(code)}
+        elif not isinstance(code, str):
+            raise WorkflowPersistenceError(
+                f"Code for node {node_id!r} must be a string or an array of lines"
+            )
     position = raw_node.get("position", {})
     if not isinstance(position, Mapping):
         raise WorkflowPersistenceError(f"Position for node {node_id!r} must be an object")
@@ -285,7 +303,11 @@ def _resolve_testdata_paths(payload: Mapping[str, Any]) -> Mapping[str, Any]:
         parameters = node.get("parameters")
         if isinstance(parameters, dict):
             node["parameters"] = {
-                name: _resolve_testdata_value(value, testdata_root)
+                name: (
+                    value
+                    if node.get("definition_id") == "user-function" and name == "code"
+                    else _resolve_testdata_value(value, testdata_root)
+                )
                 for name, value in parameters.items()
             }
         subworkflow = node.get("subworkflow")

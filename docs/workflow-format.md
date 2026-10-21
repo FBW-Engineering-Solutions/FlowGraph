@@ -20,6 +20,20 @@ Each node has a stable instance `id`, a registry `definition_id`, a JSON object
 of `parameters`, and an optional `{ "x": number, "y": number }` position. A
 composite node may contain a recursively serialized `subworkflow`.
 
+For `user-function` nodes, `parameters.code` may be a JSON string with escaped
+newlines (legacy form) or an array of Python source lines. New exports use an
+array; the loader joins its entries with `\n` before parsing the function. An
+empty first or last entry preserves a leading or trailing newline, and empty
+entries between lines preserve blank lines. For example:
+
+```json
+"code": ["def Execute(value) -> tuple[Any]:", "    return (value,)", ""]
+```
+
+Each array entry must be a string without embedded newlines. In memory, code
+remains a single Python source string. Other parameters retain their existing
+JSON representations.
+
 Edges refer to named ports using `source_node`, `source_port`, `target_node`,
 and `target_port`. Workflow boundary inputs and outputs refer to a node and
 port through `name`, `node_id`, and `node_port`.
