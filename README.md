@@ -26,6 +26,8 @@ The `flowgraph` command is headless and has no GUI runtime dependency:
 
 ```bash
 uv run flowgraph inspect workflow.json
+uv run flowgraph inspect workflow.json --full
+uv run flowgraph inspect workflow.json -i name=value --override node-id.parameter=value
 uv run flowgraph run workflow.json --input name=value
 uv run flowgraph run workflow.json -i name=value
 uv run flowgraph run workflow.json --override node-id.parameter=value
@@ -36,6 +38,11 @@ Use `--input` or its short form `-i` for each published workflow input; repeat
 the option to provide multiple inputs.
 `flowgraph inspect` displays the resolved default to the right of each published
 input, or marks it as required or having conflicting saved values.
+Inspection is compact by default; add `--full` (or `-f`) to include the workflow
+graph. Arbitrary-code warnings remain visible in both modes.
+Inspection accepts the same `--input` / `-i` and `--override` assignments as
+execution: overrides update the displayed defaults, and explicit inputs take
+precedence and are marked `(--input)`. It never executes nodes or saves changes.
 When an input is omitted, `flowgraph run` uses its downstream node's saved
 parameter value and prints a warning to stderr identifying the input, value,
 and parameter. This also works for directly exported parameters and nested

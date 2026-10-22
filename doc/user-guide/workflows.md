@@ -71,8 +71,31 @@ Inspect the public interface, then provide the inputs you want to change:
 
 ```bash
 flowgraph inspect workflow.json
+flowgraph inspect workflow.json --full
 flowgraph run workflow.json --input message=hello
 ```
+
+Inspection is compact by default: it shows published inputs, their saved defaults,
+published outputs, and any arbitrary-code warnings. Add `--full` or `-f` to include
+the `Workflow:` graph section, for example `flowgraph inspect -f workflow.json`.
+
+The full inspection graph lists nodes in dependency order, with disconnected nodes
+first. A deterministic heuristic reorders ready nodes to reduce visible crossing
+junctions, then vertical lane length, keeping the original layout on ties or when
+the candidate is worse. This does not guarantee the global minimum and does not
+change workflow execution order or saved node positions.
+Within each node, ordinary inputs, parameters, and outputs remain separate
+sections in that order. Connected inputs and parameters are reordered only
+within their own section, visiting rightmost lanes first to reduce crossings.
+Outputs are ordered by their last consumer, placing longer-lived lanes on the
+left. These display permutations do not change port definitions or parameters.
+Each connected output opens one shared vertical lane on its `(O)` line, with
+all destinations listed as `(to first.port, second.port)`. Intermediate consumers
+branch from that lane with `├──▶`; the last consumer closes it with `└──▶`.
+Input labels retain `(from source.port)` to identify provenance where lines cross.
+Unconnected outputs remain ordinary `(O)` lines without lanes. Connected
+parameters show the incoming connection rather
+than their inactive saved value. Nested workflows have separate connection lanes.
 
 `-i` is an alias for `--input`; repeat either option for multiple inputs.
 Values are decoded as JSON when possible, so `count=0` and `enabled=false`
@@ -93,6 +116,22 @@ downstream defaults show `default: (conflicting saved values; provide --input)`;
 inspection still displays the rest of the workflow. Defaults use the same lookup
 as `flowgraph run`, including nested workflows and directly exported parameters.
 Inspection does not execute nodes or emit omitted-input execution warnings.
+
+Preview command-line values with the same assignments supported by `run`:
+
+```bash
+flowgraph inspect workflow.json -i message=hello --override target.value=updated
+flowgraph inspect workflow.json --full --input message=hello
+```
+
+Overrides are applied in memory before resolving saved defaults. Explicit input
+values take precedence and appear as `default: 'hello' (--input)` in the report.
+Other inputs retain their resolved default, required, or conflict markers; you
+do not need to supply every required input just to inspect a workflow. Repeated
+assignments, unknown inputs/nodes/parameters, and incompatible explicit input
+types are rejected just as for `run`. Full graph parameter lines reflect the
+overrides; connected parameters still show their incoming connection rather than
+an inactive saved value. No nodes are executed and the workflow file is unchanged.
 
 You can omit an input when the workflow contains a usable saved parameter value
 for it:

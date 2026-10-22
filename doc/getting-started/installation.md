@@ -70,6 +70,9 @@ without opening the graphical workspace. Check a workflow with:
 uv run flowgraph inspect workflow.json
 ```
 
+Inspection shows a compact interface summary by default. Add `--full` or `-f`
+to include the workflow graph.
+
 The Web Editor and local application use the same versioned `flowgraph-workflow` JSON
 format. The editor does not execute workflows, read local files, perform mesh
 operations, or run Python source from a User Function node. Download the workflow and

@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from flowgraph.adapters.controls import FLOAT_SLIDER
+from flowgraph.adapters.data_types import STRING
 from flowgraph.adapters.image_tools import READ_IMAGE, ROTATE_IMAGE
 from flowgraph.adapters.imagej import IMAGEJ_SCRIPT, IMAGEJ_SCRIPT_FILE
 from flowgraph.adapters.remote_files import DOWNLOAD_URL
@@ -19,12 +20,22 @@ from flowgraph.adapters.workflow_interfaces import WORKFLOW_INPUT, WORKFLOW_OUTP
 from flowgraph.application.node_registry import create_node_registry
 from flowgraph.application.workflow_cli import (
     WorkflowCliError,
+    _render_graph,
     execute_cli_workflow,
     format_workflow_inspection,
+    inspect_workflow,
     parse_inputs,
     parse_overrides,
 )
-from flowgraph.application.workflow_core import WorkflowEdge, WorkflowGraph
+from flowgraph.application.workflow_core import (
+    NodeDefinition,
+    NodeRegistry,
+    ParameterDefinition,
+    PortDefinition,
+    PortDirection,
+    WorkflowEdge,
+    WorkflowGraph,
+)
 from flowgraph.application.workflow_io import load_workflow, save_workflow
 from flowgraph.core_cli import main
 
@@ -74,8 +85,44 @@ def test_cli_inspection_lists_public_interface_and_directed_edges() -> None:
     assert "(workflow-input)[input] Workflow Input" in text
     assert "(workflow-output)[output] Workflow Output" in text
     assert "(O) value - Any" in text
-    assert "  │\n   │ (workflow-output)[output] Workflow Output" in text
-    assert "   └─(I) value - Any" in text
+    assert "┌─── (O) value - Any (to output.value)" in text
+    assert "└──▶ (I) value - Any (from input.value)" in text
+
+
+@pytest.mark.parametrize("full_option", ["--full", "-f"])
+def test_cli_inspection_is_compact_by_default_and_full_is_opt_in(
+    tmp_path: Path, capsys, monkeypatch, full_option: str
+) -> None:
+    from flowgraph.application import workflow_cli
+
+    path = tmp_path / "inspection.json"
+    save_workflow(_published_workflow(), path)
+    full_text = inspect_workflow(path, full=True)
+    compact_text = full_text.split("Workflow:\n", 1)[0].rstrip()
+    with monkeypatch.context() as patch:
+
+        def unexpected_graph(*args, **kwargs):
+            pytest.fail("Compact inspection must not render the graph")
+
+        patch.setattr(workflow_cli, "_format_graph", unexpected_graph)
+        assert inspect_workflow(path) == compact_text
+        assert main(["inspect", str(path)]) == 0
+        captured = capsys.readouterr()
+        assert captured.out == compact_text + "\n"
+        assert captured.err == ""
+    assert main(["inspect", full_option, str(path)]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == full_text + "\n"
+    assert captured.err == ""
+
+
+@pytest.mark.parametrize("full", [False, True])
+def test_cli_inspection_full_flag_handles_empty_graph(tmp_path: Path, full: bool) -> None:
+    path = tmp_path / "empty.json"
+    save_workflow(WorkflowGraph(), path)
+    text = inspect_workflow(path, full=full)
+    assert text.startswith("Inputs:\n  (none)\nOutputs:\n  (none)")
+    assert ("Workflow:\n  (empty)" in text) is full
 
 
 def test_cli_inspection_lists_disconnected_nodes_before_connected_tree() -> None:
@@ -92,30 +139,12 @@ def test_cli_inspection_lists_disconnected_nodes_before_connected_tree() -> None
     writer_index = text.index("[mesh_writer]")
     assert title_index < paragraph_index < input_index < output_index < writer_index
     assert "\n\n  (paragraph-doc)[paragraph-doc-6]" in text
-    expected_workflow = """  (title-doc)[title-doc-5] Title
-  (P) title - Text: 'Mesh Converter Muscat >> Muscat'
-
-  (paragraph-doc)[paragraph-doc-6] Paragraph
-  (P) text - Text: 'Read a mesh file with Muscat and save it with Muscat. '
-
-  (workflow-input)[input] Workflow Input
-  (I) value - Any
-  (P) name - Text: 'in_filename'
-  (O) value - Any
-   │
-   │ (load-muscat)[mesh_loader] Read Mesh (Muscat)
-   └─(P) path - FilePath
-     (O) mesh - Mesh document
-      │
-      │ (workflow-input)[output] Workflow Input
-      │ (I) value - Any
-      │ (P) name - Text: 'out_filename'
-      │ (O) value - Any
-      │  │
-      │  │ (write-muscat)[mesh_writer] Write Mesh (Muscat)
-      │  └─(P) path - FilePath
-      └────(I) mesh - Mesh document"""
-    assert text.split("Workflow:\n", 1)[1] == expected_workflow
+    assert "(O) value - Any (to mesh_loader.path)" in text
+    assert "(O) value - Any (to mesh_writer.path)" in text
+    assert "(O) mesh - Mesh document (to mesh_writer.mesh)" in text
+    assert "(P) path - FilePath (from output.value)" in text
+    assert "(I) mesh - Mesh document (from mesh_loader.mesh)" in text
+    assert "(P) path - FilePath:" not in text
 
 
 def test_cli_inspection_lists_ports_parameters_and_defaults_deterministically() -> None:
@@ -141,7 +170,13 @@ def test_cli_inspection_renders_branching_edges_vertically() -> None:
 
     text = format_workflow_inspection(workflow, registry)
     assert text.count("│\n") >= 2
-    assert "└─(I) value - Any" in text
+    assert "┌─── (O) value - Text (to first.value, second.value)" in text
+    assert text.count("(O) value - Text") == 1
+    assert "├──▶ (I) value - Any (from source.value)" in text
+    assert "└──▶ (I) value - Any (from source.value)" in text
+    assert text.count("┌") == text.count("└") == 1
+    assert text.count("(I) value - Any (from source.value)") == 2
+    assert text.count("▶") == len(workflow.edges)
     assert text.index("[first]") < text.index("[second]")
 
 
@@ -159,6 +194,35 @@ def test_cli_inspection_preserves_order_for_multiple_incoming_edges() -> None:
     # the stable ordering of the two source branches.
     text = format_workflow_inspection(workflow, registry)
     assert text.index("[second]") < text.index("[first]")
+
+
+def test_cli_inspection_shared_lane_branches_twice_at_one_node_and_is_reused() -> None:
+    registry = create_node_registry()
+    graph = WorkflowGraph(
+        [
+            SET_STRING.create_instance("source"),
+            USER_FUNCTION.create_instance(
+                "merge",
+                parameters={
+                    "code": "def Execute(left, right) -> tuple[Any]:\n    return (left,)\n"
+                },
+            ),
+            WORKFLOW_OUTPUT.create_instance("sink"),
+        ]
+    )
+    for edge in (
+        WorkflowEdge("source", "value", "merge", "left"),
+        WorkflowEdge("source", "value", "merge", "right"),
+        WorkflowEdge("merge", "output1", "sink", "value"),
+    ):
+        graph.add_edge(edge, registry)
+    text = format_workflow_inspection(graph, registry).split("Workflow:\n", 1)[1]
+    assert "┌─── (O) value - Text (to merge.left, merge.right)" in text
+    assert "├──▶ (I) left - Any (from source.value)" in text
+    assert "└──▶ (I) right - Any (from source.value)" in text
+    assert "\n  ┌─── (O) output1 - Any (to sink.value)" in text
+    assert text.count("┌") == text.count("└") == 2
+    assert text.count("├") == 1
 
 
 def test_cli_inspection_lists_shared_target_inputs_before_outputs() -> None:
@@ -186,31 +250,15 @@ def test_cli_inspection_lists_shared_target_inputs_before_outputs() -> None:
 
     text = format_workflow_inspection(workflow, registry)
 
-    assert (
-        text.split("Workflow:\n", 1)[1]
-        == """  (download-url)[download-url_1] Download URL
-  (P) url - Text: 'https://example.test/image.jpg'
-  (O) path - Text
-   │
-   │ (read-image)[read-image_3] Read Image (Pillow)
-   └─(P) path - FilePath
-     (O) image - Image
-      │
-      │ (float-slider)[float-slider_1] Float Slider
-      │ (P) min - Float: 0.0
-      │ (P) max - Float: 180.0
-      │ (P) value - Float: 33.27
-      │ (O) value - Float
-      │  │
-      │  │ (rotate-image)[rotate-image_2] Rotate Image
-      │  └─(P) angle - Float
-      └────(I) image - Image
-           (P) expand - Boolean: True
-           (O) image - Image
-            │
-            │ (local-view)[local-view_2] Show Image
-            └─(I) input - Image"""
-    )
+    graph_text = text.split("Workflow:\n", 1)[1]
+    assert "(P) angle - Float (from float-slider_1.value)" in graph_text
+    assert "(I) image - Image (from read-image_3.image)" in graph_text
+    target_text = graph_text.split("[rotate-image_2]", 1)[1]
+    assert target_text.index("(P) angle") < target_text.index("(O) image")
+    assert target_text.index("(I) image") < target_text.index("(O) image")
+    for edge in workflow.edges:
+        source_section = graph_text.split(f"[{edge.source_node}]", 1)[1].split("\n\n", 1)[0]
+        assert f"(to {edge.target_node}.{edge.target_port})" in source_section
 
 
 def test_cli_inspection_keeps_disconnected_nodes_and_empty_workflows() -> None:
@@ -226,6 +274,154 @@ def test_cli_inspection_keeps_disconnected_nodes_and_empty_workflows() -> None:
     assert "(set-string)[two] String Input" in text
 
 
+@pytest.mark.parametrize("reverse", [False, True])
+def test_cli_inspection_preserves_every_edge_in_shared_dependency_graph(
+    tmp_path: Path, capsys, reverse: bool
+) -> None:
+    registry = create_node_registry()
+    nodes = [
+        USER_FUNCTION.create_instance(
+            "merge",
+            parameters={"code": "def Execute(left, right) -> tuple[Any]:\n    return (left,)\n"},
+        ),
+        SET_STRING.create_instance("left", parameters={"value": "left saved"}),
+        SET_STRING.create_instance("right", parameters={"value": "right saved"}),
+        WORKFLOW_OUTPUT.create_instance("result", parameters={"name": "result"}),
+        WORKFLOW_OUTPUT.create_instance("preview", parameters={"name": "preview"}),
+        WORKFLOW_INPUT.create_instance("source", parameters={"name": "message"}),
+    ]
+    edges = [
+        WorkflowEdge("source", "value", "left", "value"),
+        WorkflowEdge("source", "value", "right", "value"),
+        WorkflowEdge("left", "value", "merge", "left"),
+        WorkflowEdge("right", "value", "merge", "right"),
+        WorkflowEdge("left", "value", "preview", "value"),
+        WorkflowEdge("merge", "output1", "result", "value"),
+    ]
+    graph = WorkflowGraph(list(reversed(nodes)) if reverse else nodes)
+    for edge in reversed(edges) if reverse else edges:
+        graph.add_edge(edge, registry)
+    graph.sync_boundary_nodes(registry)
+    path = tmp_path / "shared-dependencies.json"
+    save_workflow(graph, path)
+    restored = load_workflow(path, registry)
+    assert main(["inspect", str(path), "--full"]) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    text = captured.out.split("Workflow:\n", 1)[1]
+    assert (
+        text.rstrip() == format_workflow_inspection(restored, registry).split("Workflow:\n", 1)[1]
+    )
+    for node in nodes:
+        assert text.count(f"[{node.id}]") == 1
+    for edge in edges:
+        source = text.index(f"[{edge.source_node}]")
+        target = text.index(f"[{edge.target_node}]")
+        source_section = text[source:target]
+        output_line = next(
+            line
+            for line in source_section.splitlines()
+            if f"(O) {edge.source_port} -" in line
+            and f"{edge.target_node}.{edge.target_port}" in line
+        )
+        assert "(to " in output_line
+        target_section = text[target:].split("\n\n", 1)[0]
+        assert f"(from {edge.source_node}.{edge.source_port})" in target_section
+    output_count = len({(edge.source_node, edge.source_port) for edge in edges})
+    assert text.count("┌") == text.count("└") == output_count
+    assert text.count("├") == len(edges) - output_count
+    assert text.count("▶") == len(edges)
+    assert "(P) value - Text:" not in text
+    assert "(I) left - Any\n" not in text
+    assert "(I) right - Any\n" not in text
+
+
+def test_cli_inspection_connection_lane_snapshot() -> None:
+    text = format_workflow_inspection(_published_workflow(), create_node_registry())
+    assert (
+        text.split("Workflow:\n", 1)[1]
+        == """       (workflow-input)[input] Workflow Input
+       (I) value - Any
+       (P) name - Text: 'value'
+  ┌─── (O) value - Any (to output.value)
+  │
+  │    (workflow-output)[output] Workflow Output
+  └──▶ (I) value - Any (from input.value)
+       (P) name - Text: 'result'
+       (O) value - Any"""
+    )
+
+
+def test_cli_inspection_reorders_independent_branches_without_changing_workflow() -> None:
+    registry = create_node_registry()
+    graph = WorkflowGraph(
+        [
+            SET_STRING.create_instance("left"),
+            SET_STRING.create_instance("right"),
+            WORKFLOW_OUTPUT.create_instance("left-end"),
+            WORKFLOW_OUTPUT.create_instance("right-end"),
+        ]
+    )
+    graph.add_edge(WorkflowEdge("left", "value", "left-end", "value"), registry)
+    graph.add_edge(WorkflowEdge("right", "value", "right-end", "value"), registry)
+    execution_order = graph.topological_order()
+    nodes = list(graph.nodes)
+    edges = list(graph.edges)
+    baseline = "\n".join(_render_graph(graph, registry, indent="  ", order=execution_order))
+    text = format_workflow_inspection(graph, registry).split("Workflow:\n", 1)[1]
+    assert baseline.count("┼") > 0
+    assert text.count("┼") == 0
+    assert text.index("[left]") < text.index("[left-end]") < text.index("[right]")
+    for edge in graph.edges:
+        assert text.index(f"[{edge.source_node}]") < text.index(f"[{edge.target_node}]")
+    assert graph.topological_order() == execution_order
+    assert list(graph.nodes) == nodes
+    assert list(graph.edges) == edges
+    assert format_workflow_inspection(graph, registry).split("Workflow:\n", 1)[1] == text
+
+
+@pytest.mark.parametrize("parameter_input", [False, True])
+def test_cli_inspection_aligns_connected_ports_and_node_details(parameter_input: bool) -> None:
+    registry = create_node_registry()
+    source = WORKFLOW_INPUT.create_instance("source", parameters={"name": "message"})
+    if parameter_input:
+        target = SET_STRING.create_instance("target")
+    else:
+        target = USER_FUNCTION.create_instance(
+            "target",
+            parameters={
+                "code": "def Execute(value, spare=None) -> tuple[Any, Any]:\n    return (value, spare)\n"
+            },
+        )
+    graph = WorkflowGraph(
+        [
+            source,
+            target,
+            WORKFLOW_OUTPUT.create_instance("first"),
+            WORKFLOW_OUTPUT.create_instance("second"),
+        ]
+    )
+    graph.add_edge(WorkflowEdge("source", "value", "target", "value"), registry)
+    outputs = [
+        port.name
+        for port in registry.require(target.definition_id).ports_for_instance(target)
+        if port.direction is PortDirection.OUTPUT
+    ]
+    graph.add_edge(WorkflowEdge("target", outputs[0], "first", "value"), registry)
+    graph.add_edge(WorkflowEdge("target", outputs[-1], "second", "value"), registry)
+    text = format_workflow_inspection(graph, registry).split("Workflow:\n", 1)[1]
+    section = text[text.index(next(line for line in text.splitlines() if "[target]" in line)) :]
+    section = section.split("[first]", 1)[0]
+    details = [
+        line
+        for line in section.splitlines()
+        if "[target]" in line or any(f"({kind})" in line for kind in "IPO")
+    ]
+    columns = [line.index("(") for line in details]
+    assert len(columns) >= 3
+    assert len(set(columns)) == 1
+
+
 def test_cli_inspection_renders_nested_workflows() -> None:
     registry = create_node_registry()
     child = WorkflowGraph([SET_STRING.create_instance("child-source")])
@@ -237,6 +433,100 @@ def test_cli_inspection_renders_nested_workflows() -> None:
     assert "(run-workflow)[nested] Run Full Workflow" in text
     assert "  subworkflow:" in text
     assert "    (set-string)[child-source] String Input" in text
+
+
+@pytest.mark.parametrize("reverse_edges", [False, True])
+def test_cli_inspection_permutations_keep_inputs_parameters_outputs_separate(reverse_edges) -> None:
+    registry = NodeRegistry()
+    registry.register(SET_STRING)
+    target = NodeDefinition(
+        id="mixed",
+        icon="",
+        label="Mixed",
+        ports=(
+            PortDefinition("left", PortDirection.INPUT, STRING),
+            PortDefinition("right", PortDirection.INPUT, STRING),
+            PortDefinition("spare", PortDirection.INPUT, STRING, required=False),
+            PortDefinition("out", PortDirection.OUTPUT, STRING),
+        ),
+        parameters=(
+            ParameterDefinition("x", STRING, "X", "saved x"),
+            ParameterDefinition("y", STRING, "Y", "saved y"),
+            ParameterDefinition("unused", STRING, "Unused", "saved unused", port=False),
+        ),
+        executor=lambda _inputs, _parameters: {},
+    )
+    registry.register(target)
+    # Parameter sources precede ordinary inputs deliberately: they must still
+    # render in the parameter section, not ahead of the (I) section.
+    graph = WorkflowGraph(
+        [
+            *(SET_STRING.create_instance(name) for name in ("px", "py", "il", "ir")),
+            target.create_instance("target"),
+        ]
+    )
+    edges = [
+        WorkflowEdge(source, "value", "target", port)
+        for source, port in (("px", "x"), ("py", "y"), ("il", "left"), ("ir", "right"))
+    ]
+    for edge in reversed(edges) if reverse_edges else edges:
+        graph.add_edge(edge, registry)
+    order = graph.topological_order()
+    baseline = "\n".join(
+        _render_graph(graph, registry, indent="  ", order=order, optimize_ports=False)
+    )
+    text = "\n".join(_render_graph(graph, registry, indent="  ", order=order))
+    section = text.split("[target]", 1)[1]
+    tokens = ["(I) right", "(I) left", "(I) spare", "(P) y", "(P) x", "(P) unused", "(O) out"]
+    assert [section.index(token) for token in tokens] == sorted(
+        section.index(token) for token in tokens
+    )
+    assert text.count("┼") < baseline.count("┼")
+    assert "saved x" not in section and "saved y" not in section
+    assert "saved unused" in section
+    assert graph.topological_order() == order
+    assert [port.name for port in target.ports][:3] == ["left", "right", "spare"]
+
+
+def test_cli_inspection_reorders_outputs_by_last_consumer_without_duplicate_fanout() -> None:
+    registry = NodeRegistry()
+    registry.register(WORKFLOW_OUTPUT)
+    source = NodeDefinition(
+        id="outputs",
+        icon="",
+        label="Outputs",
+        ports=tuple(
+            PortDefinition(name, PortDirection.OUTPUT, STRING)
+            for name in ("early", "late", "unused")
+        ),
+        executor=lambda _inputs, _parameters: {},
+    )
+    registry.register(source)
+    graph = WorkflowGraph(
+        [
+            source.create_instance("source"),
+            *(WORKFLOW_OUTPUT.create_instance(name) for name in ("first", "middle", "last")),
+        ]
+    )
+    for edge in (
+        WorkflowEdge("source", "early", "first", "value"),
+        WorkflowEdge("source", "late", "middle", "value"),
+        WorkflowEdge("source", "late", "last", "value"),
+    ):
+        graph.add_edge(edge, registry)
+    order = graph.topological_order()
+    baseline = "\n".join(
+        _render_graph(graph, registry, indent="  ", order=order, optimize_ports=False)
+    )
+    text = "\n".join(_render_graph(graph, registry, indent="  ", order=order))
+    assert text.index("(O) late") < text.index("(O) early") < text.index("(O) unused")
+    assert "(O) late - Text (to middle.value, last.value)" in text
+    assert text.count("(O) late") == 1
+    assert text.count("┼") < baseline.count("┼")
+    assert text.count("├") == 1
+    assert text.count("┌") == text.count("└") == 2
+    assert text == "\n".join(_render_graph(graph, registry, indent="  ", order=order))
+    assert [port.name for port in source.ports] == ["early", "late", "unused"]
 
 
 @pytest.mark.parametrize("definition", [IMAGEJ_SCRIPT, IMAGEJ_SCRIPT_FILE, USER_FUNCTION])
@@ -264,14 +554,18 @@ def test_cli_inspection_warns_about_nested_arbitrary_code_nodes() -> None:
     assert "  (user-function)[nested/python] User Function" in text
 
 
-def test_cli_inspect_command_warns_about_saved_arbitrary_code(tmp_path: Path, capsys) -> None:
+@pytest.mark.parametrize("options", [[], ["--full"], ["-f"]])
+def test_cli_inspect_command_warns_about_saved_arbitrary_code(
+    tmp_path: Path, capsys, options
+) -> None:
     path = tmp_path / "workflow.json"
     save_workflow(WorkflowGraph([USER_FUNCTION.create_instance("python")]), path)
 
-    assert main(("inspect", str(path))) == 0
+    assert main(["inspect", str(path), *options]) == 0
     output = capsys.readouterr()
     assert "Warning: This workflow contains nodes that execute arbitrary code:" in output.out
     assert "  (user-function)[python] User Function" in output.out
+    assert ("Workflow:" in output.out) is bool(options)
     assert output.err == ""
 
 
@@ -338,6 +632,143 @@ def _default_workflow(definition_id="set-string", value="saved") -> WorkflowGrap
     return graph
 
 
+@pytest.mark.parametrize("mode", [[], ["--full"], ["-f"]])
+@pytest.mark.parametrize("input_option", ["--input", "-i"])
+def test_inspect_previews_input_and_override_precedence_without_execution(
+    tmp_path: Path, capsys, monkeypatch, mode, input_option: str
+) -> None:
+    from flowgraph.application.workflow_core import WorkflowExecutor
+
+    def unexpected_run(*args, **kwargs):
+        pytest.fail("Inspection must never execute nodes")
+
+    monkeypatch.setattr(WorkflowExecutor, "run", unexpected_run)
+    graph = _default_workflow()
+    graph.add_node(SET_STRING.create_instance("standalone", parameters={"value": "original"}))
+    path = tmp_path / "preview.json"
+    save_workflow(graph, path)
+    original = path.read_bytes()
+    base = [
+        "inspect",
+        str(path),
+        *mode,
+        "--override",
+        "target.value=overridden",
+        "--override",
+        "standalone.value=preview",
+    ]
+    assert main(base) == 0
+    output = capsys.readouterr()
+    assert "default: 'overridden'" in output.out
+    assert "(--input)" not in output.out
+    assert output.err == ""
+    if mode:
+        assert "(P) value - Text: 'preview'" in output.out
+    assert main([*base, input_option, "value=explicit"]) == 0
+    output = capsys.readouterr()
+    assert "default: 'explicit' (--input)" in output.out
+    assert "default: 'overridden'" not in output.out
+    assert output.err == ""
+    assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    ("definition_id", "assignment", "expected"),
+    [
+        ("set-int", "0", "0"),
+        ("set-boolean", "false", "False"),
+        ("set-string", "", "''"),
+    ],
+)
+def test_inspect_explicit_falsy_values(tmp_path, capsys, definition_id, assignment, expected):
+    path = tmp_path / "falsy.json"
+    value = {"set-int": 42, "set-boolean": True, "set-string": "saved"}[definition_id]
+    save_workflow(_default_workflow(definition_id, value), path)
+    assert main(["inspect", str(path), "-i", f"value={assignment}"]) == 0
+    output = capsys.readouterr()
+    assert f"default: {expected} (--input)" in output.out
+    assert output.err == ""
+
+
+@pytest.mark.parametrize(
+    ("options", "error"),
+    [
+        (["-i", "unknown=value"], "Unknown workflow inputs"),
+        (["-i", "value=42"], "expected Text, got int"),
+        (["-i", "value=one", "--input", "value=two"], "provided more than once"),
+        (["-i", "missing-separator"], "NAME=VALUE"),
+        (["--override", "target=value"], "NODE-ID.PARAMETER=VALUE"),
+        (["--override", "missing.value=x"], "unknown node"),
+        (["--override", "target.missing=x"], "Unknown parameters"),
+        (
+            ["--override", "target.value=x", "--override", "target.value=y"],
+            "provided more than once",
+        ),
+    ],
+)
+def test_inspect_validates_assignments(tmp_path, capsys, options, error):
+    path = tmp_path / "invalid.json"
+    save_workflow(_default_workflow(), path)
+    assert main(["inspect", str(path), *options]) == 2
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert error in output.err
+    assert "Traceback" not in output.err
+
+
+def test_inspect_explicit_input_bypasses_conflicts_and_allows_other_missing_inputs(tmp_path):
+    registry = create_node_registry()
+    graph = _default_workflow()
+    graph.add_node(SET_STRING.create_instance("other", parameters={"value": "different"}))
+    graph.add_edge(WorkflowEdge("input", "value", "other", "value"), registry)
+    graph.add_node(WORKFLOW_INPUT.create_instance("missing", parameters={"name": "required"}))
+    graph.sync_boundary_nodes(registry)
+    path = tmp_path / "partial.json"
+    save_workflow(graph, path)
+    text = inspect_workflow(path, inputs={"value": "explicit"})
+    assert "default: 'explicit' (--input)" in text
+    assert "conflicting" not in text
+    assert "required:" in text and "default: (none; required)" in text
+    text = inspect_workflow(path, overrides={"other": {"value": "saved"}})
+    assert "default: 'saved'" in text
+    assert "conflicting" not in text
+
+
+def test_inspect_direct_export_previews_override_and_explicit_input(tmp_path):
+    registry = create_node_registry()
+    graph = _override_workflow()
+    graph.export_input("text", "source", "value", registry)
+    path = tmp_path / "direct-preview.json"
+    save_workflow(graph, path)
+    assert "default: 'override'" in inspect_workflow(
+        path, overrides={"source": {"value": "override"}}
+    )
+    text = inspect_workflow(
+        path, inputs={"text": "explicit"}, overrides={"source": {"value": "override"}}
+    )
+    assert "default: 'explicit' (--input)" in text
+
+
+def test_inspect_nested_input_previews_without_executing(tmp_path):
+    registry = create_node_registry()
+    nested = RUN_WORKFLOW.create_instance("nested")
+    nested.subworkflow = _default_workflow(value="child saved")
+    graph = WorkflowGraph(
+        [
+            WORKFLOW_INPUT.create_instance("input", parameters={"name": "value"}),
+            nested,
+        ]
+    )
+    graph.add_edge(WorkflowEdge("input", "value", "nested", "value"), registry)
+    graph.sync_boundary_nodes(registry)
+    path = tmp_path / "nested-preview.json"
+    save_workflow(graph, path)
+    assert "default: 'child saved'" in inspect_workflow(path)
+    assert "default: 'explicit' (--input)" in inspect_workflow(
+        path, inputs={"value": "explicit"}, full=True
+    )
+
+
 @pytest.mark.parametrize(
     ("definition_id", "value", "expected"),
     [
@@ -364,17 +795,18 @@ def test_inspect_marks_required_input_without_default():
     assert "(input.value)  default: (none; required)" in text
 
 
-def test_inspect_reports_conflicting_defaults_without_hiding_graph(tmp_path, capsys):
+@pytest.mark.parametrize("options", [[], ["--full"], ["-f"]])
+def test_inspect_reports_conflicting_defaults_without_hiding_graph(tmp_path, capsys, options):
     registry = create_node_registry()
     graph = _default_workflow()
     graph.add_node(SET_STRING.create_instance("other", parameters={"value": "different"}))
     graph.add_edge(WorkflowEdge("input", "value", "other", "value"), registry)
     path = tmp_path / "conflict.json"
     save_workflow(graph, path)
-    assert main(["inspect", str(path)]) == 0
+    assert main(["inspect", str(path), *options]) == 0
     output = capsys.readouterr()
     assert "default: (conflicting saved values; provide --input)" in output.out
-    assert "Workflow:" in output.out
+    assert ("Workflow:" in output.out) is bool(options)
     assert output.err == ""
 
 

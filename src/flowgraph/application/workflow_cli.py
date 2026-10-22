@@ -73,35 +73,59 @@ def parse_overrides(assignments: Sequence[str]) -> dict[str, dict[str, Any]]:
     return result
 
 
-def inspect_workflow(path: str | Path) -> str:
-    """Load a workflow and return its inputs, outputs, and directed ASCII graph."""
+def inspect_workflow(
+    path: str | Path,
+    *,
+    full: bool = False,
+    inputs: Mapping[str, Any] | None = None,
+    overrides: Mapping[str, Mapping[str, Any]] | None = None,
+) -> str:
+    """Preview interface values and optional graph without executing or saving.
+
+    Parameter overrides apply before saved defaults are resolved. Explicit input
+    values take precedence, while unspecified inputs may remain required.
+    """
     from flowgraph.application.node_registry import create_node_registry
 
     registry = create_node_registry()
     workflow = load_workflow(path, registry)
-    return format_workflow_inspection(workflow, registry)
+    _apply_overrides(workflow, overrides or {})
+    return format_workflow_inspection(workflow, registry, full=full, inputs=inputs)
 
 
-def format_workflow_inspection(workflow: WorkflowGraph, registry: NodeRegistry) -> str:
-    """Format one workflow as a deterministic vertical tree inspection report.
+def format_workflow_inspection(
+    workflow: WorkflowGraph,
+    registry: NodeRegistry,
+    *,
+    full: bool = True,
+    inputs: Mapping[str, Any] | None = None,
+) -> str:
+    """Format one workflow as a deterministic vertical graph inspection report.
 
-    Nodes are visited in stable topological order. Edges are rendered below the
-    output port that transports them, and every connected input is shown in the
-    target node's input section before its parameters and outputs.
+    Nodes are visited in dependency-safe display order. Inputs, parameters, and
+    outputs remain separate sections, reordered internally to reduce crossings.
+    Set ``full=False`` for an interface-only report. Code warnings are always
+    retained. The formatter defaults to full output for existing Python callers;
+    the file inspection service and CLI default to compact output.
     """
+    values = inputs if inputs is not None else {}
+    _validate_explicit_inputs(workflow, values)
     lines = ["Inputs:"]
     if workflow.inputs:
         for port in workflow.inputs:
-            try:
-                default = saved_input_default(workflow, port)
-            except ValueError:
-                suffix = "default: (conflicting saved values; provide --input)"
+            if port.name in values:
+                suffix = f"default: {_display_value(values[port.name])} (--input)"
             else:
-                suffix = (
-                    f"default: {_display_value(default[0])}"
-                    if default is not None
-                    else "default: (none; required)"
-                )
+                try:
+                    default = saved_input_default(workflow, port)
+                except ValueError:
+                    suffix = "default: (conflicting saved values; provide --input)"
+                else:
+                    suffix = (
+                        f"default: {_display_value(default[0])}"
+                        if default is not None
+                        else "default: (none; required)"
+                    )
             lines.append(
                 f"  {port.name}: {port.data_type.label} ({port.node_id}.{port.node_port})  {suffix}"
             )
@@ -123,11 +147,12 @@ def format_workflow_inspection(workflow: WorkflowGraph, registry: NodeRegistry) 
         lines.extend(f"  {node}" for node in code_nodes)
         lines.append("  Review and trust this code before running the workflow.")
 
-    lines.append("Workflow:")
-    if not workflow.nodes:
-        lines.append("  (empty)")
-    else:
-        lines.extend(_format_graph(workflow, registry, indent="  "))
+    if full:
+        lines.append("Workflow:")
+        if not workflow.nodes:
+            lines.append("  (empty)")
+        else:
+            lines.extend(_format_graph(workflow, registry, indent="  "))
     return "\n".join(lines)
 
 
@@ -147,15 +172,83 @@ def _arbitrary_code_nodes(
 
 
 def _format_graph(workflow: WorkflowGraph, registry: NodeRegistry, *, indent: str) -> list[str]:
-    """Return a vertical tree rendering of *workflow* at *indent*.
+    """Choose a dependency-safe display order with fewer visible crossings.
 
-    Disconnected nodes are listed first. Connected nodes are then rendered from
-    stable graph roots. Before a shared target is rendered, its unresolved input
-    sources are rendered first so all of the target's connected inputs appear
-    together before its outputs. Unicode box-drawing characters make the
-    continuation of each connection explicit in terminal output.
+    Compare stable topological order with a greedy ready-node schedule that
+    favors closing lanes over opening them. Score the actual rendered junctions,
+    then vertical lane length; keep the stable order on ties. This is a heuristic,
+    not a guarantee of the global minimum. Execution order is never modified.
     """
-    order = workflow.topological_order()
+    stable = workflow.topological_order()
+    incoming: dict[str, list[str]] = {node_id: [] for node_id in stable}
+    outgoing: dict[str, list[str]] = {node_id: [] for node_id in stable}
+    consumers: dict[tuple[str, str], list[str]] = {}
+    incoming_outputs: dict[str, set[tuple[str, str]]] = {node_id: set() for node_id in stable}
+    outgoing_outputs: dict[str, set[str]] = {node_id: set() for node_id in stable}
+    for edge in workflow.edges:
+        outgoing[edge.source_node].append(edge.target_node)
+        incoming[edge.target_node].append(edge.source_node)
+        output = (edge.source_node, edge.source_port)
+        consumers.setdefault(output, []).append(edge.target_node)
+        incoming_outputs[edge.target_node].add(output)
+        outgoing_outputs[edge.source_node].add(edge.source_port)
+    rank = {node_id: index for index, node_id in enumerate(stable)}
+    remaining = {node_id: len(incoming[node_id]) for node_id in stable}
+    ready = {node_id for node_id in stable if not remaining[node_id]}
+    greedy: list[str] = []
+    pending_consumers = {output: len(targets) for output, targets in consumers.items()}
+    while ready:
+
+        def closing_lanes(candidate: str) -> int:
+            return sum(
+                pending_consumers[output] == consumers[output].count(candidate)
+                for output in incoming_outputs[candidate]
+            )
+
+        node_id = min(
+            ready,
+            key=lambda candidate: (
+                len(outgoing_outputs[candidate]) - closing_lanes(candidate),
+                -closing_lanes(candidate),
+                rank[candidate],
+            ),
+        )
+        ready.remove(node_id)
+        greedy.append(node_id)
+        for output in incoming_outputs[node_id]:
+            pending_consumers[output] -= consumers[output].count(node_id)
+        for target in outgoing[node_id]:
+            remaining[target] -= 1
+            if remaining[target] == 0:
+                ready.add(target)
+
+    def score(lines: list[str]) -> tuple[int, int]:
+        # Exclude inherited indentation when optimizing a nested report.
+        content = "\n".join(line.removeprefix(indent) for line in lines)
+        return content.count("┼"), content.count("│")
+
+    baseline = _render_graph(workflow, registry, indent=indent, order=stable)
+    if tuple(greedy) == stable:
+        return baseline
+    candidate = _render_graph(workflow, registry, indent=indent, order=tuple(greedy))
+    return candidate if score(candidate) < score(baseline) else baseline
+
+
+def _render_graph(
+    workflow: WorkflowGraph,
+    registry: NodeRegistry,
+    *,
+    indent: str,
+    order: tuple[str, ...],
+    optimize_ports: bool = True,
+) -> list[str]:
+    """Render one shared lane per source output in topological node order.
+
+    A lane opens on its output line, branches at intermediate consumers, and
+    closes at its last consumer. Closed lanes can be reused by later outputs.
+    Endpoint addresses disambiguate fan-out and crossing horizontal lines.
+    Disconnected nodes are listed first, as they need no connection lanes.
+    """
     order_index = {node_id: index for index, node_id in enumerate(order)}
     incoming = {node_id: [] for node_id in order}
     outgoing = {node_id: [] for node_id in order}
@@ -182,157 +275,145 @@ def _format_graph(workflow: WorkflowGraph, registry: NodeRegistry, *, indent: st
             )
         )
 
-    rendered: set[str] = set()
+    pending: dict[tuple[str, str], int] = {}
+    for edge in workflow.edges:
+        output = (edge.source_node, edge.source_port)
+        pending[output] = pending.get(output, 0) + 1
     lines: list[str] = []
+    lanes: list[tuple[str, str] | None] = []
 
-    def render_node(
-        node_id: str,
-        indent: list[str],
-        connected_edge: WorkflowEdge | None = None,
-    ) -> None:
+    def prefix() -> str:
+        # Connection endpoints occupy two columns beyond the lane area (▶/─ and space).
+        endpoint_padding = "  " if lanes else ""
+        return (
+            indent
+            + "".join("│  " if edge is not None else "   " for edge in lanes)
+            + endpoint_padding
+        )
+
+    def connection(output: tuple[str, str], text: str, *, opening: bool) -> None:
+        if opening:
+            lane = next((index for index, value in enumerate(lanes) if value is None), len(lanes))
+            if lane == len(lanes):
+                lanes.append(output)
+            else:
+                lanes[lane] = output
+        else:
+            lane = lanes.index(output)
+            pending[output] -= 1
+        closing = not opening and pending[output] == 0
+        path = "".join("│  " if value is not None else "   " for value in lanes[:lane])
+        path += "┌──" if opening else "└──" if closing else "├──"
+        path += "".join("┼──" if value is not None else "───" for value in lanes[lane + 1 :])
+        endpoint = "─ " if opening else "▶ "
+        lines.append(f"{indent}{path}{endpoint}{text}")
+        if closing:
+            lanes[lane] = None
+
+    disconnected = [node_id for node_id in order if not incoming[node_id] and not outgoing[node_id]]
+    connected = [node_id for node_id in order if incoming[node_id] or outgoing[node_id]]
+    for node_id in [*disconnected, *connected]:
+        if lines:
+            lines.append(prefix().rstrip())
+        # Trim unused trailing lanes only between nodes so each node's ports align.
+        while lanes and lanes[-1] is None:
+            lanes.pop()
+        # Reserve the whole node's width before its header. Incoming lanes become
+        # available before outputs open, but new outgoing lanes must not shift
+        # later ports to the right within the same node.
+        consumed: dict[tuple[str, str], int] = {}
+        for edge in incoming[node_id]:
+            output = (edge.source_node, edge.source_port)
+            consumed[output] = consumed.get(output, 0) + 1
+        available = lanes.count(None) + sum(
+            count == pending[output] for output, count in consumed.items()
+        )
+        output_count = len({edge.source_port for edge in outgoing[node_id]})
+        lanes.extend([None] * max(0, output_count - available))
         node = workflow.require_node(node_id)
         definition = registry.require(node.definition_id)
         ports = definition.ports_for_instance(node)
-        rendered.add(node_id)
-        lines.append(f"{indent[0]}{_node_header(node.definition_id, node.id, definition.label)}")
+        lines.append(f"{prefix()}{_node_header(node.definition_id, node.id, definition.label)}")
 
-        connected_port = None
-        if connected_edge is not None:
-            connected_port = next(
-                (
-                    port
-                    for port in ports
-                    if port.direction is PortDirection.INPUT
-                    and port.name == connected_edge.target_port
-                ),
-                None,
-            )
-        if connected_port is not None:
-            lines.append(
-                f"{indent[1]}{_port_text('P' if connected_port.is_param else 'I', connected_port)}"
-            )
+        input_edges = {edge.target_port: edge for edge in incoming[node_id]}
 
-        connected_input_names = {
-            edge.target_port for edge in incoming[node_id] if edge.source_node in rendered
-        }
-        if connected_port is not None:
-            connected_input_names.add(connected_port.name)
-        has_additional_connected_input = False
-        for edge in incoming[node_id]:
-            if connected_port is not None and edge.target_port == connected_port.name:
-                continue
-            target_port = definition.input_for_instance(edge.target_port, node)
-            if target_port is not None:
-                lines.append(
-                    f"{_additional_input_prefix(indent)}"
-                    f"{_port_text('P' if target_port.is_param else 'I', target_port)}"
+        def render_inputs(
+            category: list[PortDefinition], input_edges: Mapping[str, WorkflowEdge]
+        ) -> None:
+            # Close rightmost lanes first, but never move a port across categories.
+            connected = [port for port in category if port.name in input_edges]
+            if optimize_ports:
+                connected.sort(
+                    key=lambda port: (
+                        -lanes.index(
+                            (input_edges[port.name].source_node, input_edges[port.name].source_port)
+                        )
+                    )
                 )
-                has_additional_connected_input = True
-        if has_additional_connected_input:
-            indent = _continued_indent(indent)
-        for port in ports:
-            if (
-                port.direction is PortDirection.INPUT
-                and not port.is_param
-                and port.name not in connected_input_names
-            ):
-                lines.append(f"{indent[2]}{_port_text('I', port)}")
+            for port in connected:
+                edge = input_edges[port.name]
+                connection(
+                    (edge.source_node, edge.source_port),
+                    f"{_port_text('P' if port.is_param else 'I', port)}"
+                    f" (from {edge.source_node}.{edge.source_port})",
+                    opening=False,
+                )
+            for port in category:
+                if port.name not in input_edges and not port.is_param:
+                    lines.append(f"{prefix()}{_port_text('I', port)}")
+
+        render_inputs(
+            [port for port in ports if port.direction is PortDirection.INPUT and not port.is_param],
+            input_edges,
+        )
+        render_inputs(
+            [port for port in ports if port.direction is PortDirection.INPUT and port.is_param],
+            input_edges,
+        )
         for parameter in definition.parameters:
-            if parameter.name in connected_input_names:
+            if parameter.name in input_edges:
                 continue
             value = node.parameters.get(parameter.name, parameter.default)
             lines.append(
-                f"{indent[2]}(P) {parameter.name} - {parameter.kind.label}: {_display_value(value)}"
+                f"{prefix()}(P) {parameter.name} - {parameter.kind.label}: {_display_value(value)}"
             )
-        for port in ports:
-            if port.direction is not PortDirection.OUTPUT:
-                continue
-            lines.append(f"{indent[2]}{_port_text('O', port)}")
-            for edge in outgoing[node_id]:
-                if edge.source_port != port.name:
-                    continue
-                target = workflow.get_node(edge.target_node)
-                if target is None:
-                    continue
-                if edge.target_node in rendered:
-                    continue
-
-                unresolved_sources = [
-                    candidate
-                    for candidate in incoming[edge.target_node]
-                    if candidate.source_node not in rendered and candidate.source_node != node_id
-                ]
-                for candidate in unresolved_sources:
-                    source_node = workflow.get_node(candidate.source_node)
-                    if source_node is None or source_node.id in rendered:
-                        continue
-                    lines.append(f"{indent[3]}│")
-                    render_node(
-                        source_node.id,
-                        _carried_indent(indent[3]),
+        output_ports = [port for port in ports if port.direction is PortDirection.OUTPUT]
+        if optimize_ports:
+            # First-fit lanes open left to right. Put longer-lived outputs on the
+            # left, so earlier consumers can close right-hand lanes without crossing.
+            output_ports.sort(
+                key=lambda port: (
+                    -max(
+                        (
+                            order_index[edge.target_node]
+                            for edge in outgoing[node_id]
+                            if edge.source_port == port.name
+                        ),
+                        default=-1,
                     )
-
-                if edge.target_node in rendered:
-                    continue
-
-                lines.append(f"{indent[3]}│")
-                render_node(
-                    edge.target_node,
-                    _child_indent(indent[3]),
-                    connected_edge=edge,
                 )
+            )
+        for port in output_ports:
+            edges = [edge for edge in outgoing[node_id] if edge.source_port == port.name]
+            if edges:
+                destinations = ", ".join(f"{edge.target_node}.{edge.target_port}" for edge in edges)
+                connection(
+                    (node_id, port.name),
+                    f"{_port_text('O', port)} (to {destinations})",
+                    opening=True,
+                )
+            else:
+                lines.append(f"{prefix()}{_port_text('O', port)}")
 
         if node.subworkflow is not None:
-            lines.append(f"{indent[0]}subworkflow:")
+            # Child connections have their own lane space, separate from the parent.
+            child_indent = f"{prefix()}  "
+            lines.append(f"{prefix()}subworkflow:")
             if node.subworkflow.nodes:
-                lines.extend(_format_graph(node.subworkflow, registry, indent=f"{indent[0]}  "))
+                lines.extend(_format_graph(node.subworkflow, registry, indent=child_indent))
             else:
-                lines.append(f"{indent[0]}  (empty)")
-
-    disconnected = [node_id for node_id in order if not incoming[node_id] and not outgoing[node_id]]
-    roots = [node_id for node_id in order if not incoming[node_id] and node_id not in disconnected]
-    remaining = [
-        node_id for node_id in order if node_id not in disconnected and node_id not in roots
-    ]
-
-    top_level_groups = [*disconnected, *roots, *remaining]
-    for node_id in top_level_groups:
-        if node_id in rendered:
-            continue
-        if lines:
-            lines.append("")
-        render_node(node_id, [indent, indent, indent, "   "])
+                lines.append(f"{child_indent}(empty)")
     return lines
-
-
-def _child_indent(edge_base: str) -> list[str]:
-    """Build indentation slots for a node reached by a primary edge."""
-    return [
-        f"{edge_base}│ ",
-        f"{edge_base}└─",
-        f"{edge_base}  ",
-        f"{edge_base}   ",
-    ]
-
-
-def _carried_indent(edge_base: str) -> list[str]:
-    """Build indentation slots for a node reached as an additional source."""
-    return [
-        f"{edge_base}│ ",
-        f"{edge_base}│ ",
-        f"{edge_base}│ ",
-        f"{edge_base}│  ",
-    ]
-
-
-def _additional_input_prefix(indent: list[str]) -> str:
-    """Return the prefix for an additional connected input on the current node."""
-    return f"{indent[3].split('│', 1)[0]}└────"
-
-
-def _continued_indent(indent: list[str]) -> list[str]:
-    """Return indentation after an additional input closes its branch."""
-    return [slot.replace("│", " ") for slot in indent]
 
 
 def _node_header(definition_id: str, node_id: str, label: str) -> str:
@@ -394,6 +475,19 @@ def write_json_output(outputs: Mapping[str, Any], path: str | Path) -> Path:
     return destination.resolve()
 
 
+def _validate_explicit_inputs(workflow: WorkflowGraph, values: Mapping[str, Any]) -> None:
+    """Validate only supplied inputs, allowing incomplete inspection previews."""
+    unknown = set(values).difference(port.name for port in workflow.inputs)
+    if unknown:
+        raise WorkflowCliError(f"Unknown workflow inputs: {sorted(unknown)!r}")
+    for port in workflow.inputs:
+        if port.name in values and not port.data_type.accepts(values[port.name]):
+            raise WorkflowCliError(
+                f"Workflow input {port.name!r} expected {port.data_type.label}, "
+                f"got {type(values[port.name]).__name__}"
+            )
+
+
 def resolve_workflow_inputs(
     workflow: WorkflowGraph,
     values: Mapping[str, Any],
@@ -404,9 +498,7 @@ def resolve_workflow_inputs(
 
     Warnings go to stderr unless a host (such as the browser) supplies a sink.
     """
-    unknown = set(values).difference(port.name for port in workflow.inputs)
-    if unknown:
-        raise WorkflowCliError(f"Unknown workflow inputs: {sorted(unknown)!r}")
+    _validate_explicit_inputs(workflow, values)
     resolved = dict(values)
     warnings = []
     for port in workflow.inputs:

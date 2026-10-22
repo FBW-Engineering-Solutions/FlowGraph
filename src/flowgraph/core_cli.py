@@ -25,27 +25,31 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
 
     inspect_parser = commands.add_parser(
-        "inspect", help="print workflow inputs, outputs, and its directed ASCII graph"
+        "inspect", help="print workflow inputs and outputs; add --full for the graph"
     )
     inspect_parser.add_argument("workflow", type=str, help="workflow JSON file")
+    inspect_parser.add_argument(
+        "--full", "-f", action="store_true", help="include the full workflow graph"
+    )
 
     run_parser = commands.add_parser("run", help="execute a workflow without opening the UI")
     run_parser.add_argument("workflow", type=str, help="workflow JSON file")
-    run_parser.add_argument(
-        "--input",
-        "-i",
-        action="append",
-        default=[],
-        metavar="NAME=VALUE",
-        help="set a published workflow input; JSON values are decoded when possible",
-    )
-    run_parser.add_argument(
-        "--override",
-        action="append",
-        default=[],
-        metavar="NODE-ID.PARAMETER=VALUE",
-        help="override a node parameter for this run",
-    )
+    for command_parser in (inspect_parser, run_parser):
+        command_parser.add_argument(
+            "--input",
+            "-i",
+            action="append",
+            default=[],
+            metavar="NAME=VALUE",
+            help="set a published workflow input; JSON values are decoded when possible",
+        )
+        command_parser.add_argument(
+            "--override",
+            action="append",
+            default=[],
+            metavar="NODE-ID.PARAMETER=VALUE",
+            help="override a node parameter for this invocation",
+        )
     run_parser.add_argument(
         "--json-output",
         type=str,
@@ -60,7 +64,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         if args.command == "inspect":
-            print(inspect_workflow(args.workflow))
+            print(
+                inspect_workflow(
+                    args.workflow,
+                    full=args.full,
+                    inputs=parse_inputs(args.input),
+                    overrides=parse_overrides(args.override),
+                )
+            )
         else:
             workflow, result = execute_cli_workflow(
                 args.workflow,

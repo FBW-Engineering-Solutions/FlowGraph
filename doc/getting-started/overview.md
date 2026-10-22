@@ -52,6 +52,9 @@ Inspect a workflow without opening the graphical application:
 uv run flowgraph inspect workflow.json
 ```
 
+This prints a compact interface summary. Add `--full` (or `-f`) to include the
+workflow graph; arbitrary-code warnings are retained in either mode.
+
 Run a workflow with published inputs:
 
 ```bash
