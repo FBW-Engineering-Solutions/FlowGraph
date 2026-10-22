@@ -30,6 +30,11 @@ FlowGraph uses Semantic Versioning conventions as a guide, with the normal
 pre-1.0 qualification that `0.y.z` releases may include breaking changes. The
 version in `pyproject.toml` is the source of truth for package artifacts.
 
+The release tag must be exactly `v` followed by that version. Validate both
+artifact filenames and internal wheel/sdist metadata with
+`packaging/check_release.py` before publication. Historical exceptions are
+recorded in `docs/release-reconciliation.md`; they do not permit future mismatches.
+
 - Increment the patch component for compatible fixes and small improvements.
 - Increment the minor component when adding features or making broader changes;
   minor `0.x` releases may still require migration work.
@@ -58,9 +63,14 @@ locked-environment hash, build logs, artifact hashes, checksums, compliance
 compliance outputs, approvals, and publication time. A failed or compromised
 release must
 be stopped, the relevant PyPI version yanked or superseded when appropriate,
-GitHub assets corrected, exposed credentials rotated, and a replacement release
+GitHub release notes annotated, exposed credentials rotated, and a replacement release
 documented in the changelog. Release automation uses GitHub-hosted runners and
 trusted publishing/MFA procedures rather than long-lived package credentials.
+
+Never silently replace or relabel published assets, reuse a published package
+version for different bytes, or move an existing tag. Publish corrections under
+a new, unused version/tag. Preserve historical assets; document any exceptional
+removal with its reason and original hashes.
 
 Dependency updates, license/SBOM rescans, secret scans, support-matrix reviews,
 and release rehearsals should be scheduled at least monthly while the project
