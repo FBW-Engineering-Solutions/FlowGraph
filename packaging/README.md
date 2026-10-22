@@ -28,6 +28,41 @@ published workflow inputs.
 pure-Python wheel. No Cython compiler, native extension build, or platform wheel
 repair step is required.
 
+## Non-publishing GitHub CI rehearsal
+
+Push a normal branch (without tags), or open a pull request. The workflow runs
+source tests, builds one wheel/sdist pair, and tests each downloaded distribution
+independently on Ubuntu, Windows, and macOS with Python 3.11 and 3.13. Manual
+`workflow_dispatch` runs also rehearse packaging without publishing, even when
+dispatched against a tag. Only an actual version-tag **push** can start release
+validation and publication. Do not push a release tag just to test packaging.
+
+Each of the 12 artifact-test jobs creates a fresh environment outside the
+checkout, installs the selected archive with its declared dependencies, checks
+dependency consistency, verifies installed versions/import locations, reads
+packaged image/workflow resources, and exercises workflow persistence and the
+installed CLI's help, inspection, and execution with an expected JSON result.
+The build uses isolation and `--no-sources`; archive installations resolve
+runtime dependencies independently of the development lockfile.
+
+Run the same checks locally from `/home/fbw/repos/FlowGraph/FlowGraph`:
+
+```bash
+uv build --no-sources --out-dir /tmp/flowgraph-rehearsal-artifacts
+python packaging/test_artifact.py --artifacts /tmp/flowgraph-rehearsal-artifacts --kind wheel
+python packaging/test_artifact.py --artifacts /tmp/flowgraph-rehearsal-artifacts --kind sdist
+```
+
+Use a new, empty output directory per rehearsal. Python 3.11+ and `uv` on PATH
+are required; network access is needed for uncached dependencies/build tools.
+The commands do not upload anything. CI archives are retained for one day.
+
+Both production publication jobs wait for the complete artifact matrix and tag
+validation, then use the same named artifacts from that workflow run. Required
+human approvals must be configured separately in GitHub environment settings;
+the workflow alone does not establish those protections. This rehearsal does
+not validate Conda, optional extras, every workflow, or byte reproducibility.
+
 ## Conda recipe
 
 The repository includes a `conda-build` recipe in `packaging/conda/meta.yaml`.
@@ -57,6 +92,11 @@ dependency graph.
 
 ## Release procedure
 
+See `docs/release-reconciliation.md` for the October 22, 2026 audit: historical
+GitHub tags `v0.1.2.1`, `v0.1.3`, and `v0.1.4` attach packages labeled `0.1.2`.
+Source `0.1.5` is not proof of a PyPI publication. Historical tags and assets
+are preserved rather than silently replaced.
+
 The version in `pyproject.toml` is the artifact version source of truth and
 `docs/changelog.md` is the release-note source of truth. From a clean checkout:
 
@@ -67,7 +107,14 @@ uv run ruff check .
 uv run pytest --cov=flowgraph --cov-report=term-missing
 rm -rf dist/
 uv build --out-dir dist/
+python packaging/check_release.py --artifacts dist/ --tag "v$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
 ```
+
+The validator compares source declarations, filenames, and internal wheel/sdist
+metadata to the exact tag. Omit `--tag` only for untagged development builds.
+CI validates downloaded artifacts before either GitHub or PyPI publication.
+Choose a new, unused tag/version for corrections; `v0.1.5` already exists and
+must not be moved to include later fixes.
 
 Inspect both artifacts, install them in clean environments, run `flowgraph
 --help`, import `flowgraph`, and exercise a representative workflow before
@@ -88,7 +135,8 @@ property. Known possible nondeterminism includes archive member timestamps,
 wheel metadata ordering, setuptools behavior, and dependency-generated content.
 
 Release rollback consists of stopping publication, yanking or superseding a
-bad PyPI release where appropriate, deleting or correcting the GitHub release
-assets, rotating affected credentials, and publishing a clearly documented fix.
-manual review of package metadata, native libraries, generated code, and
-upstream notices.
+bad PyPI release where appropriate, adding an explicit warning to the GitHub
+release notes, rotating affected credentials where necessary, and publishing a
+clearly documented fix under a new, unused version/tag. Preserve historical tags
+and assets; never silently replace or relabel published files. Any exceptional
+asset removal must be explicitly documented with the reason and original hashes.
