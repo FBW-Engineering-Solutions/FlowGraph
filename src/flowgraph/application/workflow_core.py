@@ -82,6 +82,11 @@ class DataType(Generic[T]):
 
     def accepts(self, value: object) -> bool:
         """Return whether *value* satisfies this workflow type at runtime."""
+        vector_dimensions = {"VEC2D": 2, "VEC2DI": 2, "VEC3D": 3, "VEC3DI": 3}
+        if self.id in vector_dimensions and (
+            not isinstance(value, list) or len(value) != vector_dimensions[self.id]
+        ):
+            return False
         origin = get_origin(self.python_type)
         if origin is not None:
             if isinstance(value, origin):
@@ -101,6 +106,9 @@ class DataType(Generic[T]):
             return True
         if target.python_type is list and get_origin(self.python_type) is list:
             return True
+        vector_ids = {"VEC2D", "VEC2DI", "VEC3D", "VEC3DI"}
+        if self.id in vector_ids and target.id in vector_ids:
+            return self.id == target.id
         return self.python_type == target.python_type
 
 

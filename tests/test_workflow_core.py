@@ -10,9 +10,13 @@ from flowgraph.adapters.data_types import (
     LIST_FLOAT,
     LIST_INT,
     STRING,
+    VEC2D,
+    VEC2DI,
+    VEC3D,
+    VEC3DI,
     ParameterKind,
 )
-from flowgraph.application.port_conversions import resolve_port_conversion
+from flowgraph.application.port_conversions import resolve_port_conversion, resolve_value_conversion
 from flowgraph.application.workflow_core import (
     DataType,
     ExecContext,
@@ -563,6 +567,84 @@ def test_port_conversion_registry_is_explicit_and_directional() -> None:
     assert resolve_port_conversion(STRING, FLOAT) is None
     assert resolve_port_conversion(IMAGE, IMAGEJ) is not None
     assert resolve_port_conversion(IMAGEJ, IMAGE) is None
+
+
+VECTOR_CASES = [
+    (VEC2D, VEC3D, [1.5, -2.5], [1.5, -2.5, 0.0]),
+    (VEC3D, VEC2D, [1.5, -2.5, 9.0], [1.5, -2.5]),
+    (VEC2DI, VEC3DI, [1, -2], [1, -2, 0]),
+    (VEC3DI, VEC2DI, [1, -2, 9], [1, -2]),
+    (VEC2DI, VEC2D, [1, -2], [1.0, -2.0]),
+    (VEC3DI, VEC3D, [1, -2, 9], [1.0, -2.0, 9.0]),
+    (VEC2D, VEC2DI, [1.5, -2.5], [2, -2]),
+    (VEC3D, VEC3DI, [1.5, -2.5, 3.8], [2, -2, 4]),
+    (VEC2DI, VEC3D, [1, -2], [1.0, -2.0, 0.0]),
+    (VEC3DI, VEC2D, [1, -2, 9], [1.0, -2.0]),
+    (VEC2D, VEC3DI, [1.5, -2.5], [2, -2, 0]),
+    (VEC3D, VEC2DI, [1.5, -2.5, 9.0], [2, -2]),
+]
+
+
+@pytest.mark.parametrize(("source_type", "target_type", "source_value", "expected"), VECTOR_CASES)
+def test_vector_port_conversions_execute_without_mutating_source(
+    source_type, target_type, source_value, expected
+) -> None:
+    original = source_value.copy()
+    source = definition(
+        "source",
+        (port("value", PortDirection.OUTPUT, source_type),),
+        lambda _inputs, _parameters: {"value": source_value},
+    )
+    sink = definition("sink", (port("value", PortDirection.INPUT, target_type),))
+    registry = registry_with(source, sink)
+    graph = WorkflowGraph([source.create_instance("source"), sink.create_instance("sink")])
+    edge = WorkflowEdge("source", "value", "sink", "value")
+    graph.add_edge(edge, registry)
+
+    assert graph.edge_conversion(edge, registry) is not None
+    result = WorkflowExecutor(registry).run(graph)
+    actual = result.node_inputs["sink"]["value"]
+    assert actual == expected
+    assert [type(component) for component in actual] == [type(component) for component in expected]
+    assert target_type.accepts(actual)
+    assert actual is not source_value
+    assert source_value == original
+    assert result.node_outputs["source"]["value"] == original
+
+
+@pytest.mark.parametrize(("source_type", "target_type", "source_value", "expected"), VECTOR_CASES)
+def test_vector_runtime_and_parameter_conversions(source_type, target_type, source_value, expected):
+    assert source_type.accepts(source_value)
+    conversion = resolve_value_conversion(source_value, target_type)
+    assert conversion is not None
+    assert conversion.convert(source_value) == expected
+    node = NodeDefinition(
+        id="vector-parameter",
+        label="Vector parameter",
+        icon="",
+        ports=(),
+        executor=lambda _inputs, _parameters: {},
+        parameters=(
+            ParameterDefinition(
+                name="value", label="Value", kind=target_type, default=source_value
+            ),
+        ),
+    )
+    assert node.create_instance("default").parameters["value"] == expected
+    actual = node.create_instance("override", parameters={"value": source_value}).parameters[
+        "value"
+    ]
+    assert actual == expected
+    assert [type(component) for component in actual] == [type(component) for component in expected]
+
+
+@pytest.mark.parametrize("vector_type", [VEC2D, VEC2DI, VEC3D, VEC3DI])
+def test_vector_types_reject_wrong_lengths_and_keep_identity_connections(vector_type):
+    assert not vector_type.accepts([])
+    assert not vector_type.accepts([1])
+    assert not vector_type.accepts([1.0] * 4)
+    assert vector_type.is_compatible_with(vector_type)
+    assert resolve_port_conversion(vector_type, vector_type) is None
 
 
 def test_execution_requires_connected_inputs_and_valid_outputs() -> None:

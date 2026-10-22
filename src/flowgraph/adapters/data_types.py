@@ -37,7 +37,7 @@ VEC3D = DataType("VEC3D", "3D Vector", list[float])
 VEC2D = DataType("VEC2D", "2D Vector", list[float])
 VEC3DSTR = DataType("VEC3DSTR", "3D Text Vector", list[str])
 
-VEC3DI = DataType("VEC3D", "3D Vector", list[int])
+VEC3DI = DataType("VEC3DI", "3D Integer Vector", list[int])
 VEC2DI = DataType("VEC2DI", "2D Integer Vector", list[int])
 
 

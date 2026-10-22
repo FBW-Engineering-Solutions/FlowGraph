@@ -4,12 +4,23 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from flowgraph.adapters.data_types import FLOAT, IMAGE, IMAGEJ, INTEGER, STRING, VEC3D
+from flowgraph.adapters.data_types import (
+    FLOAT,
+    IMAGE,
+    IMAGEJ,
+    INTEGER,
+    STRING,
+    VEC2D,
+    VEC2DI,
+    VEC3D,
+    VEC3DI,
+)
 from flowgraph.application.workflow_core import DataType
 from flowgraph.domain.filepath import FilePath
 
@@ -59,6 +70,27 @@ PILLOW_TO_IMAGEJ = PortConversion(
 )
 
 
+def _convert_vector(value: list[Any], *, dimensions: int, integer: bool) -> list[Any]:
+    """Resize a vector and cast components without modifying the source list."""
+    cast = round if integer else float
+    components = value[:dimensions] + [0] * max(0, dimensions - len(value))
+    return [cast(component) for component in components]
+
+
+_VECTOR_TYPES = ((VEC2D, 2, False), (VEC3D, 3, False), (VEC2DI, 2, True), (VEC3DI, 3, True))
+VECTOR_CONVERSIONS = tuple(
+    PortConversion(
+        source.id,
+        target.id,
+        f"{source.label} → {target.label}",
+        partial(_convert_vector, dimensions=dimensions, integer=integer),
+    )
+    for source, _, _ in _VECTOR_TYPES
+    for target, dimensions, integer in _VECTOR_TYPES
+    if source.id != target.id
+)
+
+
 PORT_CONVERSIONS = (
     INTEGER_TO_FLOAT,
     INTEGER_TO_STRING,
@@ -72,6 +104,7 @@ PORT_CONVERSIONS = (
     PILLOW_TO_IMAGEJ,
     FILE_TO_STR,
     STR_TO_FILE,
+    *VECTOR_CONVERSIONS,
 )
 
 
@@ -91,6 +124,9 @@ _SOURCE_DATA_TYPES = {
     INTEGER.id: INTEGER,
     FLOAT.id: FLOAT,
     VEC3D.id: VEC3D,
+    VEC2D.id: VEC2D,
+    VEC2DI.id: VEC2DI,
+    VEC3DI.id: VEC3DI,
     IMAGE.id: IMAGE,
 }
 

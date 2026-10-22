@@ -34,6 +34,26 @@ uses the float's string representation, and `Float → list[float]` wraps the
 value in a one-item list. `filename → Text` and `Text → filename` preserve the
 value as text while changing its workflow port type.
 
+### Vector conversions
+
+All four numeric vector types (`VEC2D`, `VEC3D`, `VEC2DI`, and `VEC3DI`) can
+connect to one another. The `I` suffix identifies integer components; the other
+two types contain floats.
+
+- **2D → 3D:** append a third component of `0` for integer targets or `0.0` for
+  float targets.
+- **3D → 2D:** discard the third component.
+- **Integer → float:** convert each retained component to a Python `float`.
+- **Float → integer:** round each retained component using Python `round`, just
+  like the scalar conversion. Halfway values round to the nearest even integer
+  (for example, `1.5 → 2`, `2.5 → 2`, and `-2.5 → -2`).
+
+Dimension and component-type changes can happen together. For example,
+`VEC2D [1.2, 2.8] → VEC3DI [1, 3, 0]`. Conversions create a new list and leave
+the source value unchanged. Numeric vectors must contain exactly two or three
+components according to their declared type. Same-type connections need no
+conversion.
+
 Conversions are directional. For example, `Text → Float` is not automatically
 accepted. A connection without a direct type match or one of the registered
 conversions is rejected; use an explicit workflow node when a different
