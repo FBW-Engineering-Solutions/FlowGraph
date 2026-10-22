@@ -79,6 +79,23 @@ flowgraph run workflow.json --json-output results.json
 `-i` is an alias for `--input`; either option can be repeated for multiple
 published inputs.
 
+`execute_cli_workflow()` applies node parameter overrides before resolving public
+inputs. Explicit input assignments take precedence. For omitted inputs,
+`application/workflow_defaults.py` follows Workflow Input boundary connections
+and nested public-input mappings to instance parameter values. It also handles
+directly exported parameters. Resolution does not execute nodes and uses the
+published input type and registered value conversions to normalize saved values.
+Multiple candidate values must agree; conflicting values fail rather than
+selecting an arbitrary target. Inputs without usable saved values remain required.
+
+Each fallback emits a warning to stderr naming the input, chosen value, and
+source parameter address. Workflow output formatting and `--json-output` remain
+separate from those warnings. This policy is specific to CLI execution; it does
+not alter `WorkflowGraph.execute()` or the workflow JSON schema, and execution
+does not persist overrides or fallback values. See the
+[workflow user guide](../doc/user-guide/workflows.md#omitted-inputs-and-saved-parameter-values)
+for examples.
+
 ## External-client interfaces
 
 FlowGraph can export a deterministic, non-executable node catalog with

@@ -63,6 +63,13 @@ uv run flowgraph run workflow.json \
 `-i` is the short form of `--input`. Repeat either option for each published
 input; you can mix both forms in the same command.
 
+Inputs may be omitted when their downstream nodes hold compatible saved parameter
+values. FlowGraph then uses those values and prints a warning to stderr for each
+fallback. Explicit inputs take precedence. Missing or conflicting defaults still
+require an explicit input. See
+[Omitted inputs and saved parameter values](../user-guide/workflows.md#omitted-inputs-and-saved-parameter-values)
+for precedence, nested workflows, and warning examples.
+
 Override a node parameter for one run without changing the saved JSON:
 
 ```bash

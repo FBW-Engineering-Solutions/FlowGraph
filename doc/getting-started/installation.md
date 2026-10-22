@@ -91,4 +91,11 @@ uv run flowgraph run workflow.json \
 `-i` is an alias for `--input`. Use either form repeatedly to set multiple
 published workflow inputs.
 
+If an input is omitted, the runner looks for its downstream node's saved parameter
+value and emits a warning to stderr when it uses that value. This includes nested
+workflow inputs and directly exported parameters. Inputs with no usable saved
+value, or with conflicting downstream values, must be supplied explicitly.
+See [Omitted inputs and saved parameter values](../user-guide/workflows.md#omitted-inputs-and-saved-parameter-values)
+for details. Fallbacks do not modify the saved workflow file.
+
 Continue with [your first project](first-project.md).

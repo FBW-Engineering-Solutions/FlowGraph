@@ -34,6 +34,16 @@ uv run flowgraph run workflow.json --json-output results.json
 
 Use `--input` or its short form `-i` for each published workflow input; repeat
 the option to provide multiple inputs.
+`flowgraph inspect` displays the resolved default to the right of each published
+input, or marks it as required or having conflicting saved values.
+When an input is omitted, `flowgraph run` uses its downstream node's saved
+parameter value and prints a warning to stderr identifying the input, value,
+and parameter. This also works for directly exported parameters and nested
+workflow inputs. Explicit inputs take precedence; parameter overrides are applied
+before resolving defaults. Inputs without usable saved values remain required,
+and conflicting saved values require an explicit `--input`.
+For examples and warning output, see
+[Omitted inputs and saved parameter values](doc/user-guide/workflows.md#omitted-inputs-and-saved-parameter-values).
 
 Workflows use the versioned `flowgraph-workflow` JSON format. Core validation and
 execution are UI-independent.

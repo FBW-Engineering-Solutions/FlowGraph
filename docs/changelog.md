@@ -1,3 +1,24 @@
+New in Next :
+**********************
+**********************
+
+Api Change:
+-
+
+New functionalities:
+- `flowgraph run` resolves omitted published inputs from compatible saved
+  downstream parameter values, including nested workflow inputs and directly
+  exported parameters. Each fallback emits a warning to stderr with the input,
+  chosen value, and source parameter. Explicit inputs take precedence; missing
+  defaults and conflicting downstream values still require explicit inputs.
+
+Corrections:
+-
+
+Improvement:
+-
+
+
 New in version 0.1.5:
 **********************
 **********************

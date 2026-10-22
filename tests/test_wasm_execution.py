@@ -7,11 +7,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import numpy as np
+import pytest
 from Muscat.MeshTools.MeshCreationTools import CreateCube, CreateSquare
 from PIL import Image as PillowImage
 
 from flowgraph.adapters.simple_sources import SET_STRING
-from flowgraph.adapters.workflow_interfaces import WORKFLOW_OUTPUT
+from flowgraph.adapters.workflow_interfaces import WORKFLOW_INPUT, WORKFLOW_OUTPUT
 from flowgraph.application import wasm_execution
 from flowgraph.application.node_registry import create_node_registry
 from flowgraph.application.wasm_execution import _display_meshes, execute_workflow_json
@@ -71,6 +72,92 @@ def test_execute_workflow_json_returns_python_generated_projection_and_results()
     assert response["nodes"]["inputs"]["output"] == {"value": "hello"}
     assert "Workflow:" in response["projection"]
     assert "[source] String Input" in response["projection"]
+
+
+def _public_input_workflow(definition_id="set-string", value="saved"):
+    registry = create_node_registry()
+    workflow = WorkflowGraph(
+        [
+            WORKFLOW_INPUT.create_instance("input", parameters={"name": "value"}),
+            registry.create_instance(definition_id, "target", parameters={"value": value}),
+            WORKFLOW_OUTPUT.create_instance("output", parameters={"name": "result"}),
+        ]
+    )
+    workflow.add_edge(WorkflowEdge("input", "value", "target", "value"), registry)
+    workflow.add_edge(WorkflowEdge("target", "value", "output", "value"), registry)
+    workflow.sync_boundary_nodes(registry)
+    return workflow
+
+
+@pytest.mark.parametrize(
+    ("definition_id", "value"),
+    [("set-string", "saved"), ("set-string", ""), ("set-int", 0), ("set-boolean", False)],
+)
+def test_wasm_uses_saved_public_input_and_returns_warning(definition_id, value):
+    workflow = _public_input_workflow(definition_id, value)
+    response = json.loads(execute_workflow_json(json.dumps(workflow_to_dict(workflow))))
+
+    assert response["status"] == "ok"
+    assert response["outputs"] == {"result": value}
+    assert response["nodes"]["inputs"]["target"]["value"] == value
+    assert len(response["warnings"]) == 1
+    assert "Workflow input 'value' was not provided" in response["warnings"][0]
+    assert "saved parameter value" in response["warnings"][0]
+    assert "target.value" in response["warnings"][0]
+
+
+def test_wasm_rejects_missing_public_input_without_saved_parameter():
+    registry = create_node_registry()
+    workflow = WorkflowGraph(
+        [
+            WORKFLOW_INPUT.create_instance("input", parameters={"name": "value"}),
+            registry.create_instance("show-value", "display"),
+        ]
+    )
+    workflow.add_edge(WorkflowEdge("input", "value", "display", "value"), registry)
+    workflow.sync_boundary_nodes(registry)
+
+    response = json.loads(execute_workflow_json(json.dumps(workflow_to_dict(workflow))))
+
+    assert response["status"] == "error"
+    assert "Missing required workflow inputs: value" in response["error"]["message"]
+    assert response["warnings"] == []
+
+
+def test_wasm_rejects_conflicting_saved_public_inputs():
+    registry = create_node_registry()
+    workflow = _public_input_workflow()
+    workflow.add_node(
+        registry.create_instance("set-string", "other", parameters={"value": "different"})
+    )
+    workflow.add_edge(WorkflowEdge("input", "value", "other", "value"), registry)
+    workflow.sync_boundary_nodes(registry)
+
+    response = json.loads(execute_workflow_json(json.dumps(workflow_to_dict(workflow))))
+
+    assert response["status"] == "error"
+    assert "Conflicting saved parameter values" in response["error"]["message"]
+    assert response["warnings"] == []
+
+
+@pytest.mark.parametrize("value", ["", 0, False])
+def test_shared_input_resolver_preserves_explicit_values(value):
+    from flowgraph.application.workflow_cli import resolve_workflow_inputs
+
+    definition_id = (
+        "set-string"
+        if isinstance(value, str)
+        else "set-boolean"
+        if isinstance(value, bool)
+        else "set-int"
+    )
+    workflow = _public_input_workflow(definition_id, value)
+    warnings = []
+
+    injected = resolve_workflow_inputs(workflow, {"value": value}, on_warning=warnings.append)
+
+    assert injected == {"input": {"value": value}}
+    assert warnings == []
 
 
 def test_execute_workflow_json_returns_show_value_input_as_python_text() -> None:

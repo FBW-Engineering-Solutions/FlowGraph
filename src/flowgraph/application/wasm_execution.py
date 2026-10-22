@@ -18,7 +18,11 @@ from Muscat.Simple import ED, ElementFilter
 from PIL.Image import Image
 
 from flowgraph.application.node_registry import create_node_registry
-from flowgraph.application.workflow_cli import format_workflow_inspection, workflow_outputs
+from flowgraph.application.workflow_cli import (
+    format_workflow_inspection,
+    resolve_workflow_inputs,
+    workflow_outputs,
+)
 from flowgraph.application.workflow_core import (
     NodeExecutionError,
     WorkflowError,
@@ -39,13 +43,15 @@ def execute_workflow_json(workflow_json: str) -> str:
     may remain warm in the surrounding WASM process while workflow state is
     reconstructed for each request.
     """
+    warnings: list[str] = []
     try:
         global _REGISTRY
         if _REGISTRY is None:
             _REGISTRY = create_node_registry()
         registry = _REGISTRY
         workflow = workflow_from_json(workflow_json, registry, source_name="WASM workflow")
-        result = WorkflowExecutor(registry).run(workflow)
+        injected = resolve_workflow_inputs(workflow, {}, on_warning=warnings.append)
+        result = WorkflowExecutor(registry).run(workflow, initial_inputs=injected)
         response = {
             "status": "ok",
             "execution_order": list(result.execution_order),
@@ -58,6 +64,7 @@ def execute_workflow_json(workflow_json: str) -> str:
         }
     except Exception as error:  # noqa: BLE001 - the worker boundary serializes all failures
         response = _error_response(error)
+    response["warnings"] = warnings
     return json.dumps(response, ensure_ascii=False, separators=(",", ":"))
 
 

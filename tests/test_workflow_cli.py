@@ -326,6 +326,192 @@ def test_cli_run_reports_missing_inputs_without_traceback(tmp_path: Path, capsys
     assert "Missing required workflow inputs: value" in capsys.readouterr().err
 
 
+def _default_workflow(definition_id="set-string", value="saved") -> WorkflowGraph:
+    registry = create_node_registry()
+    boundary = WORKFLOW_INPUT.create_instance("input", parameters={"name": "value"})
+    target = registry.create_instance(definition_id, "target", parameters={"value": value})
+    output = WORKFLOW_OUTPUT.create_instance("output", parameters={"name": "result"})
+    graph = WorkflowGraph([boundary, target, output])
+    graph.add_edge(WorkflowEdge("input", "value", "target", "value"), registry)
+    graph.add_edge(WorkflowEdge("target", "value", "output", "value"), registry)
+    graph.sync_boundary_nodes(registry)
+    return graph
+
+
+@pytest.mark.parametrize(
+    ("definition_id", "value", "expected"),
+    [
+        ("set-string", "saved", "'saved'"),
+        ("set-string", "", "''"),
+        ("set-int", 0, "0"),
+        ("set-boolean", False, "False"),
+    ],
+)
+def test_inspect_shows_saved_input_default(tmp_path, capsys, definition_id, value, expected):
+    path = tmp_path / "inspect-default.json"
+    save_workflow(_default_workflow(definition_id, value), path)
+    before = path.read_bytes()
+    assert main(["inspect", str(path)]) == 0
+    output = capsys.readouterr()
+    inputs = output.out.split("Outputs:", 1)[0]
+    assert f"(input.value)  default: {expected}\n" in inputs
+    assert output.err == ""
+    assert path.read_bytes() == before
+
+
+def test_inspect_marks_required_input_without_default():
+    text = format_workflow_inspection(_published_workflow(), create_node_registry())
+    assert "(input.value)  default: (none; required)" in text
+
+
+def test_inspect_reports_conflicting_defaults_without_hiding_graph(tmp_path, capsys):
+    registry = create_node_registry()
+    graph = _default_workflow()
+    graph.add_node(SET_STRING.create_instance("other", parameters={"value": "different"}))
+    graph.add_edge(WorkflowEdge("input", "value", "other", "value"), registry)
+    path = tmp_path / "conflict.json"
+    save_workflow(graph, path)
+    assert main(["inspect", str(path)]) == 0
+    output = capsys.readouterr()
+    assert "default: (conflicting saved values; provide --input)" in output.out
+    assert "Workflow:" in output.out
+    assert output.err == ""
+
+
+@pytest.mark.parametrize(
+    ("definition_id", "value"),
+    [("set-string", "saved"), ("set-string", ""), ("set-int", 0), ("set-boolean", False)],
+)
+def test_cli_omitted_input_uses_saved_downstream_value_and_warns(
+    tmp_path, capsys, definition_id, value
+):
+    path = tmp_path / "defaults.json"
+    save_workflow(_default_workflow(definition_id, value), path)
+    before = path.read_bytes()
+    _, result = execute_cli_workflow(path)
+    assert result.node_outputs["output"]["value"] == value
+    warning = capsys.readouterr().err
+    assert "Warning:" in warning
+    assert "Workflow input 'value' was not provided" in warning
+    assert "target.value" in warning
+    assert repr(value) in warning
+    assert path.read_bytes() == before
+
+
+def test_cli_explicit_input_takes_precedence_without_warning(tmp_path, capsys):
+    path = tmp_path / "defaults.json"
+    save_workflow(_default_workflow(), path)
+    assert main(["run", str(path), "--input", "value=explicit"]) == 0
+    output = capsys.readouterr()
+    assert "result: 'explicit'" in output.out
+    assert output.err == ""
+
+
+def test_cli_default_warning_does_not_pollute_json_output(tmp_path, capsys):
+    path = tmp_path / "defaults.json"
+    destination = tmp_path / "outputs.json"
+    save_workflow(_default_workflow(), path)
+    assert main(["run", str(path), "--json-output", str(destination)]) == 0
+    assert json.loads(destination.read_text()) == {"result": "saved"}
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert "Warning:" in output.err
+
+
+def test_cli_default_reflects_parameter_override(tmp_path, capsys):
+    path = tmp_path / "defaults.json"
+    save_workflow(_default_workflow(), path)
+    assert main(["run", str(path), "--override", "target.value=updated"]) == 0
+    output = capsys.readouterr()
+    assert "result: 'updated'" in output.out
+    assert "saved parameter value 'updated'" in output.err
+
+
+def test_cli_direct_export_default(tmp_path, capsys):
+    registry = create_node_registry()
+    graph = _override_workflow()
+    graph.export_input("text", "source", "value", registry)
+    inspection = format_workflow_inspection(graph, registry)
+    assert "(source.value)  default: 'saved'" in inspection
+    path = tmp_path / "direct.json"
+    save_workflow(graph, path)
+    assert main(["run", str(path)]) == 0
+    output = capsys.readouterr()
+    assert "result: 'saved'" in output.out
+    assert "source.value" in output.err
+
+
+@pytest.mark.parametrize(
+    ("definition_id", "parameter", "value"),
+    [
+        ("read-image", "path", "saved image.png"),
+        ("create-uniform-mesh-of-bars", "startPoint", [1, 2, 3]),
+    ],
+)
+def test_saved_default_normalizes_file_and_vector_values(tmp_path, definition_id, parameter, value):
+    from flowgraph.application.workflow_defaults import saved_input_default
+    from flowgraph.domain.filepath import FilePath
+
+    registry = create_node_registry()
+    boundary = WORKFLOW_INPUT.create_instance("input", parameters={"name": "value"})
+    target = registry.create_instance(definition_id, "target", parameters={parameter: value})
+    graph = WorkflowGraph([boundary, target])
+    graph.add_edge(WorkflowEdge("input", "value", "target", parameter), registry)
+    graph.sync_boundary_nodes(registry)
+    path = tmp_path / "typed.json"
+    save_workflow(graph, path)
+    restored = load_workflow(path, registry)
+    default = saved_input_default(restored, restored.inputs[0])
+    assert default is not None
+    resolved, addresses = default
+    assert addresses == (f"target.{parameter}",)
+    inspection = format_workflow_inspection(restored, registry).split("Outputs:", 1)[0]
+    if parameter == "path":
+        assert isinstance(resolved, FilePath)
+        assert str(resolved) == value
+        assert "default:" in inspection and "saved image.png" in inspection
+    else:
+        assert resolved == [1.0, 2.0, 3.0]
+        assert all(type(component) is float for component in resolved)
+        assert "default: <list: [1.0, 2.0, 3.0]>" in inspection
+
+
+def test_cli_nested_input_default(tmp_path, capsys):
+    registry = create_node_registry()
+    nested = RUN_WORKFLOW.create_instance("nested")
+    nested.subworkflow = _default_workflow(value="nested saved")
+    boundary = WORKFLOW_INPUT.create_instance("input", parameters={"name": "value"})
+    output = WORKFLOW_OUTPUT.create_instance("output", parameters={"name": "result"})
+    graph = WorkflowGraph([boundary, nested, output])
+    graph.add_edge(WorkflowEdge("input", "value", "nested", "value"), registry)
+    graph.add_edge(WorkflowEdge("nested", "result", "output", "value"), registry)
+    graph.sync_boundary_nodes(registry)
+    assert "(input.value)  default: 'nested saved'" in format_workflow_inspection(graph, registry)
+    path = tmp_path / "nested.json"
+    save_workflow(graph, path)
+    _, result = execute_cli_workflow(path)
+    assert result.node_outputs["output"]["value"] == "nested saved"
+    assert "nested/target.value" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("other_value", ["saved", "conflicting"])
+def test_cli_fanout_defaults_require_agreement(tmp_path, capsys, other_value):
+    registry = create_node_registry()
+    graph = _default_workflow()
+    graph.add_node(SET_STRING.create_instance("other", parameters={"value": other_value}))
+    graph.add_edge(WorkflowEdge("input", "value", "other", "value"), registry)
+    path = tmp_path / "fanout.json"
+    save_workflow(graph, path)
+    if other_value == "saved":
+        assert main(["run", str(path)]) == 0
+        assert "Warning:" in capsys.readouterr().err
+    else:
+        assert main(["run", str(path)]) == 2
+        assert "Conflicting saved parameter values" in capsys.readouterr().err
+        assert main(["run", str(path), "--input", "value=explicit"]) == 0
+        assert capsys.readouterr().err == ""
+
+
 def test_cli_run_reports_node_execution_errors_without_traceback(tmp_path: Path, capsys) -> None:
     workflow_path = tmp_path / "workflow.json"
     save_workflow(_override_workflow(), workflow_path)

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+import sys
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ from flowgraph.application.workflow_core import (
     WorkflowGraph,
     WorkflowRunResult,
 )
+from flowgraph.application.workflow_defaults import saved_input_default
 from flowgraph.application.workflow_io import load_workflow
 
 
@@ -89,10 +91,20 @@ def format_workflow_inspection(workflow: WorkflowGraph, registry: NodeRegistry) 
     """
     lines = ["Inputs:"]
     if workflow.inputs:
-        lines.extend(
-            f"  {port.name}: {port.data_type.label} ({port.node_id}.{port.node_port})"
-            for port in workflow.inputs
-        )
+        for port in workflow.inputs:
+            try:
+                default = saved_input_default(workflow, port)
+            except ValueError:
+                suffix = "default: (conflicting saved values; provide --input)"
+            else:
+                suffix = (
+                    f"default: {_display_value(default[0])}"
+                    if default is not None
+                    else "default: (none; required)"
+                )
+            lines.append(
+                f"  {port.name}: {port.data_type.label} ({port.node_id}.{port.node_port})  {suffix}"
+            )
     else:
         lines.append("  (none)")
 
@@ -345,7 +357,7 @@ def execute_cli_workflow(
     registry = create_node_registry()
     workflow = load_workflow(path, registry)
     _apply_overrides(workflow, overrides or {})
-    injected = _resolve_inputs(workflow, inputs or {})
+    injected = resolve_workflow_inputs(workflow, inputs or {})
     return workflow, WorkflowExecutor(registry).run(workflow, initial_inputs=injected)
 
 
@@ -382,24 +394,49 @@ def write_json_output(outputs: Mapping[str, Any], path: str | Path) -> Path:
     return destination.resolve()
 
 
-def _resolve_inputs(
-    workflow: WorkflowGraph, values: Mapping[str, Any]
+def resolve_workflow_inputs(
+    workflow: WorkflowGraph,
+    values: Mapping[str, Any],
+    *,
+    on_warning: Callable[[str], None] | None = None,
 ) -> dict[str, dict[str, Any]]:
+    """Resolve public inputs, falling back to saved downstream parameters.
+
+    Warnings go to stderr unless a host (such as the browser) supplies a sink.
+    """
     unknown = set(values).difference(port.name for port in workflow.inputs)
     if unknown:
         raise WorkflowCliError(f"Unknown workflow inputs: {sorted(unknown)!r}")
-    missing = [port.name for port in workflow.inputs if port.name not in values]
+    resolved = dict(values)
+    warnings = []
+    for port in workflow.inputs:
+        if port.name in resolved:
+            continue
+        default = saved_input_default(workflow, port)
+        if default is not None:
+            value, addresses = default
+            resolved[port.name] = value
+            warnings.append(
+                f"flowgraph: Warning: Workflow input {port.name!r} was not provided; "
+                f"using saved parameter value {_display_value(value)} from {', '.join(addresses)}."
+            )
+    missing = [port.name for port in workflow.inputs if port.name not in resolved]
     if missing:
         raise WorkflowCliError(f"Missing required workflow inputs: {', '.join(missing)}")
     injected: dict[str, dict[str, Any]] = {}
     for port in workflow.inputs:
-        value = values[port.name]
+        value = resolved[port.name]
         if not port.data_type.accepts(value):
             raise WorkflowCliError(
                 f"Workflow input {port.name!r} expected {port.data_type.label}, "
                 f"got {type(value).__name__}"
             )
         injected.setdefault(port.node_id, {})[port.node_port] = value
+    for warning in warnings:
+        if on_warning is None:
+            print(warning, file=sys.stderr)
+        else:
+            on_warning(warning)
     return injected
 
 
