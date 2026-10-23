@@ -15,7 +15,7 @@ FlowGraph Core declares `requires-python = ">=3.11"` and initially supports
 Python 3.11 and newer versions that are compatible with the declared dependency
 set.
 
-The CI workflow is configured to test Python 3.11 and 3.13. Other Python 3.11+
+The CI workflow is configured to test Python 3.11, 3.12, 3.13, and 3.14. Other Python 3.11+
 versions are declaration-level support targets until they are added to the CI
 matrix and verified. A release must not claim that every Python version has been
 tested until that matrix exists.

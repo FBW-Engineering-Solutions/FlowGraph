@@ -77,7 +77,7 @@ Docker, operating-system package managers, and third-party mirrors are not
 supported release channels at this time. See
 [`Release Channels`](docs/policies/release-channels.md) for the release policy.
 
-FlowGraph Core declares Python 3.11 or newer. CI covers Python 3.11 and 3.13 on
+FlowGraph Core declares Python 3.11 or newer. CI covers Python 3.11, 3.12, 3.13, and 3.14 on
 GitHub-hosted Ubuntu, Windows, and macOS runners; a platform/version combination
 is supported only after its release-candidate job passes. See
 [`Support Policy`](docs/policies/support-policy.md) for compatibility, deprecation,
