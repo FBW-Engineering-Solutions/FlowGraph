@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 from flowgraph.application.workflow_cli import (
     WorkflowCliError,
@@ -56,6 +57,15 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         help="write public workflow outputs as JSON to FILE",
     )
+    serve_parser = commands.add_parser(
+        "serve", help="start the experimental loopback execution API"
+    )
+    serve_parser.add_argument(
+        "--workspace", type=Path, required=True, help="existing workspace directory"
+    )
+    serve_parser.add_argument("--port", type=int, default=8765)
+    serve_parser.add_argument("--execution-timeout", type=float, default=120)
+    serve_parser.add_argument("--max-request-bytes", type=int, default=16 << 20)
     return parser
 
 
@@ -63,7 +73,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Validate arguments and run a headless FlowGraph workflow command."""
     args = build_parser().parse_args(argv)
     try:
-        if args.command == "inspect":
+        if args.command == "serve":
+            from flowgraph.server.http import LocalServer
+
+            with LocalServer(
+                args.workspace,
+                port=args.port,
+                execution_timeout=args.execution_timeout,
+                max_request=args.max_request_bytes,
+            ) as server:
+                print(f"Experimental FlowGraph API: {server.origin}", flush=True)
+                print(f"Bearer token: {server.token}", flush=True)
+                print("Trusted local workflows only; native Python is not sandboxed.", flush=True)
+                try:
+                    server.serve_forever()
+                except KeyboardInterrupt:
+                    pass
+        elif args.command == "inspect":
             print(
                 inspect_workflow(
                     args.workflow,
