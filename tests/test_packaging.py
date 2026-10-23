@@ -54,7 +54,7 @@ def test_website_documents_every_registered_adapter_node() -> None:
                 # Composite workflow nodes are explained alongside their controls.
                 content = (
                     (reference / "controls.md").read_text(encoding="utf-8")
-                    if definition.subworkflow_factory is not None
+                    if definition.subworkflows_factory is not None
                     else markdown
                 )
                 if f"`{definition.id}`" not in content:

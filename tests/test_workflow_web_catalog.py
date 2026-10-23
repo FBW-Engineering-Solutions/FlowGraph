@@ -50,7 +50,7 @@ def test_workflow_web_catalog_exports_registered_nodes_without_executors() -> No
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 
-    assert len(nodes) == len(ADAPTERS.node_definitions) == 81
+    assert len(nodes) == len(ADAPTERS.node_definitions) == 82
     assert all(isinstance(node["requirements"], list) for node in nodes.values())
     assert all(
         isinstance(requirement, str)

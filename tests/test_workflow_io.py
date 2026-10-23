@@ -84,7 +84,9 @@ def test_legacy_string_code_and_nested_code_arrays_load() -> None:
     outer.subworkflow = inner
     payload = workflow_to_dict(WorkflowGraph([outer]))
 
-    assert payload["nodes"][0]["subworkflow"]["nodes"][0]["parameters"]["code"] == code.split("\n")
+    assert payload["nodes"][0]["subworkflows"]["default"]["nodes"][0]["parameters"][
+        "code"
+    ] == code.split("\n")
     assert (
         workflow_from_dict(payload, registry)
         .require_node("outer")
@@ -92,7 +94,7 @@ def test_legacy_string_code_and_nested_code_arrays_load() -> None:
         .parameters["code"]
         == code
     )
-    payload["nodes"][0]["subworkflow"]["nodes"][0]["parameters"]["code"] = code
+    payload["nodes"][0]["subworkflows"]["default"]["nodes"][0]["parameters"]["code"] = code
     assert (
         workflow_from_dict(payload, registry)
         .require_node("outer")
@@ -453,4 +455,4 @@ def test_version_one_json_backed_run_workflow_migrates_to_a_child_graph() -> Non
     assert restored_node.parameters == {}
     assert restored_node.subworkflow is not None
     assert restored_node.subworkflow.require_node("source").parameters == {"value": "nested"}
-    assert workflow_to_dict(restored)["version"] == 2
+    assert workflow_to_dict(restored)["version"] == 3
