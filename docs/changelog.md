@@ -12,7 +12,8 @@ Corrections:
 -
 
 Improvement:
--
+- CI source and wheel/sdist tests now include Python 3.12 and 3.14 alongside
+  Python 3.11 and 3.13 on Ubuntu, Windows, and macOS.
 
 New in version 0.1.6:
 **********************

@@ -32,12 +32,12 @@ repair step is required.
 
 Push a normal branch (without tags), or open a pull request. The workflow runs
 source tests, builds one wheel/sdist pair, and tests each downloaded distribution
-independently on Ubuntu, Windows, and macOS with Python 3.11 and 3.13. Manual
+independently on Ubuntu, Windows, and macOS with Python 3.11, 3.12, 3.13, and 3.14. Manual
 `workflow_dispatch` runs also rehearse packaging without publishing, even when
 dispatched against a tag. Only an actual version-tag **push** can start release
 validation and publication. Do not push a release tag just to test packaging.
 
-Each of the 12 artifact-test jobs creates a fresh environment outside the
+Each of the 24 artifact-test jobs creates a fresh environment outside the
 checkout, installs the selected archive with its declared dependencies, checks
 dependency consistency, verifies installed versions/import locations, reads
 packaged image/workflow resources, and exercises workflow persistence and the

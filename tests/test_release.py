@@ -174,10 +174,18 @@ def test_branch_and_pr_runs_include_packaging_matrix() -> None:
     artifacts = workflow.split("\n  test-artifacts:\n", 1)[1].split("\n  validate-release:\n", 1)[0]
     assert "needs: build" in artifacts
     assert "artifact: [wheel, sdist]" in artifacts
-    assert 'python-version: ["3.11", "3.13"]' in artifacts
+    assert 'python-version: ["3.11", "3.12", "3.13", "3.14"]' in artifacts
     assert "os: [ubuntu-latest, windows-latest, macos-latest]" in artifacts
     assert "name: flowgraph-core-packages" in artifacts
     assert "python packaging/test_artifact.py" in artifacts
+
+
+@pytest.mark.parametrize("job", ["test", "test-artifacts"])
+def test_ci_matrix_covers_supported_python_versions(job: str) -> None:
+    workflow = (ROOT / ".github/workflows/build-packages.yml").read_text(encoding="utf-8")
+    body = workflow.split(f"\n  {job}:\n", 1)[1].split("\n\n  ", 1)[0]
+    assert 'python-version: ["3.11", "3.12", "3.13", "3.14"]' in body
+    assert "os: [ubuntu-latest, windows-latest, macos-latest]" in body
 
 
 def artifact_runner():
