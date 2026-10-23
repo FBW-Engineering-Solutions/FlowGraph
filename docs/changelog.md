@@ -3,6 +3,10 @@ New in Next :
 **********************
 
 Api Change:
+- Replace `flowgraph.application.wasm_execution` with the transport-independent
+  `flowgraph.application.workflow_execution` module. No compatibility alias is
+  retained. `execute_workflow_json()` and its response format are unchanged;
+  browser workers must update their imports and rebuild/stage the core wheel.
 - Composite nodes now store string-keyed `subworkflows`; definition factories use
   `subworkflows_factory`. The single-child `subworkflow` property remains as a
   compatibility view of the `"default"` child. Workflow JSON is version 3;

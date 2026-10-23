@@ -1,4 +1,4 @@
-"""Tests for the JSON boundary used by the browser WASM executor."""
+"""Tests for the transport-independent JSON workflow execution boundary."""
 
 from __future__ import annotations
 
@@ -13,14 +13,14 @@ from PIL import Image as PillowImage
 
 from flowgraph.adapters.simple_sources import SET_STRING
 from flowgraph.adapters.workflow_interfaces import WORKFLOW_INPUT, WORKFLOW_OUTPUT
-from flowgraph.application import wasm_execution
+from flowgraph.application import workflow_execution
 from flowgraph.application.node_registry import create_node_registry
-from flowgraph.application.wasm_execution import _display_meshes, execute_workflow_json
 from flowgraph.application.workflow_core import (
     NodeDefinition,
     WorkflowEdge,
     WorkflowGraph,
 )
+from flowgraph.application.workflow_execution import _display_meshes, execute_workflow_json
 from flowgraph.application.workflow_io import workflow_to_dict
 
 
@@ -93,7 +93,7 @@ def _public_input_workflow(definition_id="set-string", value="saved"):
     ("definition_id", "value"),
     [("set-string", "saved"), ("set-string", ""), ("set-int", 0), ("set-boolean", False)],
 )
-def test_wasm_uses_saved_public_input_and_returns_warning(definition_id, value):
+def test_execution_uses_saved_public_input_and_returns_warning(definition_id, value):
     workflow = _public_input_workflow(definition_id, value)
     response = json.loads(execute_workflow_json(json.dumps(workflow_to_dict(workflow))))
 
@@ -106,7 +106,7 @@ def test_wasm_uses_saved_public_input_and_returns_warning(definition_id, value):
     assert "target.value" in response["warnings"][0]
 
 
-def test_wasm_rejects_missing_public_input_without_saved_parameter():
+def test_execution_rejects_missing_public_input_without_saved_parameter():
     registry = create_node_registry()
     workflow = WorkflowGraph(
         [
@@ -124,7 +124,7 @@ def test_wasm_rejects_missing_public_input_without_saved_parameter():
     assert response["warnings"] == []
 
 
-def test_wasm_rejects_conflicting_saved_public_inputs():
+def test_execution_rejects_conflicting_saved_public_inputs():
     registry = create_node_registry()
     workflow = _public_input_workflow()
     workflow.add_node(
@@ -257,6 +257,34 @@ def test_execute_workflow_json_serializes_invalid_requests_as_errors() -> None:
     assert response["status"] == "error"
     assert response["error"]["type"] == "WorkflowPersistenceError"
     assert "not valid JSON" in response["error"]["message"]
+    assert "WASM" not in response["error"]["message"]
+
+
+def test_execution_reuses_registry_without_retaining_previous_workflow(monkeypatch) -> None:
+    registries = []
+
+    def registry_factory():
+        registry = create_node_registry()
+        registries.append(registry)
+        return registry
+
+    monkeypatch.setattr(workflow_execution, "_REGISTRY", None)
+    monkeypatch.setattr(workflow_execution, "create_node_registry", registry_factory)
+    first = json.loads(execute_workflow_json(_workflow_json()))
+    invalid = json.loads(execute_workflow_json("not-json"))
+    second = json.loads(execute_workflow_json(_show_value_workflow_json()))
+
+    assert len(registries) == 1
+    assert first["outputs"] == {"result": "hello"}
+    assert invalid["status"] == "error"
+    assert second["status"] == "ok"
+    assert second["outputs"] == {}
+    assert set(second["nodes"]["outputs"]) == {"source", "display"}
+
+
+def test_wasm_specific_module_is_removed() -> None:
+    application = Path(workflow_execution.__file__).parent
+    assert not (application / "wasm_execution.py").exists()
 
 
 def test_execute_workflow_json_reports_failing_node_and_original_line(monkeypatch) -> None:
@@ -274,7 +302,7 @@ def test_execute_workflow_json_reports_failing_node_and_original_line(monkeypatc
         )
     )
     workflow = WorkflowGraph([registry.create_instance("failing-test-node", "transfer-fields-13")])
-    monkeypatch.setattr(wasm_execution, "_REGISTRY", registry)
+    monkeypatch.setattr(workflow_execution, "_REGISTRY", registry)
     response = json.loads(execute_workflow_json(json.dumps(workflow_to_dict(workflow))))
 
     assert response["status"] == "error"
@@ -284,12 +312,12 @@ def test_execute_workflow_json_reports_failing_node_and_original_line(monkeypatc
     assert detail["definition_id"] == "failing-test-node"
     assert "dimension mismatch" in detail["message"]
     assert 'raise ValueError("dimension mismatch")' in detail["traceback"]
-    assert "test_wasm_execution.py" in detail["traceback"]
+    assert "test_workflow_execution.py" in detail["traceback"]
     assert "ValueError: dimension mismatch" in detail["traceback"]
     assert "The above exception was the direct cause" in detail["traceback"]
 
 
-def test_wasm_execution_uses_the_complete_core_node_registry() -> None:
+def test_workflow_execution_uses_the_complete_core_node_registry() -> None:
     registry = create_node_registry()
 
     assert registry.get("create-cube") is not None
@@ -302,9 +330,9 @@ def test_wasm_execution_uses_the_complete_core_node_registry() -> None:
     assert registry.get("cosapp-workflow") is not None
 
 
-def test_wasm_execution_module_uses_the_core_node_registry() -> None:
+def test_workflow_execution_module_uses_the_core_node_registry() -> None:
     source = (
-        Path(__file__).parents[1] / "src" / "flowgraph" / "application" / "wasm_execution.py"
+        Path(__file__).parents[1] / "src" / "flowgraph" / "application" / "workflow_execution.py"
     ).read_text(encoding="utf-8")
 
     assert "from flowgraph.application.node_registry import create_node_registry" in source
