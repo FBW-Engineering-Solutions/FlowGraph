@@ -55,6 +55,25 @@ For examples and warning output, see
 Workflows use the versioned `flowgraph-workflow` JSON format. Core validation and
 execution are UI-independent.
 
+### JSON execution boundary
+
+Python clients and browser-hosted Python workers use the same entry point:
+
+```python
+from flowgraph.application.workflow_execution import execute_workflow_json
+
+result_json = execute_workflow_json(workflow_json)
+```
+
+The response includes execution order, public outputs, retained node values,
+display previews, warnings, and structured errors. A process-local node registry
+is reused, but each call reconstructs its workflow. This API does not provide a
+server, authentication, cancellation, or filesystem isolation.
+
+The former WASM-specific execution module has been removed without a compatibility
+alias. Browser clients must update their import and rebuild/stage their core wheel
+together; the workflow file and execution response formats are unchanged.
+
 ## Package artifacts
 
 Build the portable, pure-Python source distribution and wheel with:

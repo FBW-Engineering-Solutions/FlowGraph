@@ -1,4 +1,4 @@
-"""JSON execution boundary for the browser-hosted FlowGraph WASM runtime."""
+"""Transport-independent JSON workflow execution and result serialization."""
 
 from __future__ import annotations
 
@@ -38,10 +38,10 @@ _REGISTRY = None
 def execute_workflow_json(workflow_json: str) -> str:
     """Execute one workflow JSON document and return a serialized response.
 
-    The function is independent from JavaScript and is the stable Python-side
-    entry point used by the persistent browser WASM worker. Runtime libraries
-    may remain warm in the surrounding WASM process while workflow state is
-    reconstructed for each request.
+    Native Python clients and browser-hosted Python workers share this entry
+    point. The node registry is cached within the calling process, while workflow
+    state is reconstructed for each request. Process management, cancellation,
+    authentication, and workspace configuration belong to the calling transport.
     """
     warnings: list[str] = []
     try:
@@ -49,7 +49,7 @@ def execute_workflow_json(workflow_json: str) -> str:
         if _REGISTRY is None:
             _REGISTRY = create_node_registry()
         registry = _REGISTRY
-        workflow = workflow_from_json(workflow_json, registry, source_name="WASM workflow")
+        workflow = workflow_from_json(workflow_json, registry, source_name="Workflow execution")
         injected = resolve_workflow_inputs(workflow, {}, on_warning=warnings.append)
         result = WorkflowExecutor(registry).run(workflow, initial_inputs=injected)
         response = {
@@ -62,7 +62,7 @@ def execute_workflow_json(workflow_json: str) -> str:
             "display_meshes": _display_meshes(workflow, result.node_inputs),
             "projection": format_workflow_inspection(workflow, registry),
         }
-    except Exception as error:  # noqa: BLE001 - the worker boundary serializes all failures
+    except Exception as error:  # noqa: BLE001 - the execution boundary serializes all failures
         response = _error_response(error)
     response["warnings"] = warnings
     return json.dumps(response, ensure_ascii=False, separators=(",", ":"))
