@@ -13,6 +13,12 @@ Api Change:
   existing version 1/2 workflows remain readable and migrate on export.
 
 New functionalities:
+- Add the experimental `flowgraph serve --workspace ...` loopback-only HTTP API,
+  with generated bearer authentication, Host/Origin checks, runtime/catalog
+  metadata, workspace file operations, and one cancellable native execution job
+  at a time. Jobs use the shared execution boundary in fresh subprocesses.
+  Includes request/result limits, execution timeout, shutdown cleanup and real
+  HTTP integration tests. API only; no editor hosting or frontend adapter yet.
 - Conditional Workflow executes only its selected `"true"` or `"false"` child,
   including branch-local producers, and exposes matching published branch
   outputs as an implicit join. Its boolean condition accepts a saved value or

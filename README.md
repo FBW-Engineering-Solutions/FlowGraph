@@ -74,6 +74,20 @@ The former WASM-specific execution module has been removed without a compatibili
 alias. Browser clients must update their import and rebuild/stage their core wheel
 together; the workflow file and execution response formats are unchanged.
 
+## Experimental local server
+
+The prototype branch includes an authenticated, loopback-only execution API:
+
+```bash
+uv run flowgraph serve --workspace /absolute/path/to/existing/workspace --port 8765
+```
+
+It runs one workflow at a time in a cancellable native subprocess and provides
+runtime metadata, catalog, and workspace file endpoints. It does not yet serve
+the editor or connect the web GUI. Native workflow code is **not sandboxed**.
+See [Local server API and limitations](docs/local-server.md) for authentication,
+request/response formats, examples, limits, and shutdown behavior.
+
 ## Package artifacts
 
 Build the portable, pure-Python source distribution and wheel with:
