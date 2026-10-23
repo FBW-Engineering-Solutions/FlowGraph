@@ -71,14 +71,20 @@ def _saved_parameters(
                 workflow, edge.target_node, edge.target_port, visited, prefix
             )
         ]
-    if node.subworkflow is not None:
-        child_port = node.subworkflow.input(node_port)
+    candidates = []
+    for child_key, child in node.subworkflows.items():
+        child_port = child.input(node_port)
         if child_port is not None:
-            return _saved_parameters(
-                node.subworkflow,
-                child_port.node_id,
-                child_port.node_port,
-                visited,
-                f"{prefix}{node_id}/",
+            child_prefix = f"{prefix}{node_id}/"
+            if child_key != "default":
+                child_prefix += f"{child_key}/"
+            candidates.extend(
+                _saved_parameters(
+                    child,
+                    child_port.node_id,
+                    child_port.node_port,
+                    visited,
+                    child_prefix,
+                )
             )
-    return []
+    return candidates

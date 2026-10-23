@@ -166,8 +166,9 @@ def _arbitrary_code_nodes(
         if node.definition_id in _ARBITRARY_CODE_NODE_IDS:
             label = registry.require(node.definition_id).label
             found.append(f"({node.definition_id})[{address}] {label}")
-        if node.subworkflow is not None:
-            found.extend(_arbitrary_code_nodes(node.subworkflow, registry, prefix=f"{address}/"))
+        for key, child in node.subworkflows.items():
+            child_prefix = f"{address}/" if key == "default" else f"{address}/{key}/"
+            found.extend(_arbitrary_code_nodes(child, registry, prefix=child_prefix))
     return found
 
 
@@ -405,12 +406,13 @@ def _render_graph(
             else:
                 lines.append(f"{prefix()}{_port_text('O', port)}")
 
-        if node.subworkflow is not None:
+        for key, child in node.subworkflows.items():
             # Child connections have their own lane space, separate from the parent.
             child_indent = f"{prefix()}  "
-            lines.append(f"{prefix()}subworkflow:")
-            if node.subworkflow.nodes:
-                lines.extend(_format_graph(node.subworkflow, registry, indent=child_indent))
+            label = "subworkflow" if key == "default" else f"subworkflow {key!r}"
+            lines.append(f"{prefix()}{label}:")
+            if child.nodes:
+                lines.extend(_format_graph(child, registry, indent=child_indent))
             else:
                 lines.append(f"{child_indent}(empty)")
     return lines

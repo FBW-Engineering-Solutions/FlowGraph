@@ -10,6 +10,7 @@ from flowgraph.application.workflow_core import (
     NodeDefinition,
     NodeInstance,
     NodeRegistry,
+    ParameterDefinition,
     PortDefinition,
     PortDirection,
     WorkflowExecutor,
@@ -17,7 +18,17 @@ from flowgraph.application.workflow_core import (
     WorkflowRunResult,
 )
 
-from .data_types import ANY, FLOAT, INTEGER, LIST_ANY, LIST_FLOAT, LIST_INT, LIST_STR, STRING
+from .data_types import (
+    ANY,
+    BOOLEAN,
+    FLOAT,
+    INTEGER,
+    LIST_ANY,
+    LIST_FLOAT,
+    LIST_INT,
+    LIST_STR,
+    STRING,
+)
 
 RUN_WORKFLOW_PORTS = (PortDefinition("result", PortDirection.OUTPUT, ANY, "Result"),)
 BATCH_WORKFLOW_PORTS = (PortDefinition("result", PortDirection.OUTPUT, LIST_ANY, "Results"),)
@@ -31,7 +42,7 @@ _BATCH_LIST_TYPES = {
 
 def _nested_ports(instance: NodeInstance) -> tuple[PortDefinition, ...]:
     """Return ports exported by a composite node's child workflow."""
-    graph = instance.subworkflow
+    graph = instance.subworkflows.get("default")
     if graph is None:
         return RUN_WORKFLOW_PORTS
     exported = tuple(
@@ -53,11 +64,15 @@ def _execute_workflow(
 ) -> Mapping[str, Any]:
     """Execute the child graph with values supplied to its public inputs."""
     context = _exec_context or ExecContext()
-    graph = instance.subworkflow
+    if set(instance.subworkflows) != {"default"}:
+        raise ValueError("Run Full Workflow requires exactly the 'default' child")
+    graph = instance.subworkflows.get("default")
     if graph is None:
         raise ValueError("The nested workflow is not initialized")
     graph.sync_boundary_nodes(registry)
-    injected = {port.node_id: {port.node_port: inputs[port.name]} for port in graph.inputs}
+    injected: dict[str, dict[str, Any]] = {}
+    for port in graph.inputs:
+        injected.setdefault(port.node_id, {})[port.node_port] = inputs[port.name]
     nested_result: WorkflowRunResult = WorkflowExecutor(
         registry,
         parallel_tasks=context.parallel_tasks,
@@ -72,7 +87,7 @@ def _execute_workflow(
 
 def _batch_ports(instance: NodeInstance) -> tuple[PortDefinition, ...]:
     """Return broadcasting inputs and aggregated outputs of a child workflow."""
-    graph = instance.subworkflow
+    graph = instance.subworkflows.get("default")
     if graph is None:
         return BATCH_WORKFLOW_PORTS
     inputs = tuple(
@@ -115,7 +130,9 @@ def _execute_batch_workflow(
     inputs broadcast to every child execution.
     """
     context = _exec_context or ExecContext()
-    graph = instance.subworkflow
+    if set(instance.subworkflows) != {"default"}:
+        raise ValueError("Batch Workflow requires exactly the 'default' child")
+    graph = instance.subworkflows.get("default")
     if graph is None:
         raise ValueError("The nested workflow is not initialized")
     graph.sync_boundary_nodes(registry)
@@ -151,9 +168,9 @@ def _execute_batch_workflow(
     return {"result": results, **outputs}
 
 
-def _empty_workflow() -> WorkflowGraph:
-    """Create an independent empty graph for one composite node instance."""
-    return WorkflowGraph()
+def _empty_workflow() -> dict[str, WorkflowGraph]:
+    """Create independent named children for a single-child composite."""
+    return {"default": WorkflowGraph()}
 
 
 RUN_WORKFLOW = NodeDefinition(
@@ -166,7 +183,7 @@ RUN_WORKFLOW = NodeDefinition(
     executor=lambda _inputs, _parameters, _exec_context: {},
     instance_port_resolver=_nested_ports,
     instance_executor=_execute_workflow,
-    subworkflow_factory=_empty_workflow,
+    subworkflows_factory=_empty_workflow,
     presentation="workflow",
 )
 
@@ -180,10 +197,83 @@ BATCH_WORKFLOW = NodeDefinition(
     executor=lambda _inputs, _parameters, _exec_context: {},
     instance_port_resolver=_batch_ports,
     instance_executor=_execute_batch_workflow,
-    subworkflow_factory=_empty_workflow,
+    subworkflows_factory=_empty_workflow,
     presentation="workflow",
 )
 
-AVAILABLE_NODES = (RUN_WORKFLOW, BATCH_WORKFLOW)
 
-__all__ = ["AVAILABLE_NODES", "BATCH_WORKFLOW", "RUN_WORKFLOW"]
+def _conditional_children() -> dict[str, WorkflowGraph]:
+    return {"false": WorkflowGraph(), "true": WorkflowGraph()}
+
+
+def _conditional_interface(instance: NodeInstance) -> WorkflowGraph:
+    """Validate alternatives without executing either child."""
+    if set(instance.subworkflows) != {"false", "true"}:
+        raise ValueError("Conditional Workflow requires exactly 'false' and 'true' children")
+    false_graph = instance.subworkflows["false"]
+    true_graph = instance.subworkflows["true"]
+    for direction in ("inputs", "outputs"):
+        left = {port.name: port.data_type for port in getattr(false_graph, direction)}
+        right = {port.name: port.data_type for port in getattr(true_graph, direction)}
+        if left != right:
+            raise ValueError(f"Conditional Workflow branches must have matching {direction}")
+    if any(port.name == "condition" for port in false_graph.inputs):
+        raise ValueError("Conditional Workflow child input 'condition' is reserved")
+    if any(port.name == "result" for port in false_graph.outputs):
+        raise ValueError("Conditional Workflow child output 'result' is reserved")
+    return false_graph
+
+
+def _conditional_ports(instance: NodeInstance) -> tuple[PortDefinition, ...]:
+    # Ports remain available while alternatives are being edited. Full interface
+    # agreement is checked at execution, not while loading an unfinished graph.
+    graph = instance.subworkflows.get("false")
+    ports = (
+        ()
+        if graph is None
+        else tuple(
+            PortDefinition(port.name, port.direction, port.data_type, port.display_label)
+            for port in (*graph.inputs, *graph.outputs)
+            if (port.direction, port.name)
+            not in {(PortDirection.INPUT, "condition"), (PortDirection.OUTPUT, "result")}
+        )
+    )
+    return CONDITIONAL_WORKFLOW.ports + ports
+
+
+def _execute_conditional(
+    instance: NodeInstance,
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    registry: NodeRegistry,
+    exec_context: ExecContext,
+) -> Mapping[str, Any]:
+    """Execute exactly one alternative and expose its common public outputs."""
+    for child in instance.subworkflows.values():
+        child.sync_boundary_nodes(registry)
+    _conditional_interface(instance)
+    condition = parameters["condition"]
+    if type(condition) is not bool:
+        raise TypeError("Conditional Workflow condition must be a boolean")
+    graph = instance.subworkflows["true" if condition else "false"]
+    selected = NodeInstance(instance.id, "run-workflow", subworkflows={"default": graph})
+    return _execute_workflow(selected, inputs, parameters, registry, exec_context)
+
+
+CONDITIONAL_WORKFLOW = NodeDefinition(
+    id="conditional-workflow",
+    icon="mdi-source-branch",
+    label="Conditional Workflow",
+    description="Executes only the true or false child workflow and returns its outputs.",
+    ports=RUN_WORKFLOW_PORTS,
+    parameters=(ParameterDefinition("condition", BOOLEAN, "Condition", False),),
+    executor=lambda _inputs, _parameters, _context: {},
+    instance_port_resolver=_conditional_ports,
+    instance_executor=_execute_conditional,
+    subworkflows_factory=_conditional_children,
+    presentation="workflow",
+)
+
+AVAILABLE_NODES = (RUN_WORKFLOW, BATCH_WORKFLOW, CONDITIONAL_WORKFLOW)
+
+__all__ = ["AVAILABLE_NODES", "BATCH_WORKFLOW", "CONDITIONAL_WORKFLOW", "RUN_WORKFLOW"]

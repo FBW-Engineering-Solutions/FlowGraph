@@ -34,7 +34,7 @@ EdgeAwareInstanceExecutor = Callable[
     ],
     Mapping[str, Any] | None,
 ]
-SubworkflowFactory = Callable[[], "WorkflowGraph"]
+SubworkflowFactory = Callable[[], dict[str, "WorkflowGraph"]]
 WorkflowExecutorFunction = Callable[
     [Mapping[str, Any], Mapping[str, Any] | None], Mapping[str, Any]
 ]
@@ -222,7 +222,7 @@ class NodeDefinition:
     instance_port_resolver: InstancePortResolver | None = None
     instance_executor: InstanceExecutor | None = None
     edge_aware_instance_executor: EdgeAwareInstanceExecutor | None = None
-    subworkflow_factory: SubworkflowFactory | None = None
+    subworkflows_factory: SubworkflowFactory | None = None
     color: str | None = None
     requirements: tuple[str, ...] = ()
 
@@ -385,7 +385,7 @@ class NodeDefinition:
             parameters=configured_parameters,
             x=x,
             y=y,
-            subworkflow=None if self.subworkflow_factory is None else self.subworkflow_factory(),
+            subworkflows={} if self.subworkflows_factory is None else self.subworkflows_factory(),
         )
 
     def create_icon_arguments(self) -> dict[str, str]:
@@ -408,7 +408,26 @@ class NodeInstance:
     parameters: dict[str, Any] = field(default_factory=dict)
     x: float = 0
     y: float = 0
-    subworkflow: WorkflowGraph | None = None
+    subworkflows: dict[str, WorkflowGraph] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.subworkflows, dict) or any(
+            not isinstance(key, str) or not key or not isinstance(graph, WorkflowGraph)
+            for key, graph in self.subworkflows.items()
+        ):
+            raise ValueError("Subworkflows must map non-empty string keys to workflow graphs")
+
+    @property
+    def subworkflow(self) -> WorkflowGraph | None:
+        """Return the default child for compatibility with single-child callers."""
+        return self.subworkflows.get("default")
+
+    @subworkflow.setter
+    def subworkflow(self, graph: WorkflowGraph | None) -> None:
+        if graph is None:
+            self.subworkflows.pop("default", None)
+        else:
+            self.subworkflows["default"] = graph
 
     def pprint(self):
         print(f"{self.id}")

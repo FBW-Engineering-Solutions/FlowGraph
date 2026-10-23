@@ -7,6 +7,24 @@ order: 21
 
 # Control Nodes
 
+## Conditional Workflow (`conditional-workflow`)
+
+Owns two editable children named `false` and `true`. The boolean **Condition**
+parameter (also connectable as an input) selects exactly one child. Both children
+must publish matching input/output names and types. Published inputs become
+parent inputs and the selected child's outputs become parent outputs; `result`
+contains its complete execution result. Child input `condition` and output
+`result` are reserved. The unselected child is not executed, and a selected-child
+failure does not fall back to the other child.
+
+Put all branch-local work inside its child, including independent producers.
+For example, if F feeds D only in the false branch, put both F and D in `false`.
+An F outside the composite still runs as an ordinary outer-graph dependency.
+Connect a common published output to E: this is the implicit join and E runs once
+after the selected child succeeds. Desktop branch edit buttons open each child
+separately. Saved-input defaults must agree across alternatives or be explicitly
+provided; inspection does not execute a branch to choose a default.
+
 Control nodes expose workflow values such as floating-point and integer sliders,
 plus headless workflow composition.
 Their executors are headless-safe; the GUI uses their `presentation` metadata to

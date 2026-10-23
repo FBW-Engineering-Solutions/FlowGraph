@@ -3,10 +3,17 @@ New in Next :
 **********************
 
 Api Change:
--
+- Composite nodes now store string-keyed `subworkflows`; definition factories use
+  `subworkflows_factory`. The single-child `subworkflow` property remains as a
+  compatibility view of the `"default"` child. Workflow JSON is version 3;
+  existing version 1/2 workflows remain readable and migrate on export.
 
 New functionalities:
--
+- Conditional Workflow executes only its selected `"true"` or `"false"` child,
+  including branch-local producers, and exposes matching published branch
+  outputs as an implicit join. Its boolean condition accepts a saved value or
+  connected input. Named children are included in CLI inspection, code warnings,
+  default resolution, and catalog metadata.
 
 Corrections:
 -

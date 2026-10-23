@@ -43,6 +43,16 @@ completed independent work.
 Composite nodes contain nested workflows. Boundary nodes map named child inputs
 and outputs to the parent workflow.
 
+`NodeInstance.subworkflows` maps non-empty string keys to owned child graphs.
+Single-child composites use `"default"`; Conditional Workflow uses `"false"` and
+`"true"`. Its adapter validates matching public input/output names and types and
+invokes the existing executor only for the selected child. No scheduler or skip
+semantics change. Branch-local producers must live inside the child to avoid
+executing when that branch is not selected. The legacy `subworkflow` property
+remains a compatibility view of the `"default"` child; new code should use the
+dictionary. Definition factories now use `subworkflows_factory` and return a
+fresh dictionary of independent graphs.
+
 ## Persistence
 
 Workflows are UTF-8 JSON documents with format identifier
