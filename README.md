@@ -79,12 +79,19 @@ together; the workflow file and execution response formats are unchanged.
 The prototype branch includes an authenticated, loopback-only execution API:
 
 ```bash
-uv run flowgraph serve --workspace /absolute/path/to/existing/workspace --port 8765
+uv run flowgraph serve --workspace /absolute/path/to/existing/workspace
 ```
 
+Port 8765 and the allowed editor origin `https://flowgraph-web.fbw-es.com` are
+defaults; explicit `--allow-origin` values replace that origin. The editor still
+requires bearer authentication and browser local-network permission. Click the
+printed **Open editor** link to pass the token and port automatically; keep the
+link private.
+
 It runs one workflow at a time in a cancellable native subprocess and provides
-runtime metadata, catalog, and workspace file endpoints. It does not yet serve
-the editor or connect the web GUI. Native workflow code is **not sandboxed**.
+runtime metadata, catalog, and workspace file endpoints. Core is API-only and never
+serves editor assets. Web and desktop clients own their GUI hosting and explicitly
+allow their origin with `--allow-origin`. Native workflow code is **not sandboxed**.
 See [Local server API and limitations](docs/local-server.md) for authentication,
 request/response formats, examples, limits, and shutdown behavior.
 

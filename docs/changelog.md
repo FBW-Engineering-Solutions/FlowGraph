@@ -13,6 +13,18 @@ Api Change:
   existing version 1/2 workflows remain readable and migrate on export.
 
 New functionalities:
+- Include token and actual bound port in hosted `Open editor` launch fragments
+  for one-click local backend selection; native editor links remain unchanged.
+- Always print an `Open editor` address at server startup pointing to the
+  independently hosted allowed client origin.
+- Default `flowgraph serve` to the public editor origin `https://flowgraph-web.fbw-es.com`
+  and port 8765. Explicit repeatable `--allow-origin` values replace the default;
+  loopback binding and bearer authentication remain unchanged.
+- Permit explicitly allowed HTTP loopback editor origins for local development,
+  including the serial editor at `http://127.0.0.1:8082`; public origins still require HTTPS.
+- Add opt-in `serve --allow-origin HTTPS_ORIGIN` for public editor connections to
+  loopback Python: restricted CORS/preflight support with unchanged bearer and
+  Host validation, no wildcard origins or network exposure.
 - Add the experimental `flowgraph serve --workspace ...` loopback-only HTTP API,
   with generated bearer authentication, Host/Origin checks, runtime/catalog
   metadata, workspace file operations, and one cancellable native execution job

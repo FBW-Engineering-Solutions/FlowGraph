@@ -6,6 +6,7 @@ import argparse
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from urllib.parse import urlencode, urlsplit
 
 from flowgraph.application.workflow_cli import (
     WorkflowCliError,
@@ -18,6 +19,8 @@ from flowgraph.application.workflow_cli import (
     write_json_output,
 )
 from flowgraph.application.workflow_core import WorkflowError
+
+DEFAULT_EDITOR_ORIGIN = "https://flowgraph-web.fbw-es.com"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -63,7 +66,18 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument(
         "--workspace", type=Path, required=True, help="existing workspace directory"
     )
-    serve_parser.add_argument("--port", type=int, default=8765)
+    serve_parser.add_argument(
+        "--port", type=int, default=8765, help="local server port (default: 8765)"
+    )
+    serve_parser.add_argument(
+        "--allow-origin",
+        action="append",
+        default=None,
+        help=(
+            f"allow an HTTPS editor origin (default: {DEFAULT_EDITOR_ORIGIN}); "
+            "repeatable; explicit values replace the default; HTTP loopback allowed for development"
+        ),
+    )
     serve_parser.add_argument("--execution-timeout", type=float, default=120)
     serve_parser.add_argument("--max-request-bytes", type=int, default=16 << 20)
     return parser
@@ -81,9 +95,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 port=args.port,
                 execution_timeout=args.execution_timeout,
                 max_request=args.max_request_bytes,
+                allowed_origins=tuple(args.allow_origin)
+                if args.allow_origin is not None
+                else (DEFAULT_EDITOR_ORIGIN,),
             ) as server:
                 print(f"Experimental FlowGraph API: {server.origin}", flush=True)
                 print(f"Bearer token: {server.token}", flush=True)
+                editor_origin = (
+                    args.allow_origin[0] if args.allow_origin is not None else DEFAULT_EDITOR_ORIGIN
+                )
+                fragment = urlencode({"token": server.token, "port": urlsplit(server.origin).port})
+                print(f"Open editor: {editor_origin}/#{fragment}", flush=True)
                 print("Trusted local workflows only; native Python is not sandboxed.", flush=True)
                 try:
                     server.serve_forever()

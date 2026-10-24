@@ -13,7 +13,7 @@ import pytest
 from flowgraph.application.node_registry import create_node_registry
 from flowgraph.application.workflow_core import WorkflowEdge, WorkflowGraph
 from flowgraph.application.workflow_io import workflow_to_dict
-from flowgraph.core_cli import build_parser
+from flowgraph.core_cli import build_parser, main
 from flowgraph.server.http import LocalServer
 from flowgraph.server.jobs import JobManager
 from flowgraph.server.workspace import Workspace
@@ -52,6 +52,96 @@ def request(api, method, path, body=None, headers=None):
         return response.status, value
     finally:
         connection.close()
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "*",
+        "null",
+        "http://example.com",
+        "http://127.0.0.1.evil.example:8082",
+        "http://192.168.1.2:8082",
+        "https://example.com/",
+        "https://example.com/path",
+        "https://user@example.com",
+        "https://example.com\r\nInjected: yes",
+    ],
+)
+def test_cors_rejects_invalid_origin_configuration(tmp_path, origin):
+    with pytest.raises(ValueError):
+        LocalServer(tmp_path, port=0, allowed_origins=(origin,))
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://www.fbw-es.com",
+        "http://127.0.0.1:8082",
+        "http://localhost:8082",
+        "http://[::1]:8082",
+    ],
+)
+def test_cors_accepts_explicit_editor_origins(tmp_path, origin):
+    with LocalServer(tmp_path, port=0, allowed_origins=(origin,)) as server:
+        assert server.allowed_origins == frozenset({origin})
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://www.fbw-es.com",
+        "http://127.0.0.1:8082",
+        "http://localhost:8082",
+        "http://[::1]:8082",
+    ],
+)
+def test_cors_is_opt_in_and_keeps_authentication(api, origin):
+    assert request(api, "GET", "/api/v1/runtime", headers={"Origin": origin})[0] == 403
+    api.allowed_origins = frozenset({origin})
+
+    def exchange(method, path="/api/v1/runtime", **headers):
+        connection = HTTPConnection("127.0.0.1", api.server_port, timeout=20)
+        try:
+            connection.request(
+                method, path, headers={"Origin": origin, "Sec-Fetch-Site": "cross-site", **headers}
+            )
+            response = connection.getresponse()
+            result = response.status, dict(response.getheaders()), response.read()
+            return result
+        finally:
+            connection.close()
+
+    status, headers, _ = exchange(
+        "OPTIONS",
+        **{
+            "Access-Control-Request-Method": "PUT",
+            "Access-Control-Request-Headers": "authorization, content-type",
+            "Access-Control-Request-Private-Network": "true",
+        },
+    )
+    assert status == 200
+    assert headers["Access-Control-Allow-Origin"] == origin
+    assert headers["Access-Control-Allow-Headers"] == "Authorization, Content-Type"
+    assert headers["Access-Control-Allow-Private-Network"] == "true"
+    assert "Access-Control-Allow-Credentials" not in headers
+    assert headers["Vary"] == "Origin"
+    for method, extra in [
+        ("TRACE", {}),
+        ("GET", {"Access-Control-Request-Headers": "X-Arbitrary"}),
+    ]:
+        assert exchange("OPTIONS", **{"Access-Control-Request-Method": method, **extra})[0] == 403
+    assert exchange("OPTIONS", "/", **{"Access-Control-Request-Method": "GET"})[0] == 404
+    status, headers, _ = exchange("GET")
+    assert status == 401
+    assert headers["Access-Control-Allow-Origin"] == origin
+    assert exchange("GET", Authorization=f"Bearer {api.token}")[0] == 200
+    status, headers, _ = exchange(
+        "GET", Origin="https://evil.example", Authorization=f"Bearer {api.token}"
+    )
+    assert status == 403
+    assert "Access-Control-Allow-Origin" not in headers
+    assert exchange("GET", Host="evil.example", Authorization=f"Bearer {api.token}")[0] == 403
 
 
 def workflow(code=None):
@@ -245,6 +335,75 @@ def test_worker_crash_and_result_limit_are_reported(api):
     assert "size limit" in failed["error"]
 
 
+@pytest.mark.parametrize(
+    ("options", "expected_port", "expected_origins"),
+    [
+        ([], 8765, ("https://flowgraph-web.fbw-es.com",)),
+        (["--port", "0"], 0, ("https://flowgraph-web.fbw-es.com",)),
+        (
+            ["--allow-origin", "http://127.0.0.1:8082"],
+            8765,
+            ("http://127.0.0.1:8082",),
+        ),
+        (
+            [
+                "--port",
+                "9000",
+                "--allow-origin",
+                "https://editor.example",
+                "--allow-origin",
+                "http://localhost:8080",
+            ],
+            9000,
+            ("https://editor.example", "http://localhost:8080"),
+        ),
+    ],
+)
+def test_cli_server_defaults_and_overrides(
+    tmp_path, monkeypatch, capsys, options, expected_port, expected_origins
+):
+    from flowgraph.server import http
+
+    configuration = {}
+
+    class StubServer:
+        origin = "http://127.0.0.1:8765"
+        token = "test-token"
+
+        def __init__(self, workspace, **kwargs):
+            configuration.update(workspace=workspace, **kwargs)
+            self.origin = f"http://127.0.0.1:{kwargs['port'] or 45678}"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def serve_forever(self):
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(http, "LocalServer", StubServer)
+    assert main(["serve", "--workspace", str(tmp_path), *options]) == 0
+    assert configuration["workspace"] == tmp_path
+    assert configuration["port"] == expected_port
+    assert configuration["allowed_origins"] == expected_origins
+    output = capsys.readouterr().out
+    assert "Experimental FlowGraph API" in output
+    assert (
+        f"Open editor: {expected_origins[0]}/#token=test-token&port={expected_port or 45678}\n"
+        in output
+    )
+    assert "Bearer token: test-token" in output
+
+    assert "editor_dir" not in configuration
+    with pytest.raises(SystemExit) as error:
+        build_parser().parse_args(
+            ["serve", "--workspace", str(tmp_path), "--editor-dir", str(tmp_path)]
+        )
+    assert error.value.code == 2
+
+
 def test_cli_and_configuration_validation(tmp_path):
     args = build_parser().parse_args(["serve", "--workspace", str(tmp_path), "--port", "0"])
     assert args.command == "serve"
@@ -255,3 +414,34 @@ def test_cli_and_configuration_validation(tmp_path):
         LocalServer(tmp_path, token="short")
     with pytest.raises(FileNotFoundError):
         Workspace(tmp_path / "missing")
+
+
+def test_server_never_hosts_editor_or_workspace_assets(tmp_path):
+    (tmp_path / "index.html").write_text("private workspace content")
+    (tmp_path / "native-bootstrap.js").write_text("private script")
+    with LocalServer(tmp_path, port=0) as server:
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            assert (
+                request(server, "GET", "/api/v1/runtime", headers={"Authorization": ""})[0] == 401
+            )
+            for path in (
+                "/",
+                "/index.html",
+                "/native-bootstrap.js",
+                "/flowgraph-editor.json",
+                "/../secret.py",
+                "/%2e%2e/secret.py",
+                "/secret.py",
+                "/private/secret.json",
+                "/vendor/",
+                "/.git/config",
+            ):
+                assert request(server, "GET", path)[0] in {403, 404}
+            assert request(server, "GET", "/", headers={"Host": "evil.example"})[0] == 403
+            assert not hasattr(server, "editor_dir")
+            assert not hasattr(server, "launch_url")
+        finally:
+            server.shutdown()
+            thread.join(timeout=5)
