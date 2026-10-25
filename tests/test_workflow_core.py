@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 
 from flowgraph.adapters.data_types import (
+    BOOLEAN,
     FLOAT,
     IMAGE,
     IMAGEJ,
@@ -519,6 +520,12 @@ def test_type_mismatch_duplicate_input_and_cycle_are_rejected() -> None:
 @pytest.mark.parametrize(
     ("source_type", "target_type", "source_value", "expected_value", "conversion_label"),
     [
+        (BOOLEAN, STRING, False, "False", "Boolean → Text"),
+        (BOOLEAN, STRING, True, "True", "Boolean → Text"),
+        (BOOLEAN, INTEGER, False, 0, "Boolean → Integer"),
+        (BOOLEAN, INTEGER, True, 1, "Boolean → Integer"),
+        (BOOLEAN, FLOAT, False, 0.0, "Boolean → Float"),
+        (BOOLEAN, FLOAT, True, 1.0, "Boolean → Float"),
         (INTEGER, FLOAT, 7, 7.0, "Integer → Float"),
         (INTEGER, STRING, 7, "7", "Integer → string"),
         (INTEGER, LIST_INT, 7, [7], "Integer → list[int]"),
@@ -557,6 +564,35 @@ def test_registered_port_conversions_validate_and_deliver_target_values(
     assert conversion.label == conversion_label
     assert result.node_inputs["sink"] == {"value": expected_value}
     assert received == [expected_value]
+    assert type(received[0]) is type(expected_value)
+
+
+@pytest.mark.parametrize("value", [False, True])
+@pytest.mark.parametrize("target_type", [STRING, INTEGER, FLOAT])
+def test_boolean_runtime_and_parameter_conversions(value, target_type) -> None:
+    expected = target_type.python_type(value)
+    conversion = resolve_value_conversion(value, target_type)
+    assert conversion is not None
+    converted = conversion.convert(value)
+    assert converted == expected
+    assert type(converted) is target_type.python_type
+
+    configured = NodeDefinition(
+        id="configured-boolean-conversion",
+        icon="",
+        label="Configured boolean conversion",
+        ports=(),
+        executor=lambda _inputs, _parameters: {},
+        parameters=(ParameterDefinition("value", target_type, "Value", value),),
+    )
+    for instance in (
+        configured.create_instance("default"),
+        configured.create_instance("override", parameters={"value": value}),
+    ):
+        assert instance.parameters["value"] == expected
+        assert type(instance.parameters["value"]) is target_type.python_type
+    assert resolve_port_conversion(target_type, BOOLEAN) is None
+    assert resolve_value_conversion(value, BOOLEAN) is None
 
 
 def test_port_conversion_registry_is_explicit_and_directional() -> None:

@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 
 from flowgraph.adapters.data_types import (
+    BOOLEAN,
     FLOAT,
     IMAGE,
     IMAGEJ,
@@ -34,6 +35,10 @@ class PortConversion:
     label: str
     convert: Callable[[Any], Any]
 
+
+BOOLEAN_TO_STRING = PortConversion("boolean", "string", "Boolean → Text", str)
+BOOLEAN_TO_INTEGER = PortConversion("boolean", "integer", "Boolean → Integer", int)
+BOOLEAN_TO_FLOAT = PortConversion("boolean", "float", "Boolean → Float", float)
 
 INTEGER_TO_FLOAT = PortConversion("integer", "float", "Integer → Float", float)
 INTEGER_TO_STRING = PortConversion("integer", "string", "Integer → string", str)
@@ -92,6 +97,9 @@ VECTOR_CONVERSIONS = tuple(
 
 
 PORT_CONVERSIONS = (
+    BOOLEAN_TO_STRING,
+    BOOLEAN_TO_INTEGER,
+    BOOLEAN_TO_FLOAT,
     INTEGER_TO_FLOAT,
     INTEGER_TO_STRING,
     INTEGER_TO_LIST_INT,
@@ -120,6 +128,7 @@ def resolve_port_conversion(source: DataType[Any], target: DataType[Any]) -> Por
 
 
 _SOURCE_DATA_TYPES = {
+    BOOLEAN.id: BOOLEAN,
     STRING.id: STRING,
     INTEGER.id: INTEGER,
     FLOAT.id: FLOAT,
@@ -133,6 +142,9 @@ _SOURCE_DATA_TYPES = {
 
 def resolve_value_conversion(value: Any, target: DataType[Any]) -> PortConversion | None:
     """Return a registered conversion for a runtime value and target type."""
+    # bool subclasses int, but an integer target must receive an actual int.
+    if isinstance(value, bool) and target.id == INTEGER.id:
+        return resolve_port_conversion(BOOLEAN, target)
     if target.accepts(value):
         return None
     for conversion in PORT_CONVERSIONS:

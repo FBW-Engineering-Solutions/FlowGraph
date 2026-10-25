@@ -22,10 +22,16 @@ not marked in this table.
 
 | Source type \ Target type | `Integer` | `Float` | `Text` | `list[int]` | `list[float]` | `Path` |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `Boolean` | X | X | X |  |  |  |
 | `Integer` |  | X | X | X |  |  |
 | `Float` | X |  | X |  | X |  |
 | `Text` |  |  |  |  |  | X |
 | `Path` |  |  | X |  |  |  |
+
+`Boolean → Text` produces exactly `"False"` or `"True"`; `Boolean → Integer`
+produces `0` or `1`; and `Boolean → Float` produces `0.0` or `1.0`.
+These conversions also normalize configured parameter defaults and overrides.
+Reverse conversions to Boolean are not registered.
 
 `Integer → Float` converts the integer to a Python `float`; `Integer → Text`
 uses its string representation; and `Integer → list[int]` wraps the value in a
