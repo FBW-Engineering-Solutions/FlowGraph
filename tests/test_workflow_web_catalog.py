@@ -57,6 +57,20 @@ def test_workflow_web_catalog_groups_sliders_under_input_scalars() -> None:
     assert all(group["label"] != "Controls" for group in groups)
 
 
+@pytest.mark.parametrize("node_id, type_id", [("float-slider", "float"), ("int-slider", "integer")])
+def test_workflow_web_catalog_exports_slider_value_input(node_id, type_id) -> None:
+    nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
+    node = nodes[node_id]
+    value_ports = [port for port in node["ports"] if port["name"] == "value"]
+    assert [(port["direction"], port["data_type_id"]) for port in value_ports] == [
+        ("output", type_id),
+        ("input", type_id),
+    ]
+    assert value_ports[1]["is_param"] is True
+    assert value_ports[1]["required"] is False
+    assert next(param for param in node["parameters"] if param["name"] == "value")["port"] is True
+
+
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 
