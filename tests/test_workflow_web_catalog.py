@@ -47,6 +47,16 @@ def test_workflow_web_catalog_exports_registered_nodes_without_executors() -> No
     )
 
 
+def test_workflow_web_catalog_groups_sliders_under_input_scalars() -> None:
+    groups = workflow_web_catalog()["groups"]
+    inputs = next(group for group in groups if group["label"] == "Inputs")
+    scalars = next(group for group in inputs["subgroups"] if group["label"] == "Scalars")
+
+    assert inputs["nodes"] == []
+    assert [node["id"] for node in scalars["nodes"]][-2:] == ["float-slider", "int-slider"]
+    assert all(group["label"] != "Controls" for group in groups)
+
+
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 

@@ -99,7 +99,10 @@ ADAPTERS = AdapterCatalog(
         AdapterGroup(
             "Inputs",
             subgroups=(
-                AdapterGroup("Scalars", (SET_STRING, SET_BOOLEAN, SET_INT, SET_FLOAT)),
+                AdapterGroup(
+                    "Scalars",
+                    (SET_STRING, SET_BOOLEAN, SET_INT, SET_FLOAT) + CONTROL_AVAILABLE_NODES,
+                ),
                 AdapterGroup(
                     "Lists/Vectors",
                     (SET_LIST_STR, SET_LIST_INT, SET_LIST_FLOAT, SET_VEC2D, SET_VEC2DI, SET_VEC3D),
@@ -129,7 +132,6 @@ ADAPTERS = AdapterCatalog(
                 AdapterGroup("Writers", (WRITE_MUSCAT, WRITE_MESHLANE, WRITE_MESHIO, WRITE_TABLE)),
             ),
         ),
-        AdapterGroup("Controls", CONTROL_AVAILABLE_NODES),
         AdapterGroup("Image Tools", IMAGE_TOOLS_AVAILABLE_NODES),
         AdapterGroup("Table Tools", TABLE_TOOLS_AVAILABLE_NODES),
         AdapterGroup("Code", USER_CODE_AVAILABLE_NODES + IMAGEJ_AVAILABLE_NODES),
