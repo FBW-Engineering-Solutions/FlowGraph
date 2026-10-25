@@ -73,7 +73,7 @@ FLOAT_SLIDER = NodeDefinition(
     parameters=(
         ParameterDefinition("min", ParameterKind.FLOAT, "Minimum", 0.0, "0.0"),
         ParameterDefinition("max", ParameterKind.FLOAT, "Maximum", 1.0, "1.0"),
-        ParameterDefinition("value", ParameterKind.FLOAT, "Value", 0.5, "0.5", port=False),
+        ParameterDefinition("value", ParameterKind.FLOAT, "Value", 0.5, "0.5"),
     ),
 )
 
@@ -99,7 +99,7 @@ INT_SLIDER = NodeDefinition(
     parameters=(
         ParameterDefinition("min", ParameterKind.INTEGER, "Minimum", 0, "0"),
         ParameterDefinition("max", ParameterKind.INTEGER, "Maximum", 100, "100"),
-        ParameterDefinition("value", ParameterKind.INTEGER, "Value", 50, "50", port=False),
+        ParameterDefinition("value", ParameterKind.INTEGER, "Value", 50, "50"),
     ),
 )
 
