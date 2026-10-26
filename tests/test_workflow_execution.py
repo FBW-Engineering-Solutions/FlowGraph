@@ -204,6 +204,8 @@ def test_display_meshes_projects_surface_without_changing_the_input() -> None:
     )
     assert sorted(preview["fields"]["temperature"]) == list(range(mesh.GetNumberOfNodes()))
     assert preview["fields"]["velocity"] == [5.0] * len(preview["x"])
+    assert preview["field_components"]["velocity"] == [[3.0, 4.0, 0.0]] * len(preview["x"])
+    assert "temperature" not in preview["field_components"]
     assert "flowgraph_node_id" not in preview["fields"]
     assert mesh.GetNumberOfElements() == original_count
     assert "temperature" in mesh.nodeFields
@@ -232,6 +234,56 @@ def test_display_meshes_handles_planar_mesh_and_skips_other_nodes() -> None:
     assert len(previews["view"]["i"]) == 2
     assert previews["view"]["z"] == [0.0] * 4
     assert "other" not in previews
+
+
+def test_display_meshes_preserves_element_fields_when_triangulating() -> None:
+    from flowgraph.domain.mesh_document import MeshDocument
+
+    mesh = CreateSquare(dimensions=[3, 2])
+    # CreateSquare also includes six boundary bars before its two quadrangles.
+    material = np.array([-1.0] * 6 + [7.0, 19.0])
+    mesh.elemFields["material"] = material.copy()
+    vectors = np.column_stack((material, material * 2, np.zeros(len(material))))
+    mesh.elemFields["velocity"] = vectors.copy()
+    document = MeshDocument(mesh)
+    registry = create_node_registry()
+    workflow = WorkflowGraph([registry.create_instance("mesh-sink", "view")])
+    preview = _display_meshes(workflow, {"view": {"mesh": document}})["view"]
+    assert sorted(preview["cell_fields"]["material"]) == [7.0, 7.0, 19.0, 19.0]
+    assert len(preview["cell_fields"]["flowgraph_element_id"]) == len(preview["i"])
+    assert sorted(preview["cell_field_components"]["velocity"]) == [
+        [7.0, 14.0, 0.0],
+        [7.0, 14.0, 0.0],
+        [19.0, 38.0, 0.0],
+        [19.0, 38.0, 0.0],
+    ]
+    np.testing.assert_allclose(
+        sorted(preview["cell_fields"]["velocity"]), np.sqrt(5) * np.array([7, 7, 19, 19])
+    )
+    np.testing.assert_array_equal(mesh.elemFields["material"], material)
+    np.testing.assert_array_equal(mesh.elemFields["velocity"], vectors)
+
+
+def test_display_meshes_maps_volume_fields_to_new_boundary_faces() -> None:
+    from Muscat.MeshContainers import ElementsDescription as ED
+
+    from flowgraph.domain.mesh_document import MeshDocument
+
+    mesh = CreateCube(dimensions=[2, 2, 2], ofTetras=True)
+    # Remove explicit boundary triangles to exercise generated skin ownership.
+    del mesh.elements[ED.ElementType.Triangle_3]
+    mesh.elemFields["material"] = np.full(mesh.GetNumberOfElements(), 42.0)
+    mesh.elemFields["invalid"] = np.full(mesh.GetNumberOfElements(), np.nan)
+    mesh.elemFields["velocity"] = np.tile([3.0, 4.0], (mesh.GetNumberOfElements(), 1))
+    document = MeshDocument(mesh)
+    registry = create_node_registry()
+    workflow = WorkflowGraph([registry.create_instance("mesh-sink", "view")])
+    preview = _display_meshes(workflow, {"view": {"mesh": document}})["view"]
+    assert preview["cell_fields"]["material"] == [42.0] * len(preview["i"])
+    assert "invalid" not in preview["cell_fields"]
+    assert preview["cell_fields"]["velocity"] == [5.0] * len(preview["i"])
+    assert preview["cell_field_components"]["velocity"] == [[3.0, 4.0]] * len(preview["i"])
+    assert mesh.GetNumberOfElements() == 6
 
 
 def test_execute_workflow_json_returns_mesh_preview_for_sink() -> None:

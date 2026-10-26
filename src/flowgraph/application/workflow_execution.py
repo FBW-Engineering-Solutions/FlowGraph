@@ -108,6 +108,52 @@ def _display_images(
     return previews
 
 
+def _surface_cell_fields(mesh: Any, surface: Any) -> dict[str, np.ndarray]:
+    """Map surface cells to source elements, including newly extracted volume faces."""
+    owners = {}
+    offset = 0
+    # Prefer explicit surface elements over their adjacent volume elements.
+    for elements in mesh.elements.values():
+        if ED.dimensionality[elements.elementType] == 2:
+            for index, connectivity in enumerate(elements.connectivity):
+                owners[tuple(sorted(connectivity))] = offset + index
+        offset += elements.GetNumberOfElements()
+    offset = 0
+    for elements in mesh.elements.values():
+        if ED.dimensionality[elements.elementType] == 3:
+            for _, local_face in ED.faces1[elements.elementType]:
+                for index, connectivity in enumerate(elements.connectivity[:, local_face]):
+                    owners.setdefault(tuple(sorted(connectivity)), offset + index)
+        offset += elements.GetNumberOfElements()
+    indices = np.asarray(
+        [
+            owners.get(tuple(sorted(surface.originalIDNodes[connectivity])), -1)
+            for elements in surface.elements.values()
+            for connectivity in elements.connectivity
+        ]
+    )
+    if np.any(indices < 0):
+        return {}
+    fields = {}
+    for name, data in mesh.elemFields.items():
+        array = np.asarray(data)
+        if (
+            array.ndim not in (1, 2)
+            or len(array) != mesh.GetNumberOfElements()
+            or not np.issubdtype(array.dtype, np.number)
+            or np.issubdtype(array.dtype, np.complexfloating)
+        ):
+            continue
+        if array.ndim == 2:
+            if not array.shape[1]:
+                continue
+            if array.shape[1] == 1:
+                array = array[:, 0]
+        if np.all(np.isfinite(array[indices])):
+            fields[name] = array[indices]
+    return fields
+
+
 def _display_meshes(workflow: Any, values: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     """Project only 3D-view sink inputs into Plotly-ready surface triangles."""
     previews: dict[str, Any] = {}
@@ -126,6 +172,7 @@ def _display_meshes(workflow: Any, values: Mapping[str, Mapping[str, Any]]) -> d
             surface = ExtractElementsByElementFilter(
                 surface, ElementFilter(dimensionality=2), copy=False
             )
+            surface.elemFields = _surface_cell_fields(mesh, surface)
             triangles = Tetrahedrization(surface)
             faces = triangles.GetElementsOfType(ED.Triangle_3).connectivity
             if not faces.size:
@@ -141,7 +188,16 @@ def _display_meshes(workflow: Any, values: Mapping[str, Mapping[str, Any]]) -> d
                 "j": faces[:, 1].tolist(),
                 "k": faces[:, 2].tolist(),
                 "fields": {},
+                "field_components": {},
+                "cell_fields": {},
+                "cell_field_components": {},
             }
+            for name, data in triangles.elemFields.items():
+                array = np.asarray(data)
+                if array.ndim == 2 and array.shape[1] > 1:
+                    preview["cell_field_components"][name] = array.tolist()
+                    array = np.linalg.norm(array, axis=1)
+                preview["cell_fields"][name] = array.tolist()
             # Muscat's skin/triangulation does not carry nodeFields across. The
             # originalIDNodes arrays trace each output vertex back to the input mesh.
             indices = np.asarray(surface.originalIDNodes)[np.asarray(triangles.originalIDNodes)]
@@ -165,6 +221,8 @@ def _display_meshes(workflow: Any, values: Mapping[str, Mapping[str, Any]]) -> d
                 values_for_vertices = scalar[indices]
                 if np.all(np.isfinite(values_for_vertices)):
                     preview["fields"][name] = values_for_vertices.tolist()
+                    if array.ndim == 2 and array.shape[1] > 1:
+                        preview["field_components"][name] = array[indices].tolist()
             previews[node.id] = preview
         except Exception as error:  # noqa: BLE001 - do not fail an otherwise successful workflow
             previews[node.id] = {"error": f"Mesh preview unavailable: {error}"}
