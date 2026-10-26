@@ -3,6 +3,12 @@
 This is a prototype for trusted local clients, not an internet-facing service.
 It uses Python's standard-library HTTP server and adds no HTTP dependencies.
 
+The file content API downloads regular files unchanged and directories as compressed
+ZIP archives (including nested and empty directories). Directory downloads respect
+the server download size limit and exclude symlinks. Deleting a directory removes
+its contents recursively; clients must request user confirmation first. Workspace
+root paths and paths outside the workspace remain forbidden.
+
 ## Quick start
 
 Create a workspace directory, then run from your core checkout:

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import io
 import os
+import shutil
 import threading
+import zipfile
 from importlib.resources import files
 from pathlib import Path, PurePosixPath
 
@@ -23,7 +26,7 @@ class Workspace:
             raise ValueError("Workspace must be an existing directory")
         self.lock = threading.RLock()
 
-    def path(self, name: str) -> Path:
+    def path(self, name: str, *, allow_directory: bool = False) -> Path:
         if not isinstance(name, str) or not name or "\\" in name or "\x00" in name:
             raise ValueError("A workspace-relative file path is required")
         relative = PurePosixPath(name)
@@ -36,7 +39,7 @@ class Workspace:
                 raise ValueError("Symlinks are not allowed in the file API")
         if not target.resolve().is_relative_to(self.root):
             raise ValueError("Path escapes workspace")
-        if target.exists() and not target.is_file():
+        if target.exists() and not target.is_file() and not (allow_directory and target.is_dir()):
             raise ValueError("Only regular files are supported")
         return target
 
@@ -79,7 +82,33 @@ class Workspace:
 
     def read(self, name: str, limit: int) -> bytes:
         with self.lock:
-            with self.path(name).open("rb") as stream:
+            target = self.path(name, allow_directory=True)
+            if target.is_dir():
+                buffer = io.BytesIO()
+                total = 0
+                with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                    archive.write(target, target.name + "/")
+                    for parent, children, names in os.walk(target, followlinks=False):
+                        children[:] = sorted(
+                            child for child in children if not (Path(parent) / child).is_symlink()
+                        )
+                        for entry in [
+                            *(Path(parent) / child for child in children),
+                            *(Path(parent) / child for child in sorted(names)),
+                        ]:
+                            if entry.is_symlink():
+                                continue
+                            if entry.is_file():
+                                total += entry.stat().st_size
+                                if total > limit:
+                                    raise ValueError("Directory exceeds the download size limit")
+                            elif not entry.is_dir():
+                                continue
+                            archive.write(entry, entry.relative_to(target.parent).as_posix())
+                if buffer.tell() > limit:
+                    raise ValueError("Archive exceeds the download size limit")
+                return buffer.getvalue()
+            with target.open("rb") as stream:
                 data = stream.read(limit + 1)
             if len(data) > limit:
                 raise ValueError("File exceeds the download size limit")
@@ -87,7 +116,11 @@ class Workspace:
 
     def delete(self, name: str) -> dict:
         with self.lock:
-            self.path(name).unlink()
+            target = self.path(name, allow_directory=True)
+            if target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
             return self.listing()
 
     def copy_demos(self) -> dict:

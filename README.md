@@ -70,6 +70,12 @@ display previews, warnings, and structured errors. A process-local node registry
 is reused, but each call reconstructs its workflow. This API does not provide a
 server, authentication, cancellation, or filesystem isolation.
 
+Mesh display previews retain scalar values or vector magnitudes in `fields` and
+`cell_fields`. Multi-component fields additionally expose their original tuples
+in `field_components` and `cell_field_components`, indexed by vertex or surface
+triangle respectively, so viewers can select an individual component without
+rerunning the workflow. These preview projections do not modify the input mesh.
+
 The former WASM-specific execution module has been removed without a compatibility
 alias. Browser clients must update their import and rebuild/stage their core wheel
 together; the workflow file and execution response formats are unchanged.

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import io
 import json
 import threading
 import time
+import zipfile
 from http.client import HTTPConnection
 from urllib.parse import urlencode
 
@@ -246,6 +248,22 @@ def test_execution_uses_workspace_as_working_directory(api):
     assert status == 202
     assert wait_job(api, job["id"])["state"] == "completed"
     assert (api.workspace.root / "created.txt").read_text() == "native"
+
+
+def test_directory_download_and_delete_over_http(api):
+    api.workspace.write("folder/nested/input.txt", b"contents")
+    (api.workspace.root / "folder/empty").mkdir()
+    route = "/api/v1/files/content?" + urlencode({"path": "folder"})
+    status, data = request(api, "GET", route)
+    assert status == 200
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        assert archive.read("folder/nested/input.txt") == b"contents"
+        assert "folder/empty/" in archive.namelist()
+    status, listing = request(api, "DELETE", route)
+    assert status == 200
+    assert listing["files"] == []
+    assert listing["directories"] == []
+    assert not (api.workspace.root / "folder").exists()
 
 
 def test_file_roundtrip_and_demos(api):
