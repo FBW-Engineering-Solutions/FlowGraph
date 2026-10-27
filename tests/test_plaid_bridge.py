@@ -1,6 +1,9 @@
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
+import pytest
 from Muscat.Bridges.CGNSBridge import MeshToCGNS
 from Muscat.TestData import GetTestDataPath
 
@@ -26,11 +29,20 @@ from flowgraph.application.workflow_core import (
 
 
 def test_plaid_node_exports_requested_typed_ports() -> None:
+    assert [(port.name, port.data_type.id) for port in LOAD_PLAID_DATASET.outputs] == [
+        ("dataset", "plaid-dataset"),
+        ("infos", "plaid-info"),
+        ("splits", "list[str]"),
+    ]
     assert [(port.name, port.data_type.id) for port in EXTRACT_PLAID_SAMPLE.inputs] == [
         ("dataset", "plaid-dataset"),
         ("infos", "plaid-info"),
         ("split", "string"),
         ("sample_number", "integer"),
+    ]
+    assert [(port.name, port.data_type.id) for port in EXTRACT_PLAID_SAMPLE.outputs] == [
+        ("sample", "plaid-sample"),
+        ("timesteps", "list[float]"),
     ]
 
 
@@ -61,7 +73,7 @@ def test_plaid_nodes_keep_their_icons_without_optional_dependency() -> None:
 
 def test_extract_plaid_time_step_exports_typed_ports() -> None:
     assert [(port.name, port.data_type.id) for port in EXTRACT_PLAID_TIME_STEP.inputs] == [
-        ("sample", "plaid-dataset"),
+        ("sample", "plaid-sample"),
         ("time", "float"),
     ]
     assert [(port.name, port.data_type.id) for port in EXTRACT_PLAID_TIME_STEP.outputs] == [
@@ -156,17 +168,104 @@ def test_extract_plaid_time_step_converts_tree_to_mesh_document() -> None:
 
 
 class _FakeConverter:
-    def to_plaid(self, dataset: object, index: int) -> tuple[object, int]:
-        return dataset, index
+    def __init__(self, sample: object) -> None:
+        self.sample = sample
+        self.requested: tuple[object, int] | None = None
+
+    def to_plaid(self, dataset: object, index: int) -> object:
+        self.requested = (dataset, index)
+        return self.sample
 
 
-def test_extract_plaid_sample_uses_split_converter() -> None:
+@pytest.mark.parametrize("times", [[], [0.0, 2.5], [0, 2], (0, 2.5), np.array([0, 2.5])])
+def test_extract_plaid_sample_uses_split_converter(times) -> None:
+    sample = SimpleNamespace(get_all_time_values=lambda: times)
+    converter = _FakeConverter(sample)
+    dataset = ["raw"]
     result = EXTRACT_PLAID_SAMPLE.executor(
         {
-            "dataset": ({"train": ["raw"]}, {"train": _FakeConverter()}),
+            "dataset": ({"train": dataset}, {"train": converter}),
             "infos": object(),
         },
         {"split": "train", "sample_number": 3},
     )
 
-    assert result == {"sample": (["raw"], 3)}
+    assert converter.requested == (dataset, 3)
+    assert result == {"sample": sample, "timesteps": [float(time) for time in times]}
+    assert all(type(time) is float for time in result["timesteps"])
+
+
+@pytest.mark.parametrize("splits", [[], ["train", "test"]])
+def test_load_plaid_dataset_exposes_split_names(monkeypatch, splits) -> None:
+    datasets = dict.fromkeys(splits)
+    converters = dict.fromkeys(splits)
+    infos = object()
+    calls = []
+
+    def load_infos(path):
+        calls.append(("infos", path))
+        return infos
+
+    def load_dataset(path):
+        calls.append(("dataset", path))
+        return datasets, converters
+
+    monkeypatch.setitem(sys.modules, "plaid", SimpleNamespace())
+    monkeypatch.setitem(sys.modules, "plaid.storage", SimpleNamespace())
+    monkeypatch.setitem(
+        sys.modules,
+        "plaid.storage.reader",
+        SimpleNamespace(load_infos_from_disk=load_infos, init_from_disk=load_dataset),
+    )
+
+    result = LOAD_PLAID_DATASET.executor({}, {"path": "/data/plaid"})
+
+    assert result == {"dataset": (datasets, converters), "infos": infos, "splits": splits}
+    assert calls == [("infos", "/data/plaid"), ("dataset", "/data/plaid")]
+
+
+@pytest.mark.parametrize(
+    "sample",
+    [
+        object(),
+        SimpleNamespace(get_all_time_values=lambda: None),
+        SimpleNamespace(get_all_time_values=lambda: ["invalid"]),
+    ],
+)
+def test_extract_plaid_sample_reports_time_value_errors_with_context(sample) -> None:
+    with pytest.raises(ValueError, match="split='train', sample_number=3") as error:
+        EXTRACT_PLAID_SAMPLE.executor(
+            {"dataset": ({"train": []}, {"train": _FakeConverter(sample)}), "infos": object()},
+            {"split": "train", "sample_number": 3},
+        )
+    assert error.value.__cause__ is not None
+
+
+def test_plaid_sample_workflow_validates_typed_time_values() -> None:
+    sample = SimpleNamespace(get_all_time_values=lambda: np.array([0, 2]))
+    source = NodeDefinition(
+        id="source",
+        icon="",
+        label="Source",
+        ports=LOAD_PLAID_DATASET.outputs,
+        executor=lambda _inputs, _parameters: {
+            "dataset": ({"train": []}, {"train": _FakeConverter(sample)}),
+            "infos": object(),
+            "splits": ["train"],
+        },
+    )
+    registry = NodeRegistry()
+    registry.register(source)
+    registry.register(EXTRACT_PLAID_SAMPLE)
+    graph = WorkflowGraph(
+        [
+            source.create_instance("source"),
+            EXTRACT_PLAID_SAMPLE.create_instance("extract", parameters={"split": "train"}),
+        ]
+    )
+    for name in ("dataset", "infos"):
+        graph.add_edge(WorkflowEdge("source", name, "extract", name), registry)
+
+    result = WorkflowExecutor(registry).run(graph)
+
+    assert result.node_outputs["extract"] == {"sample": sample, "timesteps": [0.0, 2.0]}
