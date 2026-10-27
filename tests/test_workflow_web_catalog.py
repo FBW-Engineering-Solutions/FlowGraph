@@ -71,6 +71,29 @@ def test_workflow_web_catalog_exports_slider_value_input(node_id, type_id) -> No
     assert next(param for param in node["parameters"] if param["name"] == "value")["port"] is True
 
 
+def test_workflow_web_catalog_exports_plaid_dataset_sample_and_list_types() -> None:
+    nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
+
+    def port_types(node_id, direction):
+        return {
+            port["name"]: port["data_type_id"]
+            for port in nodes[node_id]["ports"]
+            if port["direction"] == direction
+        }
+
+    assert port_types("load-plaid-dataset", "output") == {
+        "dataset": "plaid-dataset",
+        "infos": "plaid-info",
+        "splits": "list[str]",
+    }
+    assert port_types("extract-plaid-sample", "output") == {
+        "sample": "plaid-sample",
+        "timesteps": "list[float]",
+    }
+    assert port_types("extract-plaid-sample", "input")["dataset"] == "plaid-dataset"
+    assert port_types("extract-plaid-time-step", "input")["sample"] == "plaid-sample"
+
+
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 
