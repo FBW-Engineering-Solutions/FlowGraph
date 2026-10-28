@@ -65,6 +65,41 @@ accepted. A connection without a direct type match or one of the registered
 conversions is rejected; use an explicit workflow node when a different
 conversion is required.
 
+### Array types and checked conversions
+
+The core exposes three NumPy-array port types from
+`flowgraph.adapters.data_types`:
+
+| Constant | Type ID | Display name | Runtime contract |
+| --- | --- | --- | --- |
+| `ARRAY` | `array` | Array | NumPy array of any rank, including scalar and tensor arrays |
+| `ARRAY_1D` | `array-1d` | 1D Array | NumPy array of shape `(n,)` |
+| `ARRAY_2D` | `array-2d` | 2D Array | NumPy array of shape `(n, m)` |
+
+These contracts check the container and rank only. Empty arrays and all NumPy
+dtypes are permitted; individual nodes decide whether their data must be numeric,
+finite, or nonempty. Python lists are not arrays under these contracts.
+
+- Same-type connections and **1D/2D Array → Array** pass the original object
+  through unchanged.
+- **Array → 1D Array** accepts `(n,)` unchanged or converts `(n, 1)` to a
+  one-dimensional view. Other shapes fail at runtime with the received shape.
+- **Array → 2D Array** checks that the runtime array is two-dimensional and
+  passes it through unchanged; it does not reshape vectors.
+- **2D Array → 1D Array** accepts only column arrays `(n, 1)`, exposing `[:, 0]`
+  as a view, including for strided arrays. Read-only inputs remain read-only.
+
+Checked connections can be authored before their runtime shape is known.
+Multi-component arrays are never silently flattened, and row arrays `(1, n)`
+with `n > 1` are not scalar columns. No implicit **1D Array → 2D Array** rule is
+provided. Conversions preserve dtype and do not copy array data or modify the
+source. Widening rules are also published in the web catalog so ID-based clients
+can recognize these connections, although the core needs no conversion for them.
+
+These are new port contracts only: existing node ports, `LIST_FLOAT`, list
+parameters, and the separate ImageJ array type remain unchanged. No list-to-array
+or ImageJ-to-array conversion is registered in this step.
+
 ## Using a converted connection
 
 Connect ports normally in the **Workflow** panel. When FlowGraph applies an

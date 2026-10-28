@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from flowgraph.application.port_conversions import PortConversion
 
 T = TypeVar("T")
+_ARRAY_TYPE_RANKS = {"array": None, "array-1d": 1, "array-2d": 2}
 NodeExecutor = Callable[
     [Mapping[str, Any], Mapping[str, Any], "ExecContext"], Mapping[str, Any] | None
 ]
@@ -82,6 +83,9 @@ class DataType(Generic[T]):
 
     def accepts(self, value: object) -> bool:
         """Return whether *value* satisfies this workflow type at runtime."""
+        if self.id in _ARRAY_TYPE_RANKS:
+            rank = _ARRAY_TYPE_RANKS[self.id]
+            return isinstance(value, self.python_type) and (rank is None or value.ndim == rank)
         vector_dimensions = {"VEC2D": 2, "VEC2DI": 2, "VEC3D": 3, "VEC3DI": 3}
         if self.id in vector_dimensions and (
             not isinstance(value, list) or len(value) != vector_dimensions[self.id]
@@ -101,9 +105,11 @@ class DataType(Generic[T]):
         return isinstance(value, self.python_type)
 
     def is_compatible_with(self, target: DataType[Any]) -> bool:
-        """Use stable type identity; conversions require an explicit node."""
+        """Return direct compatibility; checked conversions are resolved separately."""
         if self.python_type is object or target.python_type is object:
             return True
+        if self.id in _ARRAY_TYPE_RANKS or target.id in _ARRAY_TYPE_RANKS:
+            return self.id == target.id or (self.id in _ARRAY_TYPE_RANKS and target.id == "array")
         if target.python_type is list and get_origin(self.python_type) is list:
             return True
         vector_ids = {"VEC2D", "VEC2DI", "VEC3D", "VEC3DI"}

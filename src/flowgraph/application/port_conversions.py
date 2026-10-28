@@ -11,6 +11,9 @@ from typing import Any
 import numpy as np
 
 from flowgraph.adapters.data_types import (
+    ARRAY,
+    ARRAY_1D,
+    ARRAY_2D,
     BOOLEAN,
     FLOAT,
     IMAGE,
@@ -84,6 +87,36 @@ PILLOW_TO_IMAGEJ = PortConversion(
 )
 
 
+def _array_to_1d(value: np.ndarray) -> np.ndarray:
+    """Check rank and expose a column array as a vector without copying data."""
+    if not ARRAY.accepts(value):
+        raise TypeError("1D Array conversion requires a NumPy array")
+    if value.ndim == 1:
+        return value
+    if value.ndim == 2 and value.shape[1] == 1:
+        return value[:, 0]
+    raise ValueError(f"1D Array requires shape (n,) or (n, 1); received shape {value.shape}")
+
+
+def _array_to_2d(value: np.ndarray) -> np.ndarray:
+    """Narrow a generic array to a two-dimensional array without reshaping."""
+    if not ARRAY.accepts(value):
+        raise TypeError("2D Array conversion requires a NumPy array")
+    if value.ndim != 2:
+        raise ValueError(f"2D Array requires shape (n, m); received shape {value.shape}")
+    return value
+
+
+ARRAY_CONVERSIONS = (
+    # Also publish widening rules for static clients, which only know type IDs.
+    PortConversion(ARRAY_1D.id, ARRAY.id, "1D Array → Array", lambda value: value),
+    PortConversion(ARRAY_2D.id, ARRAY.id, "2D Array → Array", lambda value: value),
+    PortConversion(ARRAY.id, ARRAY_1D.id, "Array → 1D Array", _array_to_1d),
+    PortConversion(ARRAY.id, ARRAY_2D.id, "Array → 2D Array", _array_to_2d),
+    PortConversion(ARRAY_2D.id, ARRAY_1D.id, "2D Array → 1D Array", _array_to_1d),
+)
+
+
 def _convert_vector(value: list[Any], *, dimensions: int, integer: bool) -> list[Any]:
     """Resize a vector and cast components without modifying the source list."""
     cast = round if integer else float
@@ -106,6 +139,7 @@ VECTOR_CONVERSIONS = tuple(
 
 
 PORT_CONVERSIONS = (
+    *ARRAY_CONVERSIONS,
     ELEMENT_FILTER_TO_NODE_FILTER,
     BOOLEAN_TO_STRING,
     BOOLEAN_TO_INTEGER,
@@ -138,6 +172,9 @@ def resolve_port_conversion(source: DataType[Any], target: DataType[Any]) -> Por
 
 
 _SOURCE_DATA_TYPES = {
+    ARRAY.id: ARRAY,
+    ARRAY_1D.id: ARRAY_1D,
+    ARRAY_2D.id: ARRAY_2D,
     BOOLEAN.id: BOOLEAN,
     STRING.id: STRING,
     INTEGER.id: INTEGER,

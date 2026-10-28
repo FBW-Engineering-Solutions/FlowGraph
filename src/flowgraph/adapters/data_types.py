@@ -12,6 +12,9 @@ from flowgraph.domain.filepath import FilePath
 from flowgraph.domain.mesh_document import MeshDocument
 
 ANY = DataType("any", "Any", object)
+ARRAY = DataType("array", "Array", np.ndarray)
+ARRAY_1D = DataType("array-1d", "1D Array", np.ndarray)
+ARRAY_2D = DataType("array-2d", "2D Array", np.ndarray)
 STRING = DataType("string", "Text", str)
 STR_SELECT = DataType("str", "select str", str)
 BOOLEAN = DataType("boolean", "Boolean", bool)
