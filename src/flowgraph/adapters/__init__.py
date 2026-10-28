@@ -50,6 +50,7 @@ from flowgraph.adapters.workflow_interfaces import (
     AVAILABLE_NODES as WORKFLOW_INTERFACE_AVAILABLE_NODES,
 )
 from flowgraph.adapters.writers import WRITE_MESHIO, WRITE_MESHLANE, WRITE_MUSCAT, WRITE_TABLE
+from flowgraph.adapters.zones import AVAILABLE_NODES as ZONE_AVAILABLE_NODES
 from flowgraph.application.workflow_core import NodeDefinition
 
 
@@ -125,6 +126,7 @@ ADAPTERS = AdapterCatalog(
                 AdapterGroup(
                     "Filters",
                     (CREATE_MUSCAT_ELEMENT_FILTER, FILTER_MESH_WITH_MUSCAT),
+                    subgroups=(AdapterGroup("Zones", ZONE_AVAILABLE_NODES),),
                 ),
                 AdapterGroup("Mesh Ops", MESH_OPS_AVAILABLE_NODES),
                 AdapterGroup("Field Ops", FIELD_OPS_AVAILABLE_NODES),
