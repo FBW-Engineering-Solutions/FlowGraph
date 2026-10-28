@@ -19,7 +19,7 @@ from flowgraph.application.workflow_core import (
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
-from .data_types import MUSCAT_ELEMENT_FILTER, ParameterKind
+from .data_types import MUSCAT_ELEMENT_FILTER, MUSCAT_ZONE, ParameterKind
 
 ELEMENT_DIMENSION_OPTIONS = (0, 1, 2, 3)
 ELEMENT_TYPE_OPTIONS = tuple(
@@ -49,7 +49,7 @@ def _tag_list(parameters: Mapping[str, Any], name: str) -> list[str]:
 
 
 def _create_element_filter(
-    _inputs: Mapping[str, Any],
+    inputs: Mapping[str, Any],
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
@@ -84,6 +84,8 @@ def _create_element_filter(
             elementType=element_types or None,
             nTag=node_tags or None,
             eTag=element_tags or None,
+            zone=[value for name, value in inputs.items() if name.startswith("zone_")],
+            zonesTreatment=parameters.get("zonesTreatment", "CENTER"),
         )
     }
 
@@ -93,8 +95,11 @@ CREATE_MUSCAT_ELEMENT_FILTER = NodeDefinition(
     requirements=("py:muscat",),
     icon="mdi-filter-cog-outline",
     label="Element Selector",
-    description="Creates an element filter by dimensionality, element type, and tags.",
+    description="Creates an element filter by dimensionality, element type, tags, and spatial zones.",
     ports=(
+        PortDefinition(
+            "zone", PortDirection.INPUT, MUSCAT_ZONE, "Zone", required=False, expandable=128
+        ),
         PortDefinition(
             "filter",
             PortDirection.OUTPUT,
@@ -104,6 +109,20 @@ CREATE_MUSCAT_ELEMENT_FILTER = NodeDefinition(
     ),
     executor=_create_element_filter,
     parameters=(
+        ParameterDefinition(
+            "zonesTreatment",
+            ParameterKind.STR_SELECT,
+            "Zone treatment",
+            "CENTER",
+            options=tuple(
+                ParameterOption(value, label)
+                for value, label in (
+                    ("CENTER", "Element center"),
+                    ("ALL_NODES", "All nodes"),
+                    ("AT_LEAST_ONE", "At least one node"),
+                )
+            ),
+        ),
         ParameterDefinition(
             "dimensionality",
             ParameterKind.MULTI_SELECT,

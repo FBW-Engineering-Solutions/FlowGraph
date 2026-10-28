@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+from Muscat.ImplicitGeometry.ImplicitGeometryBase import ImplicitGeometryBase
 from Muscat.LinAlg.Transform import Transform
 from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter
 from Muscat.MeshContainers.Filters.FilterOperators import FilterOperatorBase
@@ -28,6 +29,7 @@ MESH_DOCUMENT = DataType("mesh-document", "Mesh document", MeshDocument)
 TABLE_DOCUMENT = DataType("table-document", "Table", dict)
 IMAGE = DataType("image", "Image", Image)
 IMAGEJ = DataType("imagej", "ImageJ NumPy", np.ndarray)
+MUSCAT_ZONE = DataType("muscat-zone", "Zone", ImplicitGeometryBase)
 MUSCAT_ELEMENT_FILTER = DataType(
     "filter-like",
     "Selector",
