@@ -10,9 +10,13 @@ description: Nodes that create and apply Muscat element filters.
 
 Both selectors expose optional `nFilter: Node Selector` and
 `eFilter: Selector` input connectors. Connect a Node Selector's `filter` output
-to `nFilter`, or an Element Selector's `filter` output to `eFilter`. These
-criteria intersect with the selector's own tags and zones. Types are distinct;
-existing Element Selector IDs and output types remain unchanged.
+to `nFilter`, or an Element Selector's `filter` output to either `eFilter` or
+`nFilter`. Element filters implement the node-filter interface: when used as
+`nFilter`, they select the nodes used by their selected elements. FlowGraph
+registers this one-way connection as an identity conversion, passing the same
+filter object unchanged. A node filter cannot feed an element-only input.
+These criteria intersect with the selector's own tags and zones. Types remain
+distinct; existing Element Selector IDs and output types remain unchanged.
 
 ## Node Selector (`create-muscat-node-filter`)
 

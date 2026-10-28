@@ -11,7 +11,13 @@ from flowgraph.adapters.data_types import MUSCAT_ELEMENT_FILTER, MUSCAT_NODE_FIL
 from flowgraph.adapters.filters import CREATE_MUSCAT_ELEMENT_FILTER, CREATE_MUSCAT_NODE_FILTER
 from flowgraph.adapters.zones import AVAILABLE_NODES
 from flowgraph.application.node_registry import create_node_registry
-from flowgraph.application.workflow_core import WorkflowEdge, WorkflowExecutor, WorkflowGraph
+from flowgraph.application.port_conversions import resolve_port_conversion
+from flowgraph.application.workflow_core import (
+    WorkflowEdge,
+    WorkflowExecutor,
+    WorkflowGraph,
+    WorkflowValidationError,
+)
 from flowgraph.application.workflow_io import load_workflow, save_workflow
 from flowgraph.application.workflow_web_catalog import workflow_web_catalog
 
@@ -41,10 +47,64 @@ def test_node_selector_registration_and_distinct_port_types():
         assert not definition.input("eFilter").required
     assert CREATE_MUSCAT_NODE_FILTER.output("filter").data_type is MUSCAT_NODE_FILTER
     assert not MUSCAT_ELEMENT_FILTER.accepts(NodeFilter())
-    assert not MUSCAT_NODE_FILTER.accepts(ElementFilter())
+    assert MUSCAT_NODE_FILTER.accepts(ElementFilter())
+
+
+def test_element_filter_supports_node_filter_interface_without_copying():
+    conversion = resolve_port_conversion(MUSCAT_ELEMENT_FILTER, MUSCAT_NODE_FILTER)
+    assert conversion is not None
+    selector = ElementFilter(eTag="first")
+    assert conversion.convert(selector) is selector
+    assert resolve_port_conversion(MUSCAT_NODE_FILTER, MUSCAT_ELEMENT_FILTER) is None
+
+
+@pytest.mark.parametrize("target", [CREATE_MUSCAT_NODE_FILTER, CREATE_MUSCAT_ELEMENT_FILTER])
+def test_element_filter_connects_to_node_filter_port_round_trip(tmp_path, mesh, target):
+    registry = create_node_registry()
+    graph = WorkflowGraph(
+        [
+            CREATE_MUSCAT_ELEMENT_FILTER.create_instance("source", parameters={"etag": ["first"]}),
+            target.create_instance("target"),
+        ]
+    )
+    graph.add_edge(WorkflowEdge("source", "filter", "target", "nFilter"), registry)
+    path = tmp_path / "element-as-node-filter.json"
+    save_workflow(graph, path)
+    result = WorkflowExecutor(registry).run(load_workflow(path, registry))
+    source = result.node_outputs["source"]["filter"]
+    assert result.node_inputs["target"]["nFilter"] is source
+    selector = result.node_outputs["target"]["filter"]
+    assert selector.nFilter is source
+    if target is CREATE_MUSCAT_NODE_FILTER:
+        np.testing.assert_array_equal(selector.GetNodesIndices(mesh), [0, 1])
+    else:
+        np.testing.assert_array_equal(selector.GetGlobalIds(mesh), [0])
+
+
+def test_node_filter_cannot_connect_to_element_only_port():
+    registry = create_node_registry()
+    graph = WorkflowGraph(
+        [
+            CREATE_MUSCAT_NODE_FILTER.create_instance("source"),
+            CREATE_MUSCAT_ELEMENT_FILTER.create_instance("target"),
+        ]
+    )
+    with pytest.raises(WorkflowValidationError):
+        graph.add_edge(WorkflowEdge("source", "filter", "target", "eFilter"), registry)
 
 
 def test_selector_catalog_exports_typed_optional_nested_connectors():
+    conversions = workflow_web_catalog()["conversions"]
+    assert any(
+        conversion["source_type_id"] == "filter-like"
+        and conversion["target_type_id"] == "node-filter-like"
+        for conversion in conversions
+    )
+    assert not any(
+        conversion["source_type_id"] == "node-filter-like"
+        and conversion["target_type_id"] == "filter-like"
+        for conversion in conversions
+    )
     mesh = next(
         group for group in workflow_web_catalog()["groups"] if group["label"] == "Mesh Tools"
     )

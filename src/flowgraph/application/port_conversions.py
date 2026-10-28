@@ -16,6 +16,8 @@ from flowgraph.adapters.data_types import (
     IMAGE,
     IMAGEJ,
     INTEGER,
+    MUSCAT_ELEMENT_FILTER,
+    MUSCAT_NODE_FILTER,
     STRING,
     VEC2D,
     VEC2DI,
@@ -39,6 +41,13 @@ class PortConversion:
 BOOLEAN_TO_STRING = PortConversion("boolean", "string", "Boolean → Text", str)
 BOOLEAN_TO_INTEGER = PortConversion("boolean", "integer", "Boolean → Integer", int)
 BOOLEAN_TO_FLOAT = PortConversion("boolean", "float", "Boolean → Float", float)
+
+ELEMENT_FILTER_TO_NODE_FILTER = PortConversion(
+    MUSCAT_ELEMENT_FILTER.id,
+    MUSCAT_NODE_FILTER.id,
+    "Element Selector → Node Selector",
+    lambda value: value,
+)
 
 INTEGER_TO_FLOAT = PortConversion("integer", "float", "Integer → Float", float)
 INTEGER_TO_STRING = PortConversion("integer", "string", "Integer → string", str)
@@ -97,6 +106,7 @@ VECTOR_CONVERSIONS = tuple(
 
 
 PORT_CONVERSIONS = (
+    ELEMENT_FILTER_TO_NODE_FILTER,
     BOOLEAN_TO_STRING,
     BOOLEAN_TO_INTEGER,
     BOOLEAN_TO_FLOAT,
