@@ -3,17 +3,24 @@ id: reference.adapters.mesh-creation-tools
 title: Mesh Creation Tool Nodes
 section: Reference
 order: 15
-description: Nodes wrapping Muscat.MeshTools.MeshCreationTools.
+description: Nodes that create meshes from tables and Muscat mesh creation tools.
 ---
 
 # Mesh creation tool nodes
 
-These nodes wrap Muscat's `MeshCreationTools` functions. Mesh inputs and outputs use
+These nodes are available under **Mesh Tools → Mesh Creation** and include
+Table to Mesh and wrappers for Muscat's `MeshCreationTools` functions. Mesh inputs and outputs use
 FlowGraph `Mesh document` values. Boolean options are UI-only checks and are not
 connectable ports.
 
+Table to Mesh creates a point mesh from a table. Each named coordinate column
+supplies one coordinate component and is retained as a node field. Coordinate
+columns must exist and have compatible lengths. The stable node ID remains
+`csv-to-mesh`; existing workflows do not require migration.
+
 | Node (ID) | Inputs and outputs | Parameters/defaults |
 | --- | --- | --- |
+| **Table to Mesh** (`csv-to-mesh`) | Input `table: Table`; output `mesh: Mesh document` | `value=["x","y","z"]` (`Coordinates Names`), also an optional input port |
 | **Create Uniform Mesh Of Bars** (`create-uniform-mesh-of-bars`) | Output `mesh: Mesh document` | `startPoint=0.0`, `stopPoint=1.0`, `nbPoints=50`, `secondOrder=False` |
 | **Create Mesh Of Triangles** (`create-mesh-of-triangles`) | Inputs `points`, `triangles`; output `mesh` | None |
 | **Create Mesh Of** (`create-mesh-of`) | Inputs `points`, `connectivity`; output `mesh` | `elemName="Triangle_3"` |

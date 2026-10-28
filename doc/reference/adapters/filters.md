@@ -8,12 +8,39 @@ description: Nodes that create and apply Muscat element filters.
 
 # Filter nodes
 
+Both selectors expose optional `nFilter: Node Selector` and
+`eFilter: Selector` input connectors. Connect a Node Selector's `filter` output
+to `nFilter`, or an Element Selector's `filter` output to `eFilter`. These
+criteria intersect with the selector's own tags and zones. Types are distinct;
+existing Element Selector IDs and output types remain unchanged.
+
+## Node Selector (`create-muscat-node-filter`)
+
+Available under **Mesh Tools → Filters**. Creates `filter: Node Selector`, a
+Muscat `NodeFilter`. Parameters `ntag=[]` and `etag=[]` are also optional inputs.
+Node tags select their nodes; element tags and `eFilter` select nodes used by
+those elements. Expandable `zone_1`, `zone_2`, … inputs accept up to 128 zones,
+combined with OR; selected points have signed distance <= 0. Other criteria
+intersect. Empty criteria select all nodes. There are no element dimensionality,
+element-type or zone-treatment settings because this selector evaluates nodes.
+
+`nFilter` further intersects selected node indices. FlowGraph uses a small
+Muscat `NodeFilter` subclass to apply this criterion because the installed
+upstream implementation stores `nFilter` without evaluating it. The output
+can feed another selector's `nFilter`; Filter Mesh still requires an element
+selector rather than a node selector.
+
 ## Element Selector (`create-muscat-element-filter`)
 
 Creates `filter: Element filter`. Parameters (all default to `[]`) are
 `dimensionality` (choices 0–3), `element_types` (Muscat element-type names),
 `ntag` (node-tag names), and `etag` (element-tag names). Each parameter is also
 an optional input port. Empty selections mean no restriction for that criterion.
+
+`nFilterTreatment` controls how a connected `nFilter` selects elements:
+`ALL_NODES` (default) requires every node, while `AT_LEAST_ONE` requires any
+node. This setting is also an optional input port and is independent of
+`zonesTreatment`. Connected `eFilter` intersects element selections directly.
 
 Optional expandable `zone_1`, `zone_2`, … inputs (up to 128) accept **Zone**
 outputs from the **Mesh Tools → Filters → Zones** submenu. Multiple zones are

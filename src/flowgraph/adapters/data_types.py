@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 from Muscat.ImplicitGeometry.ImplicitGeometryBase import ImplicitGeometryBase
 from Muscat.LinAlg.Transform import Transform
-from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter
+from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter, NodeFilter
 from Muscat.MeshContainers.Filters.FilterOperators import FilterOperatorBase
 from PIL.Image import Image
 
@@ -35,6 +35,7 @@ MUSCAT_ELEMENT_FILTER = DataType(
     "Selector",
     (ElementFilter, FilterOperatorBase),
 )
+MUSCAT_NODE_FILTER = DataType("node-filter-like", "Node Selector", (NodeFilter, FilterOperatorBase))
 VEC3D = DataType("VEC3D", "3D Vector", list[float])
 VEC2D = DataType("VEC2D", "2D Vector", list[float])
 VEC3DSTR = DataType("VEC3DSTR", "3D Text Vector", list[str])

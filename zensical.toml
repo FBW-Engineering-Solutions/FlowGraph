@@ -29,7 +29,6 @@ nav = [
     { "Inputs" = "reference/adapters/inputs.md" },
     { "Files" = "reference/adapters/file.md" },
     { "Readers" = "reference/adapters/readers.md" },
-    { "Mesh Generation" = "reference/adapters/mesh-gens.md" },
     { "Mesh Creation" = "reference/adapters/mesh-creation-tools.md" },
     { "File Conversion" = "reference/adapters/file-conversion.md" },
     { "Filters" = "reference/adapters/filters.md" },

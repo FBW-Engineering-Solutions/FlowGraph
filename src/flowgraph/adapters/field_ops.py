@@ -1,4 +1,4 @@
-"""Workflow nodes for transferring fields between meshes."""
+"""Workflow nodes for extracting and transferring mesh fields."""
 
 from collections.abc import Mapping
 from typing import Any
@@ -12,11 +12,12 @@ from Muscat.MeshContainers.Mesh import Mesh
 from Muscat.MeshTools.MeshFieldOperations import GetFieldTransferOp
 from Muscat.MeshTools.MeshTools import GetElementsCenters
 
-from flowgraph.adapters.data_types import MESH_DOCUMENT
+from flowgraph.adapters.data_types import ANY, MESH_DOCUMENT
 from flowgraph.application.workflow_core import (
     ExecContext,
     NodeDefinition,
     ParameterDefinition,
+    ParameterOption,
     PortDefinition,
     PortDirection,
 )
@@ -122,4 +123,56 @@ TRANSFER_FIELDS_NODE = NodeDefinition(
 )
 
 
-AVAILABLE_NODES = (TRANSFER_FIELDS_NODE,)
+def _extract_field(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Copy one mesh field without changing its shape, dtype, or source data."""
+    mesh = inputs["mesh"].mesh
+    entity = parameters.get("entity", "node")
+    if entity not in ("node", "element"):
+        raise ValueError("Field association must be 'node' or 'element'")
+    name = parameters.get("fieldName", "")
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("Field name must be a nonempty string")
+    fields = mesh.nodeFields if entity == "node" else mesh.elemFields
+    if name not in fields:
+        available = ", ".join(sorted(fields)) or "(none)"
+        raise ValueError(
+            f"{entity.capitalize()} field {name!r} does not exist; available: {available}"
+        )
+    return {"field": np.array(fields[name], copy=True)}
+
+
+EXTRACT_FIELD_NODE = NodeDefinition(
+    id="extract-field",
+    requirements=("py:muscat", "py:numpy"),
+    icon="mdi-table-arrow-right",
+    label="Extract Field",
+    description="Extract a nodal or element field as an independent NumPy array.",
+    ports=(
+        PortDefinition("mesh", PortDirection.INPUT, MESH_DOCUMENT, "Mesh"),
+        PortDefinition("field", PortDirection.OUTPUT, ANY, "Field"),
+    ),
+    parameters=(
+        ParameterDefinition(
+            "entity",
+            ParameterKind.STR_SELECT,
+            "Association",
+            "node",
+            options=(ParameterOption("node", "Node"), ParameterOption("element", "Element")),
+        ),
+        ParameterDefinition(
+            "fieldName",
+            ParameterKind.TEXT,
+            "Field name",
+            "",
+            placeholder="Enter the field name",
+        ),
+    ),
+    executor=_extract_field,
+)
+
+
+AVAILABLE_NODES = (TRANSFER_FIELDS_NODE, EXTRACT_FIELD_NODE)

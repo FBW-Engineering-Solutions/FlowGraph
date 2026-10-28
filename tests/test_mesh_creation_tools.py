@@ -13,6 +13,7 @@ from flowgraph.adapters.mesh_creation_tools import (
     MIRROR_MESH_NODE,
     SUBDIVIDE_MESH_NODE,
 )
+from flowgraph.adapters.mesh_generations import CSV_TO_MESH
 from flowgraph.domain.mesh_document import MeshDocument
 
 
@@ -23,6 +24,15 @@ def test_mesh_creation_nodes_are_registered() -> None:
     assert CREATE_CUBE_NODE.id in node_ids
     assert CREATE_MESH_OF_NODE.id in node_ids
     assert CREATE_0D_ELEMENTS_NODE.id in node_ids
+
+
+def test_table_to_mesh_is_registered_once_under_mesh_creation() -> None:
+    mesh = next(group for group in ADAPTERS.groups if group.label == "Mesh Tools")
+    creation = next(group for group in mesh.subgroups if group.label == "Mesh Creation")
+    assert CSV_TO_MESH in creation.node_definitions
+    assert all(group.label != "Mesh Gens" for group in mesh.subgroups)
+    assert ADAPTERS.node_definitions.count(CSV_TO_MESH) == 1
+    assert ADAPTERS.require("csv-to-mesh") is CSV_TO_MESH
 
 
 def test_mesh_creation_boolean_checks_are_not_ports() -> None:

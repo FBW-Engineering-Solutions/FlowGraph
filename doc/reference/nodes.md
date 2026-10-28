@@ -143,7 +143,6 @@ reference for each group is split into the following pages:
 | Inputs | [Input nodes](adapters/inputs.md) |
 | Files | [File nodes](adapters/file.md) |
 | Readers | [Reader nodes](adapters/readers.md) |
-| Mesh Gens | [Mesh-generation nodes](adapters/mesh-gens.md) |
 | Mesh Creation | [Mesh-creation nodes](adapters/mesh-creation-tools.md) |
 | Filters | [Filter nodes](adapters/filters.md) |
 | Mesh Ops | [Mesh-operation nodes](adapters/mesh-ops.md) |

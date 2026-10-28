@@ -14,6 +14,7 @@ from flowgraph.adapters.files import (
 )
 from flowgraph.adapters.filters import (
     CREATE_MUSCAT_ELEMENT_FILTER,
+    CREATE_MUSCAT_NODE_FILTER,
     FILTER_MESH_WITH_MUSCAT,
 )
 from flowgraph.adapters.image_tools import AVAILABLE_NODES as IMAGE_TOOLS_AVAILABLE_NODES
@@ -121,11 +122,14 @@ ADAPTERS = AdapterCatalog(
                     "Readers",
                     (LOAD_MUSCAT, LOAD_MESHIO, LOAD_MESHLANE, LOAD_CSV, READ_TABLE),
                 ),
-                AdapterGroup("Mesh Gens", (CSV_TO_MESH,)),
-                AdapterGroup("Mesh Creation", MESH_CREATION_AVAILABLE_NODES),
+                AdapterGroup("Mesh Creation", (CSV_TO_MESH,) + MESH_CREATION_AVAILABLE_NODES),
                 AdapterGroup(
                     "Filters",
-                    (CREATE_MUSCAT_ELEMENT_FILTER, FILTER_MESH_WITH_MUSCAT),
+                    (
+                        CREATE_MUSCAT_ELEMENT_FILTER,
+                        CREATE_MUSCAT_NODE_FILTER,
+                        FILTER_MESH_WITH_MUSCAT,
+                    ),
                     subgroups=(AdapterGroup("Zones", ZONE_AVAILABLE_NODES),),
                 ),
                 AdapterGroup("Mesh Ops", MESH_OPS_AVAILABLE_NODES),
