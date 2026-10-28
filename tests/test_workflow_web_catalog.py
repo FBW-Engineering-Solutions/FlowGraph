@@ -97,7 +97,7 @@ def test_workflow_web_catalog_exports_plaid_dataset_sample_and_list_types() -> N
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 
-    assert len(nodes) == len(ADAPTERS.node_definitions) == 106
+    assert len(nodes) == len(ADAPTERS.node_definitions) == 107
     assert all(isinstance(node["requirements"], list) for node in nodes.values())
     assert all(
         isinstance(requirement, str)
