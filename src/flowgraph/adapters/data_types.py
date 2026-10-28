@@ -35,7 +35,10 @@ MUSCAT_ELEMENT_FILTER = DataType(
     "Selector",
     (ElementFilter, FilterOperatorBase),
 )
-MUSCAT_NODE_FILTER = DataType("node-filter-like", "Node Selector", (NodeFilter, FilterOperatorBase))
+# Element filters also implement GetNodesIndices and can serve as nodal filters.
+MUSCAT_NODE_FILTER = DataType(
+    "node-filter-like", "Node Selector", (NodeFilter, ElementFilter, FilterOperatorBase)
+)
 VEC3D = DataType("VEC3D", "3D Vector", list[float])
 VEC2D = DataType("VEC2D", "2D Vector", list[float])
 VEC3DSTR = DataType("VEC3DSTR", "3D Text Vector", list[str])
