@@ -46,6 +46,7 @@ from flowgraph.adapters.simple_sources import (
 from flowgraph.adapters.sinks import AVAILABLE_NODES as SINKS_AVAILABLE_NODES
 from flowgraph.adapters.table_tools import AVAILABLE_NODES as TABLE_TOOLS_AVAILABLE_NODES
 from flowgraph.adapters.user_code import AVAILABLE_NODES as USER_CODE_AVAILABLE_NODES
+from flowgraph.adapters.vector_tools import AVAILABLE_NODES as VECTOR_TOOLS_AVAILABLE_NODES
 from flowgraph.adapters.workflow import AVAILABLE_NODES as WORKFLOW_AVAILABLE_NODES
 from flowgraph.adapters.workflow_interfaces import (
     AVAILABLE_NODES as WORKFLOW_INTERFACE_AVAILABLE_NODES,
@@ -140,6 +141,7 @@ ADAPTERS = AdapterCatalog(
         ),
         AdapterGroup("Image Tools", IMAGE_TOOLS_AVAILABLE_NODES),
         AdapterGroup("Table Tools", TABLE_TOOLS_AVAILABLE_NODES),
+        AdapterGroup("Vector Tools", VECTOR_TOOLS_AVAILABLE_NODES),
         AdapterGroup("Code", USER_CODE_AVAILABLE_NODES + IMAGEJ_AVAILABLE_NODES),
         AdapterGroup("Workflow", WORKFLOW_INTERFACE_AVAILABLE_NODES + WORKFLOW_AVAILABLE_NODES),
         AdapterGroup("Sinks", SINKS_AVAILABLE_NODES),

@@ -41,6 +41,7 @@ nav = [
     { "Controls" = "reference/adapters/controls.md" },
     { "Image Tools" = "reference/adapters/image-tools.md" },
     { "Table Tools" = "reference/adapters/table-tools.md" },
+    { "Vector Tools" = "reference/adapters/vector-tools.md" },
     { "Workflow Nodes" = "reference/adapters/workflow.md" },
     { "Code Nodes" = "reference/adapters/code.md" },
     { "CoSApp" = "reference/adapters/cosapp.md" },
