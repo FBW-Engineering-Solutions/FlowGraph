@@ -13,6 +13,7 @@ description: Nodes for coordinate transforms, tetrahedralization, and tags.
 | **Mesh Transform** (`transform`) | Outputs `Transform` | `translation=[0,0,0]`, `first=[1,0,0]`, `second=[0,1,0]`; `keepNormalized=True`, `keepOrthogonal=True` (the last two are UI-only). |
 | **Apply Transform** (`apply-transform`) | Inputs `mesh: Mesh document`, `Transform: Transform`; output `mesh: Mesh document` | `onVectorFields=True`, `inverse=False` (UI-only). |
 | **Delaunay 3D** (`delaunay-3d`) | Input/output `meshDocument: Mesh document` | None |
+| **Remove Lonely Nodes** (`remove-lonely-nodes`) | Input/output `mesh: Mesh document` | None |
 | **Quad To Lin** (`quad-to-lin`) | Input `inputMesh: Mesh document`; output `outputMesh: Mesh document` | `divideQuadElements=True`, `linearizedMiddlePoints=False` (UI-only) |
 | **Remesh** (`remesh`) | Input `mesh: Mesh document`; optional `levelset`, `solution`, `metric: Any`; output `mesh: Mesh document` | `backend="MmgInMemory"`, `remesherOptions="{}"`, `backendOptions="{}"` (local settings) |
 | **Rename Tag** (`rename-tag`) | Input/output `mesh: Mesh document` | `entity="element"`, `tag=""`, `newTag=""` |
@@ -31,6 +32,13 @@ nodes used by the selected elements.
 Quad To Lin delegates to Muscat's `QuadToLin` operation. It converts supported
 quadratic elements to linear elements, optionally subdividing them and
 linearizing their middle points. As in Muscat, mesh fields are not preserved.
+
+Remove Lonely Nodes is available under **Mesh Tools → Mesh Ops**. It removes
+points not referenced by any element and remaps connectivity to the remaining
+points. Node fields (including FlowGraph IDs), original node IDs and node tags
+are filtered consistently; element fields, element IDs and element tags are
+retained. The input document is unchanged. A mesh with no elements loses all
+its points; a mesh with no unused points retains its topology and metadata.
 
 Remesh delegates to Muscat's remesher using the selected `MmgInMemory` (default)
 or `mmg` backend. Optional `levelset`, `solution`, and `metric` inputs override
