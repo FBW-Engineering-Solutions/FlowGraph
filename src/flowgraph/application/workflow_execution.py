@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import traceback
 from base64 import b64encode
 from collections.abc import Mapping
@@ -42,6 +43,8 @@ def execute_workflow_json(workflow_json: str) -> str:
     point. The node registry is cached within the calling process, while workflow
     state is reconstructed for each request. Process management, cancellation,
     authentication, and workspace configuration belong to the calling transport.
+    Non-finite numbers are transported as JSON null; Python-text displays retain
+    their original representations. Runtime values used by nodes are not changed.
     """
     warnings: list[str] = []
     try:
@@ -65,7 +68,9 @@ def execute_workflow_json(workflow_json: str) -> str:
     except Exception as error:  # noqa: BLE001 - the execution boundary serializes all failures
         response = _error_response(error)
     response["warnings"] = warnings
-    return json.dumps(response, ensure_ascii=False, separators=(",", ":"))
+    return json.dumps(
+        _json_safe(response), ensure_ascii=False, separators=(",", ":"), allow_nan=False
+    )
 
 
 def _serialize_result(result: WorkflowRunResult) -> dict[str, Any]:
@@ -259,6 +264,8 @@ def _error_response(error: Exception) -> dict[str, Any]:
 
 def _json_safe(value: Any) -> Any:
     """Convert runtime values into deterministic JSON-compatible data."""
+    if isinstance(value, (float, np.floating)):
+        return float(value) if math.isfinite(value) else None
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, Path):
