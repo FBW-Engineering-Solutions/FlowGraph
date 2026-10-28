@@ -15,8 +15,7 @@ connectable ports.
 
 Table to Mesh creates a point mesh from a table. Each named coordinate column
 supplies one coordinate component and is retained as a node field. Coordinate
-columns must exist and have compatible lengths. The stable node ID remains
-`csv-to-mesh`; existing workflows do not require migration.
+columns must exist and have compatible lengths.
 
 | Node (ID) | Inputs and outputs | Parameters/defaults |
 | --- | --- | --- |

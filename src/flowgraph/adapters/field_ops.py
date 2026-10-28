@@ -12,7 +12,7 @@ from Muscat.MeshContainers.Mesh import Mesh
 from Muscat.MeshTools.MeshFieldOperations import GetFieldTransferOp
 from Muscat.MeshTools.MeshTools import GetElementsCenters
 
-from flowgraph.adapters.data_types import ANY, MESH_DOCUMENT
+from flowgraph.adapters.data_types import ARRAY, MESH_DOCUMENT
 from flowgraph.application.workflow_core import (
     ExecContext,
     NodeDefinition,
@@ -153,7 +153,7 @@ EXTRACT_FIELD_NODE = NodeDefinition(
     description="Extract a nodal or element field as an independent NumPy array.",
     ports=(
         PortDefinition("mesh", PortDirection.INPUT, MESH_DOCUMENT, "Mesh"),
-        PortDefinition("field", PortDirection.OUTPUT, ANY, "Field"),
+        PortDefinition("field", PortDirection.OUTPUT, ARRAY, "Field"),
     ),
     parameters=(
         ParameterDefinition(

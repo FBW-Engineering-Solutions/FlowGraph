@@ -32,10 +32,10 @@ from flowgraph.adapters.readers import (
 )
 from flowgraph.adapters.remote_files import DOWNLOAD_URL
 from flowgraph.adapters.simple_sources import (
+    SET_ARRAY_1D,
     SET_BOOLEAN,
     SET_FLOAT,
     SET_INT,
-    SET_LIST_FLOAT,
     SET_LIST_INT,
     SET_LIST_STR,
     SET_STRING,
@@ -108,7 +108,7 @@ ADAPTERS = AdapterCatalog(
                 ),
                 AdapterGroup(
                     "Lists/Vectors",
-                    (SET_LIST_STR, SET_LIST_INT, SET_LIST_FLOAT, SET_VEC2D, SET_VEC2DI, SET_VEC3D),
+                    (SET_LIST_STR, SET_LIST_INT, SET_ARRAY_1D, SET_VEC2D, SET_VEC2DI, SET_VEC3D),
                 ),
                 AdapterGroup(
                     "Files",

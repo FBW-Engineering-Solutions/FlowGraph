@@ -12,7 +12,7 @@ from flowgraph.application.workflow_core import (
     PortDirection,
 )
 
-from .data_types import ANY, FLOAT, INTEGER
+from .data_types import ARRAY_1D, FLOAT, INTEGER
 
 
 def _vector_statistics(
@@ -34,6 +34,8 @@ def _vector_statistics(
         return outputs
 
     vector = np.asarray(inputs["vector"])
+    if vector.ndim == 2 and vector.shape[1] == 1:
+        vector = vector[:, 0]
     if vector.ndim != 1 or vector.size == 0:
         raise ValueError("Vector Statistics requires a non-empty one-dimensional vector")
     if vector.dtype.kind not in "iuf":
@@ -64,7 +66,7 @@ VECTOR_STATISTICS = NodeDefinition(
     description="Compute connected vector statistics: extrema and indices, mean, and population std.",
     requirements=("py:numpy",),
     ports=(
-        PortDefinition("vector", PortDirection.INPUT, ANY, "Vector"),
+        PortDefinition("vector", PortDirection.INPUT, ARRAY_1D, "Vector"),
         PortDefinition("min", PortDirection.OUTPUT, FLOAT, "Minimum"),
         PortDefinition("min_index", PortDirection.OUTPUT, INTEGER, "Minimum index"),
         PortDefinition("max", PortDirection.OUTPUT, FLOAT, "Maximum"),

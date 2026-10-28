@@ -19,6 +19,9 @@ from flowgraph.adapters.data_types import (
     IMAGE,
     IMAGEJ,
     INTEGER,
+    LIST_ANY,
+    LIST_FLOAT,
+    LIST_INT,
     MUSCAT_ELEMENT_FILTER,
     MUSCAT_NODE_FILTER,
     STRING,
@@ -107,6 +110,22 @@ def _array_to_2d(value: np.ndarray) -> np.ndarray:
     return value
 
 
+def _real_array_to_float_list(value: np.ndarray) -> list[float]:
+    """Bridge numeric arrays to APIs explicitly requiring Python float lists."""
+    if not ARRAY_1D.accepts(value) or value.dtype.kind not in "iuf":
+        raise TypeError("List Floats requires a 1D array of real integer or floating-point values")
+    return [float(item) for item in value]
+
+
+def _sequence_to_array(value: list) -> np.ndarray:
+    """Materialize a numeric sequence as a read-only one-dimensional array."""
+    array = np.asarray(value)
+    if array.ndim != 1 or array.dtype.kind not in "iuf":
+        raise TypeError("1D Array requires a one-dimensional numeric sequence")
+    array.setflags(write=False)
+    return array
+
+
 ARRAY_CONVERSIONS = (
     # Also publish widening rules for static clients, which only know type IDs.
     PortConversion(ARRAY_1D.id, ARRAY.id, "1D Array → Array", lambda value: value),
@@ -114,6 +133,17 @@ ARRAY_CONVERSIONS = (
     PortConversion(ARRAY.id, ARRAY_1D.id, "Array → 1D Array", _array_to_1d),
     PortConversion(ARRAY.id, ARRAY_2D.id, "Array → 2D Array", _array_to_2d),
     PortConversion(ARRAY_2D.id, ARRAY_1D.id, "2D Array → 1D Array", _array_to_1d),
+    PortConversion(LIST_FLOAT.id, ARRAY_1D.id, "List Floats → 1D Array", _sequence_to_array),
+    PortConversion(LIST_INT.id, ARRAY_1D.id, "List Ints → 1D Array", _sequence_to_array),
+    PortConversion(
+        FLOAT.id, ARRAY_1D.id, "Float → 1D Array", lambda value: _sequence_to_array([value])
+    ),
+    PortConversion(ARRAY_1D.id, LIST_FLOAT.id, "1D Array → List Floats", _real_array_to_float_list),
+    PortConversion(ARRAY_1D.id, LIST_ANY.id, "1D Array → List Any", lambda value: value.tolist()),
+    *(
+        PortConversion(vector.id, ARRAY_1D.id, f"{vector.label} → 1D Array", _sequence_to_array)
+        for vector in (VEC2D, VEC2DI, VEC3D, VEC3DI)
+    ),
 )
 
 
@@ -175,6 +205,8 @@ _SOURCE_DATA_TYPES = {
     ARRAY.id: ARRAY,
     ARRAY_1D.id: ARRAY_1D,
     ARRAY_2D.id: ARRAY_2D,
+    LIST_FLOAT.id: LIST_FLOAT,
+    LIST_INT.id: LIST_INT,
     BOOLEAN.id: BOOLEAN,
     STRING.id: STRING,
     INTEGER.id: INTEGER,

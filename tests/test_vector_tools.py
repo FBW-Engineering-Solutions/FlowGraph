@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from flowgraph.adapters import ADAPTERS
-from flowgraph.adapters.simple_sources import SET_LIST_FLOAT
+from flowgraph.adapters.simple_sources import SET_ARRAY_1D
 from flowgraph.adapters.vector_tools import VECTOR_STATISTICS
 from flowgraph.application.node_registry import create_node_registry
 from flowgraph.application.workflow_core import (
@@ -139,7 +139,7 @@ def test_registration_and_serialized_catalog():
     node = next(n for n in group["nodes"] if n["id"] == VECTOR_STATISTICS.id)
     assert node["requirements"] == ["py:numpy"]
     assert [(p["name"], p["data_type_id"]) for p in node["ports"]] == [
-        ("vector", "any"),
+        ("vector", "array-1d"),
         ("min", "float"),
         ("min_index", "integer"),
         ("max", "float"),
@@ -165,7 +165,7 @@ def test_connected_and_exported_outputs_round_trip_and_execute(tmp_path):
     registry.register(sink)
     graph = WorkflowGraph(
         [
-            SET_LIST_FLOAT.create_instance("source", parameters={"value": [1.0, 3.0, 5.0]}),
+            SET_ARRAY_1D.create_instance("source", parameters={"value": [1.0, 3.0, 5.0]}),
             VECTOR_STATISTICS.create_instance("statistics"),
             sink.create_instance("sink"),
         ]

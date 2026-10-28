@@ -5,7 +5,7 @@ import pytest
 from Muscat.MeshContainers.Mesh import Mesh
 
 from flowgraph.adapters import ADAPTERS
-from flowgraph.adapters.data_types import ANY, MESH_DOCUMENT
+from flowgraph.adapters.data_types import ARRAY, MESH_DOCUMENT
 from flowgraph.adapters.field_ops import EXTRACT_FIELD_NODE
 from flowgraph.adapters.mesh_creation_tools import CREATE_CUBE_NODE
 from flowgraph.adapters.simple_sources import SET_STRING
@@ -21,7 +21,7 @@ def test_extract_field_registered_under_field_ops() -> None:
     assert EXTRACT_FIELD_NODE in field_ops.node_definitions
     assert ADAPTERS.require("extract-field") is EXTRACT_FIELD_NODE
     assert EXTRACT_FIELD_NODE.input("mesh").data_type is MESH_DOCUMENT
-    assert EXTRACT_FIELD_NODE.output("field").data_type is ANY
+    assert EXTRACT_FIELD_NODE.output("field").data_type is ARRAY
     assert [port.name for port in EXTRACT_FIELD_NODE.inputs] == ["mesh", "entity", "fieldName"]
 
 

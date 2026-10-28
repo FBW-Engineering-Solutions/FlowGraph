@@ -15,8 +15,8 @@ to `nFilter`, or an Element Selector's `filter` output to either `eFilter` or
 `nFilter`, they select the nodes used by their selected elements. FlowGraph
 registers this one-way connection as an identity conversion, passing the same
 filter object unchanged. A node filter cannot feed an element-only input.
-These criteria intersect with the selector's own tags and zones. Types remain
-distinct; existing Element Selector IDs and output types remain unchanged.
+These criteria intersect with the selector's own tags and zones. Node Selector
+and Element Selector have distinct output types.
 
 ## Node Selector (`create-muscat-node-filter`)
 
@@ -69,7 +69,7 @@ classes and the mesh-conversion helper are not zone nodes.
 
 | Node (ID) | Configuration and required inputs |
 | --- | --- |
-| Wrapped Field (`zone-wrapped`) | Signed-distance `field` list, default `[0.0]`; its length must match the evaluated nodes/centers. |
+| Wrapped Field (`zone-wrapped`) | Signed-distance `field: 1D Array` input, editable list default `[0.0]`; its length must match the evaluated nodes/centers. |
 | External Surface (`zone-externalsurface`) | `mesh`; `method="bulk"` (`bulk` or `normal`), `offset=0.001`. |
 | By Element Tag (`zone-byetag`) | `mesh`; `etags=[]`, `offset=0.0`. |
 | By Element Tag II (`zone-byetagii`) | `mesh`; `etags=[]`, `offset=0.0`, `numberOfElementPseudoDistance=10`. See support restriction below. |
@@ -99,7 +99,13 @@ periods, hole counts and pseudo-distance counts must be positive. Normals and
 transform axes cannot be degenerate, and cylinder endpoints must differ.
 
 **Support-bound fields:** Wrapped Field and By Element Tag II are Muscat field
-objects, not general pointwise signed-distance functions. Wrapped Field values
+objects. Wrapped Field accepts real finite scalar arrays `(n,)` or columns
+`(n, 1)` through checked connections. Multi-component/tensor arrays connect but
+fail at runtime; no flattening or magnitude calculation is implicit. It retains
+a read-only view of array data without changing the producer's writeability.
+The list default remains JSON-serializable and is overridden, not replaced, by
+connected arrays. Neither object is a general pointwise signed-distance
+function. Wrapped Field values
 must match the evaluated array length; use node-based treatment when wrapping
 node values. By Element Tag II evaluates only on its support nodes; use it with
 the same mesh and `ALL_NODES` or `AT_LEAST_ONE`, not `CENTER` or point-transform

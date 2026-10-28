@@ -42,7 +42,7 @@ def test_plaid_node_exports_requested_typed_ports() -> None:
     ]
     assert [(port.name, port.data_type.id) for port in EXTRACT_PLAID_SAMPLE.outputs] == [
         ("sample", "plaid-sample"),
-        ("timesteps", "list[float]"),
+        ("timesteps", "array-1d"),
     ]
 
 
@@ -191,8 +191,10 @@ def test_extract_plaid_sample_uses_split_converter(times) -> None:
     )
 
     assert converter.requested == (dataset, 3)
-    assert result == {"sample": sample, "timesteps": [float(time) for time in times]}
-    assert all(type(time) is float for time in result["timesteps"])
+    assert result["sample"] is sample
+    np.testing.assert_array_equal(result["timesteps"], [float(time) for time in times])
+    assert result["timesteps"].dtype == np.dtype(float)
+    assert not result["timesteps"].flags.writeable
 
 
 @pytest.mark.parametrize("splits", [[], ["train", "test"]])
@@ -268,4 +270,5 @@ def test_plaid_sample_workflow_validates_typed_time_values() -> None:
 
     result = WorkflowExecutor(registry).run(graph)
 
-    assert result.node_outputs["extract"] == {"sample": sample, "timesteps": [0.0, 2.0]}
+    assert result.node_outputs["extract"]["sample"] is sample
+    np.testing.assert_array_equal(result.node_outputs["extract"]["timesteps"], [0.0, 2.0])

@@ -11,11 +11,12 @@ description: Demand-driven statistics for numeric vectors.
 ## Vector Statistics (`vector-statistics`)
 
 Available under **Vector Tools**. Connect a numeric list, fixed-size vector, or
-one-dimensional NumPy array to the required `vector` input. The input uses `Any`
-to support both lists and arrays (including scalar fields from Extract Field),
-and is validated at runtime. Requested calculations require a non-empty vector
+one-dimensional NumPy array to the required `vector: 1D Array` input. Numeric
+list/vector ports use registered array conversions. Generic Array outputs
+(including Extract Field) are checked at runtime; `(n, 1)` columns become `(n,)`
+views. Requested calculations require a non-empty vector
 of finite real integers or floats; strings, booleans, complex values and
-multidimensional arrays are rejected. The input is not modified.
+multi-component arrays are rejected. The input is not modified.
 
 | Output | Type | Meaning |
 | --- | --- | --- |
@@ -34,6 +35,7 @@ standard deviation is zero and both indices are zero.
 The engine requires all declared outputs to exist: unconnected value outputs
 contain `NaN`, and unconnected index outputs contain `-1`. These are unused
 markers, not computed statistics. With no connected outputs, the node does not
-inspect the vector or perform any calculation. Direct Python executor calls
+inspect the vector or perform any calculation within its executor (the engine
+still validates/converts connected inputs). Direct Python executor calls
 must provide `ExecContext(connected_output_ports=...)` to request quantities;
 omitting the context requests none. There are no parameters.

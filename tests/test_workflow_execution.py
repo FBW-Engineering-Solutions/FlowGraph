@@ -17,8 +17,10 @@ from flowgraph.application import workflow_execution
 from flowgraph.application.node_registry import create_node_registry
 from flowgraph.application.workflow_core import (
     NodeDefinition,
+    NodeExecutionError,
     WorkflowEdge,
     WorkflowGraph,
+    WorkflowRunResult,
 )
 from flowgraph.application.workflow_execution import _display_meshes, execute_workflow_json
 from flowgraph.application.workflow_io import workflow_to_dict
@@ -72,6 +74,55 @@ def test_execute_workflow_json_returns_python_generated_projection_and_results()
     assert response["nodes"]["inputs"]["output"] == {"value": "hello"}
     assert "Workflow:" in response["projection"]
     assert "[source] String Input" in response["projection"]
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_execution_serializes_nonfinite_values_as_null(monkeypatch, failed):
+    values = {
+        "mean": float("nan"),
+        "std": float("inf"),
+        "nested": [float("-inf"), np.float32("nan"), np.float64("inf"), 1.5],
+        "text": "NaN and Infinity are text",
+        "flag": False,
+    }
+    result = WorkflowRunResult(
+        execution_order=("source", "output"),
+        node_outputs={"source": {"value": values}, "output": {"value": values}},
+        node_inputs={"output": {"value": values}},
+    )
+
+    def run(*args, **kwargs):
+        if failed:
+            raise NodeExecutionError("output", "workflow-output", "failed", partial_result=result)
+        return result
+
+    monkeypatch.setattr(workflow_execution.WorkflowExecutor, "run", run)
+    monkeypatch.setattr(
+        workflow_execution, "_display_meshes", lambda *args: {"preview": {"values": values}}
+    )
+
+    def reject_constant(value):
+        raise AssertionError(f"Non-standard JSON constant: {value}")
+
+    response = json.loads(execute_workflow_json(_workflow_json()), parse_constant=reject_constant)
+    expected = {
+        "mean": None,
+        "std": None,
+        "nested": [None, None, None, 1.5],
+        "text": "NaN and Infinity are text",
+        "flag": False,
+    }
+    retained = response["partial"] if failed else response["nodes"]
+    assert retained["outputs"]["source"]["value"] == expected
+    assert retained["inputs"]["output"]["value"] == expected
+    if failed:
+        assert response["status"] == "error"
+        assert response["error"]["node_id"] == "output"
+    else:
+        assert response["status"] == "ok"
+        assert response["outputs"] == {"result": expected}
+        assert response["display_meshes"]["preview"]["values"] == expected
+        assert "nan" in response["display_inputs"]["output"]["value"]
 
 
 def _public_input_workflow(definition_id="set-string", value="saved"):
