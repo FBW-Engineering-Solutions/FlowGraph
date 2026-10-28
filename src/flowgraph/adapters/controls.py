@@ -35,17 +35,15 @@ def _slider_bounds(
         value_type = "integer" if integer else "number"
         raise TypeError(f"The slider min, max, and value must be {value_type}s")
 
-    if integer:
-        if minimum >= maximum:
-            raise ValueError("The slider minimum must be less than its maximum")
-    else:
+    if not integer:
         minimum = float(minimum)
         maximum = float(maximum)
         value = float(value)
         if not all(math.isfinite(item) for item in (minimum, maximum, value)):
             raise ValueError("The slider min, max, and value must be finite")
-        if minimum >= maximum:
-            raise ValueError("The slider minimum must be less than its maximum")
+
+    if minimum > maximum:
+        raise ValueError("The slider minimum must be less than or equal to its maximum")
 
     if not minimum <= value <= maximum:
         raise ValueError("The slider value must be between its minimum and maximum")

@@ -28,7 +28,8 @@ optional; an unconnected port uses the configured default.
 
 Sliders appear under **Inputs → Scalars**. Their `min`, `max`, and `value`
 parameters are optional input ports; connections override local settings.
-They require `min < max` and `min <= value <= max`.
+Both sliders require `min <= max` and `min <= value <= max`; equal bounds fix
+the value to that bound.
 
 Numeric values reject booleans; floats and vector/list components must be finite.
 1D Array Input uses a list-based parameter editor and outputs a read-only NumPy

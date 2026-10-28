@@ -75,3 +75,49 @@ def test_connected_slider_value_still_requires_valid_range(slider, source, value
     graph.add_edge(WorkflowEdge("source", "value", "slider", "value"), registry)
     with pytest.raises(NodeExecutionError, match="between its minimum and maximum"):
         WorkflowExecutor(registry).run(graph)
+
+
+@pytest.mark.parametrize(
+    "slider, source, value",
+    [(FLOAT_SLIDER, SET_FLOAT, value) for value in (-2.5, 0.0, 3.0)]
+    + [(INT_SLIDER, SET_INT, value) for value in (-2, 0, 3)],
+)
+@pytest.mark.parametrize("connected", [False, True])
+def test_slider_accepts_equal_bounds(slider, source, value, connected) -> None:
+    registry = create_node_registry()
+    graph = WorkflowGraph(
+        [slider.create_instance("slider", parameters=dict.fromkeys(("min", "max", "value"), value))]
+    )
+    if connected:
+        graph.add_node(source.create_instance("source", parameters={"value": value}))
+        for name in ("min", "max", "value"):
+            graph.add_edge(WorkflowEdge("source", "value", "slider", name), registry)
+
+    result = WorkflowExecutor(registry).run(graph)
+
+    assert result.node_outputs["slider"] == {"value": value}
+    assert type(result.node_outputs["slider"]["value"]) is type(value)
+
+
+@pytest.mark.parametrize(
+    "slider, value", [(FLOAT_SLIDER, -0.1), (FLOAT_SLIDER, 0.1), (INT_SLIDER, -1), (INT_SLIDER, 1)]
+)
+def test_slider_equal_bounds_reject_out_of_range_value(slider, value) -> None:
+    graph = WorkflowGraph(
+        [slider.create_instance("slider", parameters={"min": 0, "max": 0, "value": value})]
+    )
+    with pytest.raises(NodeExecutionError, match="between its minimum and maximum"):
+        WorkflowExecutor(create_node_registry()).run(graph)
+
+
+@pytest.mark.parametrize(
+    "slider, parameters",
+    [
+        (FLOAT_SLIDER, {"min": 1.0, "max": 0.0, "value": 0.5}),
+        (INT_SLIDER, {"min": 1, "max": 0, "value": 0}),
+    ],
+)
+def test_slider_rejects_invalid_bounds(slider, parameters) -> None:
+    graph = WorkflowGraph([slider.create_instance("slider", parameters=parameters)])
+    with pytest.raises(NodeExecutionError, match="minimum must be less than"):
+        WorkflowExecutor(create_node_registry()).run(graph)
