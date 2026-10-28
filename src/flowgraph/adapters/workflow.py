@@ -20,6 +20,7 @@ from flowgraph.application.workflow_core import (
 
 from .data_types import (
     ANY,
+    ARRAY_1D,
     BOOLEAN,
     FLOAT,
     INTEGER,
@@ -96,7 +97,7 @@ def _batch_ports(instance: NodeInstance) -> tuple[PortDefinition, ...]:
             PortDirection.INPUT,
             port.data_type,
             port.display_label,
-            accepted_data_types=(list_type,)
+            accepted_data_types=((list_type, ARRAY_1D) if port.data_type is FLOAT else (list_type,))
             if (list_type := _BATCH_LIST_TYPES.get(port.data_type.id))
             else (),
         )
@@ -126,8 +127,8 @@ def _execute_batch_workflow(
 ) -> Mapping[str, Any]:
     """Execute a child graph for each list entry and aggregate its public outputs.
 
-    Lists define the batch dimension and must all have the same length. Scalar
-    inputs broadcast to every child execution.
+    Lists and 1D arrays on scalar-float inputs define the batch dimension and
+    must all have the same length. Other inputs broadcast to every child run.
     """
     context = _exec_context or ExecContext()
     if set(instance.subworkflows) != {"default"}:
@@ -136,7 +137,12 @@ def _execute_batch_workflow(
     if graph is None:
         raise ValueError("The nested workflow is not initialized")
     graph.sync_boundary_nodes(registry)
-    list_inputs = {name: value for name, value in inputs.items() if isinstance(value, list)}
+    float_inputs = {port.name for port in graph.inputs if port.data_type is FLOAT}
+    list_inputs = {
+        name: value
+        for name, value in inputs.items()
+        if isinstance(value, list) or (name in float_inputs and ARRAY_1D.accepts(value))
+    }
     if not list_inputs:
         raise ValueError("Batch Workflow requires at least one list input")
     lengths = {len(value) for value in list_inputs.values()}
@@ -155,8 +161,12 @@ def _execute_batch_workflow(
     for index in range(batch_size):
         injected = {
             port.node_id: {
-                port.node_port: inputs[port.name][index]
-                if isinstance(inputs[port.name], list)
+                port.node_port: (
+                    float(inputs[port.name][index])
+                    if port.name in float_inputs and ARRAY_1D.accepts(inputs[port.name])
+                    else inputs[port.name][index]
+                )
+                if port.name in list_inputs
                 else inputs[port.name]
             }
             for port in graph.inputs

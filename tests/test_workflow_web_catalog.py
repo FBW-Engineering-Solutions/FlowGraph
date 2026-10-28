@@ -98,7 +98,7 @@ def test_workflow_web_catalog_exports_plaid_dataset_sample_and_list_types() -> N
     }
     assert port_types("extract-plaid-sample", "output") == {
         "sample": "plaid-sample",
-        "timesteps": "list[float]",
+        "timesteps": "array-1d",
     }
     assert port_types("extract-plaid-sample", "input")["dataset"] == "plaid-dataset"
     assert port_types("extract-plaid-time-step", "input")["sample"] == "plaid-sample"

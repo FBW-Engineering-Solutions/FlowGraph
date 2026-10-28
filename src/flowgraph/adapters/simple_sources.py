@@ -5,6 +5,8 @@ import math
 from collections.abc import Mapping
 from typing import Any
 
+import numpy as np
+
 from flowgraph.application.workflow_core import (
     ExecContext,
     NodeDefinition,
@@ -14,10 +16,10 @@ from flowgraph.application.workflow_core import (
 )
 
 from .data_types import (
+    ARRAY_1D,
     BOOLEAN,
     FLOAT,
     INTEGER,
-    LIST_FLOAT,
     LIST_INT,
     LIST_STR,
     STRING,
@@ -279,29 +281,31 @@ SET_LIST_INT = NodeDefinition(
 )
 
 
-def _set_float_list(
+def _set_array_1d(
     _inputs: Mapping[str, Any],
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Output a configured finite list of floating-point values."""
+    """Output a configured finite, read-only one-dimensional float array."""
     value = _parse_list_parameter(parameters)
     if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in value):
         raise TypeError("The configured float list must contain only numbers")
     normalized = [float(item) for item in value]
     if any(not math.isfinite(item) for item in normalized):
         raise ValueError("The configured float list must contain only finite numbers")
-    return {"value": normalized}
+    array = np.asarray(normalized, dtype=float)
+    array.setflags(write=False)
+    return {"value": array}
 
 
-SET_LIST_FLOAT = NodeDefinition(
-    id="set-list[float]",
-    requirements=(),
+SET_ARRAY_1D = NodeDefinition(
+    id="set-array-1d",
+    requirements=("py:numpy",),
     icon="mdi-format-list-numbered-rtl",
-    label="Float List Input",
-    description="Outputs a configured list of float.",
-    ports=(PortDefinition("value", PortDirection.OUTPUT, LIST_FLOAT, "Value"),),
-    executor=_set_float_list,
+    label="1D Array Input",
+    description="Outputs a configured one-dimensional float array.",
+    ports=(PortDefinition("value", PortDirection.OUTPUT, ARRAY_1D, "Value"),),
+    executor=_set_array_1d,
     parameters=(
         ParameterDefinition("value", ParameterKind.LIST_FLOAT, "Value", [], "[1.0, 2.0, 3.0]"),
     ),
@@ -328,5 +332,5 @@ AVAILABLE_NODES = (
     SET_VEC3D,
     SET_LIST_STR,
     SET_LIST_INT,
-    SET_LIST_FLOAT,
+    SET_ARRAY_1D,
 )

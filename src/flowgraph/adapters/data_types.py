@@ -22,6 +22,8 @@ INTEGER = DataType("integer", "Integer", int)
 FLOAT = DataType("float", "Float", float)
 LIST_STR = DataType("list[str]", "List Text", list[str])
 LIST_INT = DataType("list[int]", "List Ints", list[int])
+# JSON-friendly parameter editors and APIs explicitly requiring Python lists.
+# Numeric data ports should normally use ARRAY_1D instead.
 LIST_FLOAT = DataType("list[float]", "List Floats", list[float])
 LIST_ANY = DataType("list[any]", "List Any", list)
 FILE = DataType("filename", "FilePath", FilePath)

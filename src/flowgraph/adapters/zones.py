@@ -8,6 +8,7 @@ from Muscat.ImplicitGeometry import ImplicitGeometryObjects as objects
 from Muscat.ImplicitGeometry import ImplicitGeometryOperators as operators
 
 from flowgraph.adapters.data_types import (
+    ARRAY_1D,
     BOOLEAN,
     FILE,
     FLOAT,
@@ -107,9 +108,20 @@ def _definition(name, label, parameters=(), ports=(), *, operator=False):
             if name == "Plane":
                 zone.SetNormal(values["normal"])
             elif name == "Wrapped":
-                zone.field = np.asarray(values["field"], dtype=float)
-                if zone.field.ndim != 1 or not zone.field.size:
-                    raise ValueError("field must be a nonempty list of signed distances")
+                field = np.asarray(values["field"])
+                if field.ndim == 2 and field.shape[1] == 1:
+                    field = field[:, 0]
+                if field.ndim != 1 or not field.size:
+                    raise ValueError(
+                        f"Wrapped Field requires nonempty scalar data of shape (n,) or (n, 1); "
+                        f"received shape {field.shape}"
+                    )
+                if field.dtype.kind not in "iuf":
+                    raise TypeError("Wrapped Field requires real integer or floating-point values")
+                if not np.all(np.isfinite(field)):
+                    raise ValueError("Wrapped Field requires finite signed distances")
+                zone.field = field.view()
+                zone.field.setflags(write=False)
             elif name == "ExternalSurface":
                 if values["method"] not in ("bulk", "normal"):
                     raise ValueError("method must be bulk or normal")
@@ -161,7 +173,12 @@ _MESH = _input("mesh", MESH_DOCUMENT)
 _ZONE = _input("zone", MUSCAT_ZONE)
 
 AVAILABLE_NODES = (
-    _definition("Wrapped", "Wrapped Field", (_parameter("field", LIST_FLOAT, [0.0]),)),
+    _definition(
+        "Wrapped",
+        "Wrapped Field",
+        (ParameterDefinition("field", LIST_FLOAT, "field", [0.0], port=False),),
+        (_input("field", ARRAY_1D, required=False),),
+    ),
     _definition(
         "ExternalSurface",
         "External Surface",

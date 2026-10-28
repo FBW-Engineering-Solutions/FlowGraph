@@ -96,9 +96,22 @@ provided. Conversions preserve dtype and do not copy array data or modify the
 source. Widening rules are also published in the web catalog so ID-based clients
 can recognize these connections, although the core needs no conversion for them.
 
-These are new port contracts only: existing node ports, `LIST_FLOAT`, list
-parameters, and the separate ImageJ array type remain unchanged. No list-to-array
-or ImageJ-to-array conversion is registered in this step.
+### List and array conversions
+
+`List Floats`, `List Ints`, and the four fixed-size numeric vector types convert
+to read-only 1D NumPy arrays. A Float converts to a one-item array. These
+sequence conversions allocate array storage; existing arrays use the zero-copy
+rules above. A 1D Array converts to `List Floats` (real numeric dtype required)
+or `List Any` when a downstream API specifically requires Python lists. Those
+conversions allocate lists and leave the source unchanged. No ImageJ conversion
+is registered.
+
+Wrapped Field and Vector Statistics use 1D Array inputs; Extract Field
+outputs generic Array. 1D Array Input (`set-array-1d`) and Plaid time
+values output read-only 1D arrays. `LIST_FLOAT` is used for list parameter
+editors, explicit user-code `list[float]` annotations and batch list outputs.
+Float Batch Workflow inputs accept both float lists and 1D arrays;
+array-valued child inputs still represent one value rather than a batch axis.
 
 ## Using a converted connection
 

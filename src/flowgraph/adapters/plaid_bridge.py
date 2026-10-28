@@ -3,6 +3,8 @@
 from collections.abc import Mapping
 from typing import Any
 
+import numpy as np
+
 from flowgraph.application.workflow_core import (
     DataType,
     ExecContext,
@@ -13,7 +15,7 @@ from flowgraph.application.workflow_core import (
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
-from .data_types import LIST_FLOAT, LIST_STR, MESH_DOCUMENT, ParameterKind
+from .data_types import ARRAY_1D, LIST_STR, MESH_DOCUMENT, ParameterKind
 
 PLAID_DATASET = DataType("plaid-dataset", "Plaid dataset", object)
 PLAID_SAMPLE = DataType("plaid-sample", "Plaid sample", object)
@@ -101,7 +103,8 @@ def _extract_plaid_sample(
         dataset = datasetdict[split]
         converter = converterdict[split]
         sample = converter.to_plaid(dataset, sample_number)
-        timesteps = [float(time) for time in sample.get_all_time_values()]
+        timesteps = np.fromiter((float(time) for time in sample.get_all_time_values()), dtype=float)
+        timesteps.setflags(write=False)
     except (AttributeError, KeyError, IndexError, TypeError, ValueError, OSError) as error:
         raise ValueError(
             f"Could not extract Plaid sample: split={split!r}, sample_number={sample_number}"
@@ -112,7 +115,7 @@ def _extract_plaid_sample(
 
 EXTRACT_PLAID_SAMPLE = NodeDefinition(
     id="extract-plaid-sample",
-    requirements=("py:pyplaid",),
+    requirements=("py:pyplaid", "py:numpy"),
     icon="mdi-database-search-outline",
     label="Extract Plaid sample",
     description="Converts one item from a loaded Plaid dataset into a Plaid Sample.",
@@ -120,7 +123,7 @@ EXTRACT_PLAID_SAMPLE = NodeDefinition(
         PortDefinition("dataset", PortDirection.INPUT, PLAID_DATASET, "Dataset"),
         PortDefinition("infos", PortDirection.INPUT, PLAID_INFO, "PLAID_INFO"),
         PortDefinition("sample", PortDirection.OUTPUT, PLAID_SAMPLE, "Sample"),
-        PortDefinition("timesteps", PortDirection.OUTPUT, LIST_FLOAT, "Time steps"),
+        PortDefinition("timesteps", PortDirection.OUTPUT, ARRAY_1D, "Time steps"),
     ),
     executor=_extract_plaid_sample,
     parameters=(
