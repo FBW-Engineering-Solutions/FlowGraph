@@ -47,6 +47,16 @@ def test_workflow_web_catalog_exports_registered_nodes_without_executors() -> No
     )
 
 
+def test_workflow_web_catalog_groups_table_to_mesh_under_mesh_creation() -> None:
+    mesh = next(
+        group for group in workflow_web_catalog()["groups"] if group["label"] == "Mesh Tools"
+    )
+    creation = next(group for group in mesh["subgroups"] if group["label"] == "Mesh Creation")
+    assert "csv-to-mesh" in [node["id"] for node in creation["nodes"]]
+    assert all(group["label"] != "Mesh Gens" for group in mesh["subgroups"])
+    assert sum(node["id"] == "csv-to-mesh" for node in _nodes([mesh])) == 1
+
+
 def test_workflow_web_catalog_groups_sliders_under_input_scalars() -> None:
     groups = workflow_web_catalog()["groups"]
     inputs = next(group for group in groups if group["label"] == "Inputs")
@@ -97,7 +107,7 @@ def test_workflow_web_catalog_exports_plaid_dataset_sample_and_list_types() -> N
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 
-    assert len(nodes) == len(ADAPTERS.node_definitions) == 107
+    assert len(nodes) == len(ADAPTERS.node_definitions) == 109
     assert all(isinstance(node["requirements"], list) for node in nodes.values())
     assert all(
         isinstance(requirement, str)

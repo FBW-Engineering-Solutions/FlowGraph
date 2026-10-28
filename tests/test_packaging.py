@@ -21,7 +21,6 @@ def test_website_documents_every_registered_adapter_node() -> None:
         "Lists/Vectors": "inputs.md",
         "Files": "file.md",
         "Readers": "readers.md",
-        "Mesh Gens": "mesh-gens.md",
         "Mesh Creation": "mesh-creation-tools.md",
         "Filters": "filters.md",
         "Mesh Ops": "mesh-ops.md",
