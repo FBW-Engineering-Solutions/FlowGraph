@@ -30,6 +30,7 @@ def test_website_documents_every_registered_adapter_node() -> None:
         "Controls": "controls.md",
         "Image Tools": "image-tools.md",
         "Table Tools": "table-tools.md",
+        "Vector Tools": "vector-tools.md",
         "Code": "code.md",
         "Workflow": "workflow.md",
         "Sinks": "sinks.md",

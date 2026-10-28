@@ -29,6 +29,7 @@ For definitions created in your own Python code, see
 - [Controls](controls.md)
 - [Image Tools](image-tools.md)
 - [Table Tools](table-tools.md)
+- [Vector Tools](vector-tools.md)
 - [Code](code.md)
 - [Workflow](workflow.md)
 - [External Tools → CoSApp](cosapp.md)
