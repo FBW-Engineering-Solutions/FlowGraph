@@ -10,6 +10,8 @@ from enum import Enum
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, get_args, get_origin
 
+from flowgraph.application.file_dependencies import declared_file_dependencies
+
 if TYPE_CHECKING:
     from flowgraph.application.port_conversions import PortConversion
 
@@ -213,7 +215,18 @@ class WorkflowPort:
 
 @dataclass(frozen=True)
 class NodeDefinition:
-    """Reusable behavior, port contract, and direct execution requirements for a node."""
+    """Reusable behavior, port contract, and direct execution requirements for a node.
+
+    Executors must treat every input as read-only, including nested containers,
+    arrays, mesh data and objects reachable through views. Inputs can be shared
+    with other branches and retained between runs. Produce new output data when
+    transforming values; copy only the storage that needs modification. Neither
+    stateless nor session execution provides mutation detection or rollback.
+    Cache policy controls reuse and side effects, not input ownership. Omitted
+    policy resolves to pure, or external for typed file inputs/parameters or a
+    supplied dependency resolver. Explicit policies override inference; path-only
+    nodes must explicitly declare pure, and actions must explicitly declare always.
+    """
 
     id: str
     icon: str
@@ -231,8 +244,33 @@ class NodeDefinition:
     subworkflows_factory: SubworkflowFactory | None = None
     color: str | None = None
     requirements: tuple[str, ...] = ()
+    cache_policy: str | None = None
+    cache_revision: str = "1"
+    cache_dependencies: Callable[[Mapping[str, Any], Mapping[str, Any]], Any] | None = None
 
     def __post_init__(self) -> None:
+        # None distinguishes omission from an explicit pure path-only override.
+        file_names = tuple(
+            dict.fromkeys(
+                [p.name for p in self.parameters if p.kind.id in {"filename", "ServerFile"}]
+                + [
+                    p.name
+                    for p in self.ports
+                    if p.direction is PortDirection.INPUT
+                    and any(t.id in {"filename", "ServerFile"} for t in p.accepted_types)
+                ]
+            )
+        )
+        policy = self.cache_policy
+        if policy is None:
+            policy = "external" if file_names or self.cache_dependencies is not None else "pure"
+        object.__setattr__(self, "cache_policy", policy)
+        if policy == "external" and self.cache_dependencies is None and file_names:
+            object.__setattr__(self, "cache_dependencies", declared_file_dependencies(file_names))
+        if self.cache_policy not in {"always", "pure", "external", "composite"}:
+            raise ValueError("cache_policy must be always, pure, external, or composite")
+        if self.cache_policy == "external" and self.cache_dependencies is None:
+            raise ValueError("External cache policy requires a dependency resolver")
 
         # add paramters as ports
         parameter_ports = tuple(

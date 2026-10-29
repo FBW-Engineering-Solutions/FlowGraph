@@ -31,6 +31,7 @@ def _select_file(
 
 
 SELECT_FILE = NodeDefinition(
+    cache_policy="pure",
     id="select-file",
     requirements=(),
     icon="mdi-file-find-outline",
@@ -66,6 +67,7 @@ def _select_server_file(
 
 
 SELECT_SERVER_FILE = NodeDefinition(
+    cache_policy="pure",
     id="select-server-file",
     requirements=(),
     icon="mdi-cloud-upload-outline",
@@ -150,6 +152,7 @@ def _read_directory_files(
 
 
 READ_DIRECTORY_FILES = NodeDefinition(
+    cache_policy="always",
     id="read-directory-files",
     requirements=(),
     icon="mdi-file-find-outline",

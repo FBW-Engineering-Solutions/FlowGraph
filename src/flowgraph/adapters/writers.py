@@ -172,6 +172,7 @@ def _write_table(
 
 
 WRITE_MUSCAT = NodeDefinition(
+    cache_policy="pure",
     id="write-muscat",
     requirements=("py:muscat",),
     icon="mdi-file-export-outline",
@@ -188,6 +189,7 @@ WRITE_MUSCAT = NodeDefinition(
 
 
 WRITE_MESHIO = NodeDefinition(
+    cache_policy="pure",
     id="write-meshio",
     requirements=("py:muscat", "py:meshio"),
     icon="mdi-file-swap-outline",
@@ -204,6 +206,7 @@ WRITE_MESHIO = NodeDefinition(
 
 
 WRITE_MESHLANE = NodeDefinition(
+    cache_policy="pure",
     id="write-meshlane",
     requirements=("py:muscat", "py:meshlane"),
     icon="mdi-file-swap-outline",
@@ -220,6 +223,7 @@ WRITE_MESHLANE = NodeDefinition(
 
 
 WRITE_TABLE = NodeDefinition(
+    cache_policy="pure",
     id="write-table",
     requirements=("py:pandas", "py:openpyxl"),
     icon="mdi-file-table-outline",

@@ -39,6 +39,32 @@ def _workflow_json() -> str:
     return json.dumps(workflow_to_dict(workflow))
 
 
+def test_scoped_json_execution_blocks_outdated_inputs_without_upstream_execution():
+    session_id = "scoped-json-regression"
+    payload = _workflow_json()
+    assert (
+        json.loads(execute_workflow_json(payload, options={"session_id": session_id}))["status"]
+        == "ok"
+    )
+    graph = json.loads(payload)
+    graph["nodes"][0]["parameters"]["value"] = "changed"
+    response = json.loads(
+        execute_workflow_json(
+            json.dumps(graph),
+            options={
+                "session_id": session_id,
+                "targets": ["output"],
+                "force": ["output"],
+                "upstream": "none",
+            },
+        )
+    )
+    assert response["status"] == "error"
+    assert response["cache"]["executed"] == []
+    assert response["cache"]["blocked"] == ["output"]
+    workflow_execution.clear_execution_session(session_id)
+
+
 def _show_value_workflow_json() -> str:
     registry = create_node_registry()
     workflow = WorkflowGraph(
