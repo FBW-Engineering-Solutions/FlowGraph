@@ -6,6 +6,7 @@ import json
 import math
 import traceback
 from base64 import b64encode
+from collections import OrderedDict
 from collections.abc import Mapping
 from io import BytesIO
 from pathlib import Path
@@ -22,7 +23,6 @@ from flowgraph.application.node_registry import create_node_registry
 from flowgraph.application.workflow_cli import (
     format_workflow_inspection,
     resolve_workflow_inputs,
-    workflow_outputs,
 )
 from flowgraph.application.workflow_core import (
     NodeExecutionError,
@@ -31,22 +31,43 @@ from flowgraph.application.workflow_core import (
     WorkflowRunResult,
 )
 from flowgraph.application.workflow_io import workflow_from_json
+from flowgraph.application.workflow_session import WorkflowSession
 from flowgraph.domain.mesh_document import MeshDocument
 
 _REGISTRY = None
+_SESSIONS: OrderedDict[str, WorkflowSession] = OrderedDict()
+INCREMENTAL_EXECUTION_VERSION = 1
 
 
-def execute_workflow_json(workflow_json: str) -> str:
+def clear_execution_session(session_id: str) -> None:
+    """Dispose one transport-owned session, without deleting user files."""
+    session = _SESSIONS.pop(session_id, None)
+    if session is not None:
+        session.clear()
+
+
+def _node_ids(options: Mapping[str, Any], key: str) -> set[str] | None:
+    value = options.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise ValueError(f"{key} must be an array of node IDs")
+    return set(value)
+
+
+def execute_workflow_json(workflow_json: str, options: Mapping[str, Any] | None = None) -> str:
     """Execute one workflow JSON document and return a serialized response.
 
     Native Python clients and browser-hosted Python workers share this entry
-    point. The node registry is cached within the calling process, while workflow
-    state is reconstructed for each request. Process management, cancellation,
+    point. Without options execution is stateless. Explicit session options retain
+    bounded runtime results while graph state is reconstructed for each request.
+    Process management, cancellation,
     authentication, and workspace configuration belong to the calling transport.
     Non-finite numbers are transported as JSON null; Python-text displays retain
     their original representations. Runtime values used by nodes are not changed.
     """
     warnings: list[str] = []
+    session = None
     try:
         global _REGISTRY
         if _REGISTRY is None:
@@ -54,11 +75,45 @@ def execute_workflow_json(workflow_json: str) -> str:
         registry = _REGISTRY
         workflow = workflow_from_json(workflow_json, registry, source_name="Workflow execution")
         injected = resolve_workflow_inputs(workflow, {}, on_warning=warnings.append)
-        result = WorkflowExecutor(registry).run(workflow, initial_inputs=injected)
+        if options is not None:
+            if not isinstance(options, Mapping):
+                raise ValueError("Execution options must be an object")
+            session_id = options.get("session_id")
+            if not isinstance(session_id, str) or not 1 <= len(session_id) <= 128:
+                raise ValueError("session_id must be text between 1 and 128 characters")
+            if type(options.get("from_scratch", False)) is not bool:
+                raise ValueError("from_scratch must be a boolean")
+            if type(options.get("missing_only", False)) is not bool:
+                raise ValueError("missing_only must be a boolean")
+            targets, forced = _node_ids(options, "targets"), _node_ids(options, "force")
+            if session_id not in _SESSIONS or _SESSIONS[session_id].registry is not registry:
+                _SESSIONS[session_id] = WorkflowSession(registry)
+            session = _SESSIONS[session_id]
+            _SESSIONS.move_to_end(session_id)
+            while len(_SESSIONS) > 8:
+                _SESSIONS.popitem(last=False)[1].clear()
+            session.metadata = {}
+            result = session.run(
+                workflow,
+                targets=targets,
+                force=forced,
+                from_scratch=options.get("from_scratch", False),
+                upstream=options.get("upstream", "normal"),
+                missing_only=options.get("missing_only", False),
+                initial_inputs=injected,
+            )
+        else:
+            result = WorkflowExecutor(registry).run(workflow, initial_inputs=injected)
         response = {
             "status": "ok",
             "execution_order": list(result.execution_order),
-            "outputs": _json_safe(workflow_outputs(workflow, result)),
+            "outputs": _json_safe(
+                {
+                    port.name: result.node_outputs[port.node_id][port.node_port]
+                    for port in workflow.outputs
+                    if port.node_id in result.node_outputs
+                }
+            ),
             "nodes": _serialize_result(result),
             "display_inputs": _display_result(result.node_inputs),
             "display_images": _display_images(result.node_inputs),
@@ -67,6 +122,15 @@ def execute_workflow_json(workflow_json: str) -> str:
         }
     except Exception as error:  # noqa: BLE001 - the execution boundary serializes all failures
         response = _error_response(error)
+        if isinstance(error, NodeExecutionError) and error.partial_result is not None:
+            response["execution_order"] = list(error.partial_result.execution_order)
+            response["display_inputs"] = _display_result(error.partial_result.node_inputs)
+            response["display_images"] = _display_images(error.partial_result.node_inputs)
+            response["display_meshes"] = _display_meshes(workflow, error.partial_result.node_inputs)
+    if session is not None:
+        response["cache"] = session.metadata
+        response["cache"]["session_id"] = options["session_id"]
+        response["cache"]["version"] = INCREMENTAL_EXECUTION_VERSION
     response["warnings"] = warnings
     return json.dumps(
         _json_safe(response), ensure_ascii=False, separators=(",", ":"), allow_nan=False
@@ -279,4 +343,4 @@ def _json_safe(value: Any) -> Any:
     return {"type": type(value).__name__, "description": str(value)}
 
 
-__all__ = ["execute_workflow_json"]
+__all__ = ["INCREMENTAL_EXECUTION_VERSION", "clear_execution_session", "execute_workflow_json"]

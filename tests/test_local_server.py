@@ -177,6 +177,77 @@ def wait_job(api, identifier):
     pytest.fail("Execution did not finish")
 
 
+def test_incremental_session_retains_objects_and_disposal_starts_cold(api):
+    options = {"session_id": "test-session"}
+    status, job = request(
+        api,
+        "POST",
+        "/api/v1/executions",
+        {
+            "workflow": workflow(),
+            "options": options,
+        },
+    )
+    assert status == 202
+    first = wait_job(api, job["id"])["result"]
+    assert first["status"] == "ok"
+    worker = api.jobs.sessions["test-session"][0]
+    _, job = request(
+        api,
+        "POST",
+        "/api/v1/executions",
+        {
+            "workflow": workflow(),
+            "options": options,
+        },
+    )
+    second = wait_job(api, job["id"])["result"]
+    assert second["execution_order"] == []
+    assert set(second["cache"]["reused"]) == {"source", "output"}
+    assert second["outputs"] == first["outputs"]
+    assert api.jobs.sessions["test-session"][0] is worker
+    assert request(api, "POST", "/api/v1/execution-sessions/dispose", options)[0] == 200
+    assert worker.poll() is not None
+    _, job = request(
+        api,
+        "POST",
+        "/api/v1/executions",
+        {
+            "workflow": workflow(),
+            "options": options,
+        },
+    )
+    third = wait_job(api, job["id"])["result"]
+    assert third["execution_order"] == ["source", "output"]
+    assert third["cache"]["epoch"] != second["cache"]["epoch"]
+
+
+def test_incremental_cancel_loses_session_and_recovers(api):
+    options = {"session_id": "cancel-test"}
+    _, job = request(
+        api,
+        "POST",
+        "/api/v1/executions",
+        {
+            "workflow": workflow("def Execute():\n    while True: pass\n"),
+            "options": options,
+        },
+    )
+    worker = api.jobs.sessions["cancel-test"][0]
+    assert request(api, "POST", f"/api/v1/executions/{job['id']}/cancel", {})[0] == 200
+    assert worker.poll() is not None
+    _, job = request(
+        api,
+        "POST",
+        "/api/v1/executions",
+        {
+            "workflow": workflow(),
+            "options": options,
+        },
+    )
+    assert wait_job(api, job["id"])["result"]["status"] == "ok"
+
+
 def test_runtime_catalog_and_authentication(api):
     status, runtime = request(api, "GET", "/api/v1/runtime")
     assert status == 200

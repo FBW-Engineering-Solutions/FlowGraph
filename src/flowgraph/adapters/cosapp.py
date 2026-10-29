@@ -169,7 +169,7 @@ COSAPP_WORKFLOW = NodeDefinition(
             "",
             "Path to a trusted Python file defining the CoSApp model",
             file_patterns=("*.py",),
-            port=False,
+            port=True,
         ),
         ParameterDefinition(
             "factory",

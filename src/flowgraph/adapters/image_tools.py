@@ -470,6 +470,7 @@ PILLOW_TO_IMAGEJ = NodeDefinition(
 
 
 WRITE_IMAGE = NodeDefinition(
+    cache_policy="always",
     id="write-image",
     requirements=("py:pillow",),
     icon="mdi-image-arrow-up-outline",

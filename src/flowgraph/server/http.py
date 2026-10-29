@@ -107,7 +107,12 @@ class LocalServer(ThreadingHTTPServer):
             "status": "Native Python backend ready.",
             "workflow_format": WORKFLOW_FORMAT,
             "workflow_format_version": WORKFLOW_FORMAT_VERSION,
-            "capabilities": {"mountDirectory": False, "cancelExecution": True},
+            "capabilities": {
+                "mountDirectory": False,
+                "cancelExecution": True,
+                "incrementalExecution": 1,
+                "scopedExecution": 1,
+            },
             "directory": str(self.workspace.root),
             "packages": packages,
             "versions": versions,
@@ -249,7 +254,14 @@ class ApiHandler(BaseHTTPRequestHandler):
                 workflow = body.get("workflow")
                 if not isinstance(workflow, dict):
                     raise ApiError(400, "workflow must be a workflow JSON object")
-                self._reply(202, self.server.jobs.submit(workflow))
+                self._reply(202, self.server.jobs.submit(workflow, body.get("options")))
+            elif method == "POST" and path == "/api/v1/execution-sessions/dispose":
+                body = self._body(json_body=True)
+                session_id = body.get("session_id")
+                if not isinstance(session_id, str):
+                    raise ApiError(400, "session_id must be text")
+                self.server.jobs.dispose_session(session_id)
+                self._reply(200, {"status": "ok"})
             elif path.startswith("/api/v1/executions/"):
                 parts = path.removeprefix("/api/v1/executions/").split("/")
                 if method == "GET" and len(parts) == 1:

@@ -9,7 +9,14 @@ for compatible external clients.
 > development, experimentation, and early adopter feedback. APIs and workflow
 > behavior may change before `1.0.0`. See [`Release Policy`](docs/policies/release-policy.md).
 
-## Development
+## Incremental workflow execution
+
+`WorkflowExecutor` remains stateless. Use `WorkflowSession` for selected targets,
+dependency-aware cache reuse, forced runs and session lifecycle. See
+[`Incremental execution`](doc/reference/incremental-execution.md) for the Python
+API, node safety contracts, transport options and resource limits.
+
+## Development setup
 
 ```bash
 uv sync --extra dev

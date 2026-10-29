@@ -13,10 +13,10 @@ from flowgraph.application.workflow_core import (
     ParameterDefinition,
     PortDefinition,
     PortDirection,
-    WorkflowExecutor,
     WorkflowGraph,
     WorkflowRunResult,
 )
+from flowgraph.application.workflow_session import run_child
 
 from .data_types import (
     ANY,
@@ -62,6 +62,8 @@ def _execute_workflow(
     _parameters: Mapping[str, Any],
     registry: NodeRegistry,
     _exec_context: ExecContext | None = None,
+    *,
+    session_key: str = "default",
 ) -> Mapping[str, Any]:
     """Execute the child graph with values supplied to its public inputs."""
     context = _exec_context or ExecContext()
@@ -74,11 +76,14 @@ def _execute_workflow(
     injected: dict[str, dict[str, Any]] = {}
     for port in graph.inputs:
         injected.setdefault(port.node_id, {})[port.node_port] = inputs[port.name]
-    nested_result: WorkflowRunResult = WorkflowExecutor(
+    nested_result: WorkflowRunResult = run_child(
+        graph,
         registry,
+        key=session_key,
         parallel_tasks=context.parallel_tasks,
         gpu_available=context.gpu_available,
-    ).run(graph, initial_inputs=injected)
+        initial_inputs=injected,
+    )
     outputs = {
         port.name: nested_result.node_outputs[port.node_id][port.node_port]
         for port in graph.outputs
@@ -153,11 +158,6 @@ def _execute_batch_workflow(
     batch_size = lengths.pop()
     results: list[WorkflowRunResult] = []
     outputs = {port.name: [] for port in graph.outputs}
-    executor = WorkflowExecutor(
-        registry,
-        parallel_tasks=context.parallel_tasks,
-        gpu_available=context.gpu_available,
-    )
     for index in range(batch_size):
         injected = {
             port.node_id: {
@@ -171,7 +171,14 @@ def _execute_batch_workflow(
             }
             for port in graph.inputs
         }
-        result = executor.run(graph, initial_inputs=injected)
+        result = run_child(
+            graph,
+            registry,
+            key=f"batch:{index}",
+            initial_inputs=injected,
+            parallel_tasks=context.parallel_tasks,
+            gpu_available=context.gpu_available,
+        )
         results.append(result)
         for port in graph.outputs:
             outputs[port.name].append(result.node_outputs[port.node_id][port.node_port])
@@ -184,6 +191,7 @@ def _empty_workflow() -> dict[str, WorkflowGraph]:
 
 
 RUN_WORKFLOW = NodeDefinition(
+    cache_policy="composite",
     id="run-workflow",
     requirements=(),
     icon="mdi-play-network-outline",
@@ -198,6 +206,7 @@ RUN_WORKFLOW = NodeDefinition(
 )
 
 BATCH_WORKFLOW = NodeDefinition(
+    cache_policy="composite",
     id="batch-workflow",
     requirements=(),
     icon="mdi-format-list-numbered",
@@ -267,10 +276,18 @@ def _execute_conditional(
         raise TypeError("Conditional Workflow condition must be a boolean")
     graph = instance.subworkflows["true" if condition else "false"]
     selected = NodeInstance(instance.id, "run-workflow", subworkflows={"default": graph})
-    return _execute_workflow(selected, inputs, parameters, registry, exec_context)
+    return _execute_workflow(
+        selected,
+        inputs,
+        parameters,
+        registry,
+        exec_context,
+        session_key="true" if condition else "false",
+    )
 
 
 CONDITIONAL_WORKFLOW = NodeDefinition(
+    cache_policy="composite",
     id="conditional-workflow",
     icon="mdi-source-branch",
     label="Conditional Workflow",
