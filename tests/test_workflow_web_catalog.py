@@ -107,7 +107,7 @@ def test_workflow_web_catalog_exports_plaid_dataset_sample_and_list_types() -> N
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 
-    assert len(nodes) == len(ADAPTERS.node_definitions) == 110
+    assert len(nodes) == len(ADAPTERS.node_definitions) == 111
     assert all(isinstance(node["requirements"], list) for node in nodes.values())
     assert all(
         isinstance(requirement, str)
@@ -252,6 +252,12 @@ def test_extra_groups_reject_duplicate_built_in_ids(tmp_path: Path) -> None:
 
 def test_workflow_web_catalog_exports_expandable_port_capacity() -> None:
     nodes = _nodes(workflow_web_catalog()["groups"])
+    bridge = next(node for node in nodes if node["id"] == "paraview-bridge")
+    assert [(port["name"], port["expandable"]) for port in bridge["ports"]] == [
+        ("mesh", 10),
+        ("table", 10),
+        ("image", 10),
+    ]
     aggregate = next(node for node in nodes if node["id"] == "aggregate-lists-to-table")
 
     assert aggregate["ports"] == [

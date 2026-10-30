@@ -22,6 +22,7 @@ from flowgraph.adapters.imagej import AVAILABLE_NODES as IMAGEJ_AVAILABLE_NODES
 from flowgraph.adapters.mesh_creation_tools import AVAILABLE_NODES as MESH_CREATION_AVAILABLE_NODES
 from flowgraph.adapters.mesh_generations import CSV_TO_MESH
 from flowgraph.adapters.mesh_ops import AVAILABLE_NODES as MESH_OPS_AVAILABLE_NODES
+from flowgraph.adapters.paraview import PARAVIEW_BRIDGE
 from flowgraph.adapters.plaid_bridge import AVAILABLE_NODES as PLAID_AVAILABLE_NODES
 from flowgraph.adapters.readers import (
     LOAD_CSV,
@@ -144,7 +145,7 @@ ADAPTERS = AdapterCatalog(
         AdapterGroup("Vector Tools", VECTOR_TOOLS_AVAILABLE_NODES),
         AdapterGroup("Code", USER_CODE_AVAILABLE_NODES + IMAGEJ_AVAILABLE_NODES),
         AdapterGroup("Workflow", WORKFLOW_INTERFACE_AVAILABLE_NODES + WORKFLOW_AVAILABLE_NODES),
-        AdapterGroup("Sinks", SINKS_AVAILABLE_NODES),
+        AdapterGroup("Sinks", SINKS_AVAILABLE_NODES + (PARAVIEW_BRIDGE,)),
         AdapterGroup("Doc", DOCUMENTATION_AVAILABLE_NODES),
         AdapterGroup(
             "External Tools",

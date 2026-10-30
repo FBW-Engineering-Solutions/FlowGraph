@@ -17,7 +17,7 @@ from Muscat.MeshTools.MeshInspectionTools import ExtractElementsByElementFilter
 from Muscat.MeshTools.MeshModificationTools import ComputeSkin
 from Muscat.MeshTools.MeshTetrahedrization import Tetrahedrization
 from Muscat.Simple import ED, ElementFilter
-from PIL.Image import Image
+from PIL.Image import Image, Resampling
 
 from flowgraph.application.node_registry import create_node_registry
 from flowgraph.application.workflow_cli import (
@@ -37,6 +37,7 @@ from flowgraph.domain.mesh_document import MeshDocument
 _REGISTRY = None
 _SESSIONS: OrderedDict[str, WorkflowSession] = OrderedDict()
 INCREMENTAL_EXECUTION_VERSION = 1
+IMAGE_PREVIEW_MAX_SIZE = 1024
 
 
 def clear_execution_session(session_id: str) -> None:
@@ -116,7 +117,7 @@ def execute_workflow_json(workflow_json: str, options: Mapping[str, Any] | None 
             ),
             "nodes": _serialize_result(result),
             "display_inputs": _display_result(result.node_inputs),
-            "display_images": _display_images(result.node_inputs),
+            "display_images": _display_images(workflow, result.node_inputs),
             "display_meshes": _display_meshes(workflow, result.node_inputs),
             "projection": format_workflow_inspection(workflow, registry),
         }
@@ -125,7 +126,7 @@ def execute_workflow_json(workflow_json: str, options: Mapping[str, Any] | None 
         if isinstance(error, NodeExecutionError) and error.partial_result is not None:
             response["execution_order"] = list(error.partial_result.execution_order)
             response["display_inputs"] = _display_result(error.partial_result.node_inputs)
-            response["display_images"] = _display_images(error.partial_result.node_inputs)
+            response["display_images"] = _display_images(workflow, error.partial_result.node_inputs)
             response["display_meshes"] = _display_meshes(workflow, error.partial_result.node_inputs)
     if session is not None:
         response["cache"] = session.metadata
@@ -154,26 +155,37 @@ def _display_result(values: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[s
 
 
 def _display_images(
+    workflow: Any,
     values: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, dict[str, dict[str, Any]]]:
-    """Return browser-ready PNG previews for Pillow image inputs."""
+    """Return bounded sink previews, retaining original dimensions for coordinates."""
     previews: dict[str, dict[str, dict[str, Any]]] = {}
-    for node_id, node_values in values.items():
-        node_previews: dict[str, dict[str, Any]] = {}
-        for port_name, value in node_values.items():
-            if not isinstance(value, Image):
-                continue
+    encoded: dict[int, dict[str, Any]] = {}
+    for node in workflow.nodes:
+        if node.definition_id != "local-view":
+            continue
+        value = values.get(node.id, {}).get("input")
+        if not isinstance(value, Image):
+            continue
+        key = id(value)
+        if key not in encoded:
+            preview = value
+            if max(value.size) > IMAGE_PREVIEW_MAX_SIZE:
+                scale = IMAGE_PREVIEW_MAX_SIZE / max(value.size)
+                size = tuple(max(1, round(dimension * scale)) for dimension in value.size)
+                preview = value.resize(size, Resampling.LANCZOS, reducing_gap=3.0)
             buffer = BytesIO()
-            value.save(buffer, format="PNG")
-            node_previews[str(port_name)] = {
+            preview.save(buffer, format="PNG")
+            encoded[key] = {
                 "mime_type": "image/png",
                 "data": b64encode(buffer.getvalue()).decode("ascii"),
                 "width": value.width,
                 "height": value.height,
                 "mode": value.mode,
+                "preview_width": preview.width,
+                "preview_height": preview.height,
             }
-        if node_previews:
-            previews[str(node_id)] = node_previews
+        previews[str(node.id)] = {"input": encoded[key]}
     return previews
 
 

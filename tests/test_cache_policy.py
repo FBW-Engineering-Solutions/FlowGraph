@@ -177,9 +177,17 @@ def test_builtin_computations_and_exception_classification():
         WRITE_MUSCAT,
         WRITE_MESHIO,
         WRITE_MESHLANE,
-        READ_DIRECTORY_FILES,
         USER_FUNCTION,
         DOWNLOAD_URL,
     ):
+        print(item.id)
+        print(item.cache_policy)
+        assert item.cache_policy == "pure"
+
+    for item in (
+        READ_DIRECTORY_FILES,
+    ):
+        print(item.id)
+        print(item.cache_policy)
         assert item.cache_policy == "always"
     assert RUN_WORKFLOW.cache_policy == "composite"
