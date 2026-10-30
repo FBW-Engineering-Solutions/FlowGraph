@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from base64 import b64decode
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -22,7 +24,11 @@ from flowgraph.application.workflow_core import (
     WorkflowGraph,
     WorkflowRunResult,
 )
-from flowgraph.application.workflow_execution import _display_meshes, execute_workflow_json
+from flowgraph.application.workflow_execution import (
+    _display_images,
+    _display_meshes,
+    execute_workflow_json,
+)
 from flowgraph.application.workflow_io import workflow_to_dict
 
 
@@ -259,6 +265,71 @@ def test_execute_workflow_json_returns_png_preview_for_show_image() -> None:
     assert preview["height"] == 2
     assert preview["mode"] == "RGBA"
     assert preview["data"].startswith("iVBOR")
+    assert preview["preview_width"] == 3
+    assert preview["preview_height"] == 2
+
+
+@pytest.mark.parametrize(
+    ("size", "expected"),
+    [
+        ((3000, 4000), (768, 1024)),
+        ((4000, 3000), (1024, 768)),
+        ((1024, 1024), (1024, 1024)),
+        ((7, 5), (7, 5)),
+        ((1, 4000), (1, 1024)),
+    ],
+)
+def test_image_preview_preserves_original_dimensions_pixels_and_alpha(size, expected):
+    registry = create_node_registry()
+    workflow = WorkflowGraph([registry.create_instance("local-view", "display")])
+    image = PillowImage.new("RGBA", size, (12, 34, 56, 78))
+    original = image.tobytes()
+
+    preview = _display_images(workflow, {"display": {"input": image}})["display"]["input"]
+
+    assert (preview["width"], preview["height"]) == size
+    assert (preview["preview_width"], preview["preview_height"]) == expected
+    assert preview["mode"] == "RGBA"
+    with PillowImage.open(BytesIO(b64decode(preview["data"]))) as decoded:
+        assert decoded.size == expected
+        assert decoded.mode == "RGBA"
+        assert decoded.getpixel((0, 0))[3] == 78
+    assert image.size == size
+    assert image.tobytes() == original
+
+
+def test_image_previews_only_encode_display_sinks_and_reuse_shared_images(monkeypatch):
+    registry = create_node_registry()
+    workflow = WorkflowGraph(
+        [
+            registry.create_instance("local-view", "first"),
+            registry.create_instance("local-view", "second"),
+            registry.create_instance("show-value", "other"),
+            registry.create_instance("local-view", "empty"),
+        ]
+    )
+    image = PillowImage.new("RGB", (10, 10))
+    save = PillowImage.Image.save
+    calls = []
+
+    def counted_save(self, *args, **kwargs):
+        calls.append(self)
+        return save(self, *args, **kwargs)
+
+    monkeypatch.setattr(PillowImage.Image, "save", counted_save)
+    previews = _display_images(
+        workflow,
+        {
+            "first": {"input": image},
+            "second": {"input": image},
+            "other": {"value": image},
+            "empty": {"input": None},
+        },
+    )
+
+    assert set(previews) == {"first", "second"}
+    assert previews["first"]["input"] is previews["second"]["input"]
+    assert calls == [image]
 
 
 def test_display_meshes_projects_surface_without_changing_the_input() -> None:
