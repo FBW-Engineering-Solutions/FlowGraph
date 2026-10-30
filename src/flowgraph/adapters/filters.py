@@ -6,7 +6,13 @@ from typing import Any
 import Muscat.MeshContainers.ElementsDescription as ED
 import numpy as np
 from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter, NodeFilter
-from Muscat.MeshContainers.Filters.FilterOperators import FilterOperatorBase
+from Muscat.MeshContainers.Filters.FilterOperators import (
+    ComplementaryFilter,
+    DifferenceFilter,
+    FilterOperatorBase,
+    IntersectionFilter,
+    UnionFilter,
+)
 from Muscat.MeshTools.MeshInspectionTools import ExtractElementsByElementFilter
 
 from flowgraph.adapters.readers import MESH_DOCUMENT
@@ -271,4 +277,73 @@ FILTER_MESH_WITH_MUSCAT = NodeDefinition(
         PortDefinition("mesh", PortDirection.OUTPUT, MESH_DOCUMENT, "Filtered mesh"),
     ),
     executor=_filter_mesh,
+)
+
+
+def _selector_operator(operator):
+    def execute(inputs, parameters, _exec_context=None):
+        if operator in (UnionFilter, IntersectionFilter):
+            names = sorted(
+                (name for name in inputs if name.startswith("filter_")),
+                key=lambda name: int(name.rsplit("_", 1)[1]),
+            )
+            filters = [inputs[name] for name in names]
+            if not filters:
+                raise ValueError("At least one selector must be connected")
+        elif operator is DifferenceFilter:
+            filters = [inputs["first"], inputs["second"]]
+        else:
+            filters = [inputs["filter"]]
+        if not all(isinstance(value, (ElementFilter, FilterOperatorBase)) for value in filters):
+            raise TypeError("Selector operators require element selectors")
+        return {"filter": operator(filters=filters)}
+
+    return execute
+
+
+def _operator_node(name, label, operator):
+    if operator in (UnionFilter, IntersectionFilter):
+        inputs = (
+            PortDefinition(
+                "filter",
+                PortDirection.INPUT,
+                MUSCAT_ELEMENT_FILTER,
+                "Selector",
+                required=False,
+                expandable=128,
+            ),
+        )
+    else:
+        names = ("first", "second") if operator is DifferenceFilter else ("filter",)
+        inputs = tuple(
+            PortDefinition(name, PortDirection.INPUT, MUSCAT_ELEMENT_FILTER, name.title())
+            for name in names
+        )
+    return NodeDefinition(
+        id=name,
+        label=label,
+        icon="mdi-filter-outline",
+        requirements=("py:muscat",),
+        description=f"{label} of element selections; evaluated on the consuming mesh.",
+        ports=(
+            *inputs,
+            PortDefinition("filter", PortDirection.OUTPUT, MUSCAT_ELEMENT_FILTER, "Selector"),
+        ),
+        executor=_selector_operator(operator),
+    )
+
+
+SELECTOR_UNION = _operator_node("selector-union", "Selector Union", UnionFilter)
+SELECTOR_INTERSECTION = _operator_node(
+    "selector-intersection", "Selector Intersection", IntersectionFilter
+)
+SELECTOR_DIFFERENCE = _operator_node("selector-difference", "Selector Difference", DifferenceFilter)
+SELECTOR_COMPLEMENT = _operator_node(
+    "selector-complement", "Selector Complement", ComplementaryFilter
+)
+SELECTOR_OPERATORS = (
+    SELECTOR_UNION,
+    SELECTOR_INTERSECTION,
+    SELECTOR_DIFFERENCE,
+    SELECTOR_COMPLEMENT,
 )

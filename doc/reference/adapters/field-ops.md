@@ -8,6 +8,20 @@ description: Nodes that extract mesh fields and transfer fields and tags between
 
 # Field-operation nodes
 
+## Set Mesh Field (`set-mesh-field`)
+
+Requires `mesh: Mesh document` and `field: Array`; outputs `mesh: Mesh document`.
+Connectable parameters are `fieldName="field"` and `entity="node"` (Node or
+Element). A field must be a 1D scalar or 2D multi-component array whose first
+dimension matches the selected entity count. Names are nonempty and case-sensitive.
+Existing fields may be replaced, except reserved `flowgraph_node_id` and
+`flowgraph_element_id`. No interpolation or dtype conversion is performed.
+
+The output mesh has independent metadata with read-only views of field and mesh
+arrays; data storage is shared without copying. Upstream owners must not mutate
+shared arrays after publishing them. This completes the workflow
+**Extract Field → Calculator → Set Mesh Field → Write Mesh**.
+
 ## Extract Field (`extract-field`)
 
 Available under **Mesh Tools → Field Ops**. Requires `mesh: Mesh document`;

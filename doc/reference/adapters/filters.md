@@ -8,6 +8,21 @@ description: Nodes that create and apply Muscat element filters.
 
 # Filter nodes
 
+## Selector operators
+
+- **Selector Union** (`selector-union`) and **Selector Intersection**
+  (`selector-intersection`) accept 1–128 expandable element-selector inputs
+  `filter_1` … `filter_128`; a single connection is an identity operation.
+- **Selector Difference** (`selector-difference`) accepts `first`, `second` and
+  subtracts the second selection from the first.
+- **Selector Complement** (`selector-complement`) accepts `filter` and selects
+  every element not selected by it, relative to the consuming mesh (all dimensions).
+
+All emit `filter: Selector`, connect to Filter Mesh, Create Tag, or measurement
+nodes, and can be nested. They combine complete element selections, unlike zone
+operators which combine implicit geometry. Node-only selectors are not accepted.
+Union/Intersection require at least one connected input when executed.
+
 Both selectors expose optional `nFilter: Node Selector` and
 `eFilter: Selector` input connectors. Connect a Node Selector's `filter` output
 to `nFilter`, or an Element Selector's `filter` output to either `eFilter` or
