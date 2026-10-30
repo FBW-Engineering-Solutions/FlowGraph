@@ -369,6 +369,8 @@ class GatewayServer(socketserver.TCPServer):
     def __init__(
         self, address: tuple[str, int], updates: queue.Queue, allowed_origins: tuple[str, ...] = ()
     ):
+        if any("\r" in origin or "\n" in origin for origin in allowed_origins):
+            raise ValueError("Allowed origins must not contain CR or LF")
         self.updates = updates
         self.allowed_origins = allowed_origins
         super().__init__(address, _Handler)
@@ -447,13 +449,16 @@ class _HTTPHandler(BaseHTTPRequestHandler):
     def _reply(self, status: int, error: str | None = None) -> None:
         body = json.dumps({"ok": error is None, **({"error": error} if error else {})}).encode()
         self.send_response(status)
-        origin = self.headers.get("Origin")
-        if origin in self.server.allowed_origins:
-            self.send_header("Access-Control-Allow-Origin", origin)
-            self.send_header("Vary", "Origin")
-            self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
-            self.send_header("Access-Control-Allow-Private-Network", "true")
+        request_origin = self.headers.get("Origin")
+        for allowed_origin in self.server.allowed_origins:
+            if request_origin == allowed_origin:
+                # Emit trusted configuration, never the request header itself.
+                self.send_header("Access-Control-Allow-Origin", allowed_origin)
+                self.send_header("Vary", "Origin")
+                self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.send_header("Access-Control-Allow-Private-Network", "true")
+                break
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Connection", "close")
@@ -810,6 +815,8 @@ def main(argv: list[str] | None = None) -> int:
     ):
         parser.error("interval must be finite and positive; max-sources must be positive")
     for origin in args.allow_origin:
+        if "\r" in origin or "\n" in origin:
+            parser.error("--allow-origin must not contain CR or LF")
         parsed = urlsplit(origin)
         if (
             parsed.scheme not in {"http", "https"}

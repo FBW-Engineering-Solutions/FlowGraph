@@ -25,6 +25,7 @@ from flowgraph.paraview_gateway import (
     GatewayServer,
     LiveGateway,
     Update,
+    _HTTPHandler,
     _read_frame,
     _write_frame,
     data_transaction,
@@ -539,9 +540,12 @@ def http_frame(metadata=None, payload=None):
     return HEADER.pack(len(encoded), len(payload)) + encoded + payload
 
 
-def test_http_upload_preflight_and_native_on_same_port():
-    origin = "http://localhost:8082"
-    with receiver(allowed_origins=(origin,)) as (port, accepted):
+@pytest.mark.parametrize("origin", ["http://localhost:8082", "https://editor.example"])
+def test_http_upload_preflight_and_native_on_same_port(origin):
+    with receiver(allowed_origins=("http://localhost:8082", "https://editor.example")) as (
+        port,
+        accepted,
+    ):
         client = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
         client.request(
             "OPTIONS",
@@ -569,6 +573,7 @@ def test_http_upload_preflight_and_native_on_same_port():
         )
         reply = client.getresponse()
         assert reply.status == 200
+        assert reply.getheader("Access-Control-Allow-Origin") == origin
         assert json.loads(reply.read())["ok"]
         client.close()
         send_dataset("native-node", "table", to_vtk("table", {"x": [7]}), port=port)
@@ -591,6 +596,44 @@ def test_http_denies_untrusted_origin(origin):
         assert "--allow-origin" in reply.read().decode()
         client.close()
         assert accepted == []
+
+
+def test_http_reply_uses_configured_origin_value():
+    configured_origin = "http://localhost:8082"
+    request_origin = configured_origin.encode().decode()
+    assert request_origin == configured_origin
+    assert request_origin is not configured_origin
+    headers = []
+    handler = SimpleNamespace(
+        headers={"Origin": request_origin},
+        server=SimpleNamespace(allowed_origins=(configured_origin,)),
+        send_response=lambda status: None,
+        send_header=lambda name, value: headers.append((name, value)),
+        end_headers=lambda: None,
+        wfile=SimpleNamespace(write=lambda body: None),
+    )
+
+    _HTTPHandler._reply(handler, 200)
+
+    origins = [value for name, value in headers if name == "Access-Control-Allow-Origin"]
+    assert len(origins) == 1
+    assert origins[0] is configured_origin
+
+
+@pytest.mark.parametrize("newline", ["\r", "\n", "\r\n"])
+@pytest.mark.parametrize("position", ["leading", "embedded", "trailing"])
+def test_allow_origin_rejects_newlines(newline, position, capsys):
+    origin = {
+        "leading": f"{newline}http://localhost:8082",
+        "embedded": f"http://local{newline}host:8082",
+        "trailing": f"http://localhost:8082{newline}",
+    }[position]
+    with pytest.raises(ValueError, match="must not contain CR or LF"):
+        GatewayServer(("127.0.0.1", 0), queue.Queue(), (origin,))
+    with pytest.raises(SystemExit) as caught:
+        main(["--allow-origin", origin])
+    assert caught.value.code == 2
+    assert "--allow-origin must not contain CR or LF" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("body", [b"bad", HEADER.pack(100, 100) + b"x", http_frame([], b"xml")])
