@@ -16,9 +16,11 @@ from flowgraph.adapters.filters import (
     CREATE_MUSCAT_ELEMENT_FILTER,
     CREATE_MUSCAT_NODE_FILTER,
     FILTER_MESH_WITH_MUSCAT,
+    SELECTOR_OPERATORS,
 )
 from flowgraph.adapters.image_tools import AVAILABLE_NODES as IMAGE_TOOLS_AVAILABLE_NODES
 from flowgraph.adapters.imagej import AVAILABLE_NODES as IMAGEJ_AVAILABLE_NODES
+from flowgraph.adapters.mesh_analysis import MESH_NODES, SET_MESH_FIELD
 from flowgraph.adapters.mesh_creation_tools import AVAILABLE_NODES as MESH_CREATION_AVAILABLE_NODES
 from flowgraph.adapters.mesh_generations import CSV_TO_MESH
 from flowgraph.adapters.mesh_ops import AVAILABLE_NODES as MESH_OPS_AVAILABLE_NODES
@@ -131,11 +133,12 @@ ADAPTERS = AdapterCatalog(
                         CREATE_MUSCAT_ELEMENT_FILTER,
                         CREATE_MUSCAT_NODE_FILTER,
                         FILTER_MESH_WITH_MUSCAT,
-                    ),
+                    )
+                    + SELECTOR_OPERATORS,
                     subgroups=(AdapterGroup("Zones", ZONE_AVAILABLE_NODES),),
                 ),
-                AdapterGroup("Mesh Ops", MESH_OPS_AVAILABLE_NODES),
-                AdapterGroup("Field Ops", FIELD_OPS_AVAILABLE_NODES),
+                AdapterGroup("Mesh Ops", MESH_OPS_AVAILABLE_NODES + MESH_NODES),
+                AdapterGroup("Field Ops", FIELD_OPS_AVAILABLE_NODES + (SET_MESH_FIELD,)),
                 AdapterGroup("File Conversion", (MESH_FILE_CONVERSION,)),
                 AdapterGroup("Writers", (WRITE_MUSCAT, WRITE_MESHLANE, WRITE_MESHIO, WRITE_TABLE)),
             ),

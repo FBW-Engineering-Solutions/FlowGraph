@@ -45,3 +45,35 @@ or `mmg` backend. Optional `levelset`, `solution`, and `metric` inputs override
 matching mesh node fields when connected. The remesher and backend options must
 each be JSON objects. The operation returns a new mesh document; it requires a
 working remeshing backend in the local environment.
+
+## Boundary, inspection, and cleanup
+
+These nodes leave inputs unchanged and publish read-only array views, sharing
+unchanged buffers rather than copying them.
+
+| Node (ID) | Contract |
+| --- | --- |
+| **Extract Skin** (`extract-skin`) | `mesh` → `mesh`. Connectable integer `dimensionality=-1` selects the highest element dimension automatically; explicit values are 1, 2, 3. |
+| **Mesh Measure** (`mesh-measure`) | `mesh`, optional element `filter` → Float `measure`. Defaults to the highest element dimension. Empty selections return zero; mixed-dimensional selections are rejected. |
+| **Element Measures** (`element-measures`) | `mesh`, optional element `filter` → read-only 1D arrays `measures`, `indices`. Without a selector includes all dimensions. |
+| **Element Centers** (`element-centers`) | `mesh` → read-only 2D array `centers` in global element order: arithmetic means of element node coordinates. |
+| **Merge Duplicate Nodes** (`merge-duplicate-nodes`) | `mesh` → `mesh`, read-only integer `indices` of retained source nodes. Connectable Float `tolerance=0.0`: exact matching; positive finite values merge nearby nodes. |
+| **Remove Duplicate Elements** (`remove-duplicate-elements`) | `mesh` → `mesh`. Equal node sets within each element type are duplicates, including permutations. |
+
+Skin retains all source nodes, original node IDs, nodal fields and node tags.
+It creates a `Skin` element tag and fresh positional FlowGraph element IDs;
+source element fields/tags do not transfer. Empty or point-only meshes are
+rejected. Use **Remove Lonely Nodes** afterward to compact the boundary.
+
+Measures are lengths (1D), areas (2D), or volumes (3D). Element Measures pairs
+values with **global positional indices**, not stored `flowgraph_element_id`
+values. Filtered results are compact, not full-mesh fields. Mixed-dimensional
+outputs may have different units: select one dimension before summing. The full
+mesh measure array is evaluated before gathering a selection for reliable alignment.
+
+Duplicate-node cleanup remaps connectivity/tags and retains representative nodal
+fields and original/FlowGraph IDs without averaging conflicts. Duplicate-element
+cleanup merges tags and keeps the first duplicate's fields and original ID.
+Output order follows Muscat connectivity ordering; IDs need not be contiguous.
+Node merging may create duplicate elements: chain both cleanup nodes if needed.
+Neither cleanup implicitly removes unused nodes.
