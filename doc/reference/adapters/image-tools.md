@@ -39,7 +39,14 @@ dimensions, crop regions, color modes, and image inputs are reported as actionab
 **Image Fluency Metrics** has local (non-port) parameters
 `complexity_rotate=False`, `self_similarity_full=False`, and
 `symmetry_shift_range=0.05` (from 0 to 1). The metrics are separate float
-outputs; connect only the values needed downstream. **Pillow To ImageJ** has no
+outputs; only connected outputs (including exported workflow outputs) are computed
+during workflow execution. For example, connecting only `contrast` skips FFT-based
+self-similarity, symmetry searches, and gzip compression. Unconsumed outputs retain
+their declared keys with `NaN` placeholders (`null` in JSON responses). Direct
+executor calls without an execution context compute all metrics. Channels are
+converted once and shared by the requested channel-based metrics.
+
+**Pillow To ImageJ** has no
 parameters and produces an independent NumPy array rather than modifying the
 source Pillow image.
 
