@@ -3,10 +3,40 @@ id: reference.adapters.vector-tools
 title: Vector Tools
 section: Reference
 order: 23
-description: Demand-driven statistics for numeric vectors.
+description: Indexed value extraction and demand-driven statistics for numeric vectors.
 ---
 
 # Vector Tools
+
+## Scalars to 1D Array (`scalars-to-array-1d`)
+
+Connect scalar outputs to the expandable `scalar: Float` input family, with up
+to **125** numbered ports (`scalar_1` through `scalar_125`). One spare input is
+shown as connections are added, until the limit is reached. Integer outputs use
+the existing Float conversion.
+
+The `array: 1D Array` output is a read-only NumPy float64 array containing only
+connected values in numeric port order, not connection creation order. Gaps are
+omitted, not filled with zeros. For example, `scalar_1 = 10`, `scalar_3 = 30`
+produces `[10.0, 30.0]`. With no connected inputs the result has shape `(0,)`.
+NaN and infinity values are preserved. Building the array allocates its storage
+once; no additional output copy is made. There are no parameters.
+
+## Extract Vector Value (`extract-vector-value`)
+
+Extract one component from the required `vector: 1D Array` input, returning
+`value: Float`. Configure the integer `index` parameter (default `0`), or connect
+an Integer output to its optional input port to override the local setting.
+Indices are zero-based: `0` selects the first value, `1` the second, and `-1`
+the last. For example, `[10, 20, 30]` with index `1` returns `20.0`.
+
+Numeric list and fixed-size vector ports use the existing array conversions.
+Generic Array inputs are rank-checked by those conversions; `(n, 1)` columns
+become zero-copy 1D views. Empty vectors, multi-component arrays, non-real data,
+and out-of-range indices produce errors. The node does not copy or modify an
+input array; only the selected scalar is converted to a Python float. Integer
+values therefore follow Float precision, and selected NaN/infinity values are
+preserved (JSON results represent non-finite numbers as null).
 
 ## Vector Statistics (`vector-statistics`)
 
