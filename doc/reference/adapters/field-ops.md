@@ -47,10 +47,18 @@ Requires `source_data: Mesh document` and `target: Mesh document`; emits
 `mesh_document: Mesh document`. It interpolates source node and element fields
 onto the target mesh. Parameters are UI-only and default to:
 
+- `method="Interp/Clamp"` (Interpolation / Clamp, or inter-clamp)
 - `transferNodeData=True`
 - `transferElementData=True`
 - `transferNodeTags=False`
 - `transferElementTags=False`
 
-FlowGraph-generated ID fields and string fields are not interpolated. The target
-mesh is copied before transferred data is written.
+The **Interpolation** dropdown controls both field and tag transfers, for nodes
+and elements. **Interpolation / Clamp** interpolates inside the source mesh and
+uses the closest point on its boundary outside. Other choices are
+**Interpolation / Nearest**, **Interpolation / Extrapolation**,
+and **Interpolation / Zero Fill**. Workflows without a saved method use
+Interpolation / Clamp.
+
+FlowGraph-generated ID fields and string fields are not interpolated. The output
+uses a view of the target mesh, sharing its geometry without a full mesh copy.
