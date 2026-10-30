@@ -31,7 +31,7 @@ def _transfer_fields(
     _parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Transfer all nodal fields from ``source_data`` onto ``target``."""
+    """Transfer fields and tags using the selected inside/outside interpolation."""
     source_mesh: Mesh = inputs["source_data"].mesh
     target_mesh: Mesh = inputs["target"].mesh
     outpout_mesh = target_mesh.View()
@@ -40,10 +40,11 @@ def _transfer_fields(
     transfer_elements = _parameters.get("transferElementData", True)
     transfer_nodes_tags = _parameters.get("transferNodeTags", True)
     transfer_elements_tags = _parameters.get("transferElementTags", True)
+    method = _parameters.get("method", "Interp/Clamp")
 
     if transfer_nodes or transfer_nodes_tags:
         field = FEField(name="source", mesh=source_mesh)
-        operator_nodal, _, _ = GetFieldTransferOp(field, target_mesh.nodes)
+        operator_nodal, _, _ = GetFieldTransferOp(field, target_mesh.nodes, method=method)
         if transfer_nodes and source_mesh.nodeFields:
             for name, data in source_mesh.nodeFields.items():
                 if name == "flowgraph_node_id" or np.issubdtype(data.dtype, np.str_):
@@ -67,7 +68,7 @@ def _transfer_fields(
         numbering = ComputeDofNumbering(source_mesh, LagrangeSpaceP0)
         field = FEField(name="source", mesh=source_mesh, space=LagrangeSpaceP0, numbering=numbering)
         operator_elem, _, _ = GetFieldTransferOp(
-            field, GetElementsCenters(target_mesh), elementFilter=ElementFilter()
+            field, GetElementsCenters(target_mesh), method=method, elementFilter=ElementFilter()
         )
 
         if transfer_elements and source_mesh.elemFields:
@@ -95,13 +96,26 @@ TRANSFER_FIELDS_NODE = NodeDefinition(
     id="transfer-fields",
     icon="mdi-swap-horizontal-bold",
     label="Transfer Fields",
-    description="Transfers nodal fields from one mesh onto another mesh.",
+    description="Transfers node and element fields and tags between meshes with selectable interpolation.",
     ports=(
         PortDefinition("source_data", PortDirection.INPUT, MESH_DOCUMENT, "Source data"),
         PortDefinition("target", PortDirection.INPUT, MESH_DOCUMENT, "Target"),
         PortDefinition("mesh_document", PortDirection.OUTPUT, MESH_DOCUMENT, "Mesh document"),
     ),
     parameters=(
+        ParameterDefinition(
+            "method",
+            ParameterKind.STR_SELECT,
+            "Interpolation",
+            "Interp/Clamp",
+            options=(
+                ParameterOption("Interp/Clamp", "Interpolation / Clamp"),
+                ParameterOption("Interp/Nearest", "Interpolation / Nearest"),
+                ParameterOption("Interp/Extrap", "Interpolation / Extrapolation"),
+                ParameterOption("Interp/ZeroFill", "Interpolation / Zero Fill"),
+            ),
+            port=False,
+        ),
         ParameterDefinition(
             "transferNodeData", ParameterKind.BOOLEAN, "Apply on node fields", True, port=False
         ),
