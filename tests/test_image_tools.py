@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -6,7 +7,7 @@ from Muscat.MeshContainers import ElementsDescription as ED
 from Muscat.MeshContainers.ElementsContainers import StructuredElementsContainer
 from PIL import Image as PillowImage
 
-from flowgraph.adapters import ADAPTERS
+from flowgraph.adapters import ADAPTERS, image_tools
 from flowgraph.adapters.data_types import BOOLEAN, FILE, FLOAT, IMAGE, IMAGEJ, INTEGER, FilePath
 from flowgraph.adapters.image_tools import (
     AVAILABLE_NODES,
@@ -27,7 +28,14 @@ from flowgraph.adapters.image_tools import (
 from flowgraph.adapters.simple_sources import SET_FLOAT, SET_INT, SET_STRING
 from flowgraph.application.node_registry import create_node_registry
 from flowgraph.application.port_conversions import resolve_port_conversion
-from flowgraph.application.workflow_core import WorkflowEdge, WorkflowExecutor, WorkflowGraph
+from flowgraph.application.workflow_core import (
+    ExecContext,
+    WorkflowEdge,
+    WorkflowExecutor,
+    WorkflowGraph,
+)
+from flowgraph.application.workflow_execution import clear_execution_session, execute_workflow_json
+from flowgraph.application.workflow_io import workflow_to_dict
 
 
 def test_image_data_type_accepts_pillow_images() -> None:
@@ -120,6 +128,101 @@ def test_image_fluency_metrics_rejects_invalid_symmetry_shift_range() -> None:
                 "symmetry_shift_range": 0.05,
             },
         )
+
+
+@pytest.mark.parametrize(
+    "requested",
+    [
+        frozenset(),
+        frozenset({"contrast"}),
+        frozenset({"complexity"}),
+        frozenset({"self_similarity"}),
+        frozenset({"symmetry_vertical"}),
+        frozenset({"symmetry_horizontal"}),
+        frozenset({"contrast", "self_similarity", "symmetry_horizontal"}),
+    ],
+)
+def test_image_fluency_computes_only_requested_metrics(
+    monkeypatch: pytest.MonkeyPatch, requested: frozenset[str]
+) -> None:
+    from unittest.mock import Mock
+
+    image = PillowImage.fromarray(
+        np.random.default_rng(42).integers(0, 256, size=(32, 32, 3), dtype=np.uint8)
+    )
+    parameters = IMAGE_FLUENCY_METRICS.create_instance("metrics").parameters
+    expected = IMAGE_FLUENCY_METRICS.executor({"image": image}, parameters)
+    spies = {}
+    for name in (
+        "_metric_channels",
+        "_rms_contrast",
+        "_compression_complexity",
+        "_self_similarity_channel",
+        "_mirror_similarity",
+    ):
+        spies[name] = Mock(wraps=getattr(image_tools, name))
+        monkeypatch.setattr(image_tools, name, spies[name])
+
+    result = IMAGE_FLUENCY_METRICS.executor(
+        {"image": image}, parameters, ExecContext(connected_output_ports=requested)
+    )
+
+    assert result.keys() == expected.keys()
+    for port, value in result.items():
+        if port in requested:
+            assert value == pytest.approx(expected[port])
+        else:
+            assert np.isnan(value)
+    assert spies["_metric_channels"].call_count == int(bool(requested - {"complexity"}))
+    assert spies["_rms_contrast"].call_count == int("contrast" in requested)
+    assert spies["_compression_complexity"].call_count == int("complexity" in requested)
+    assert spies["_self_similarity_channel"].call_count == 3 * int("self_similarity" in requested)
+    assert [call.args[1] for call in spies["_mirror_similarity"].call_args_list] == [
+        axis
+        for axis in ("vertical", "horizontal")
+        if f"symmetry_{axis}" in requested
+        for _ in range(3)
+    ]
+
+
+@pytest.mark.parametrize("size", [(2, 2), (32, 32)])
+@pytest.mark.parametrize("exported", [False, True])
+def test_contrast_only_workflow_handles_constant_images(
+    tmp_path: Path, size: tuple[int, int], exported: bool
+) -> None:
+    # A small or constant image is valid for contrast but invalid for unused metrics.
+    source = tmp_path / "constant.png"
+    PillowImage.new("RGB", size, (10, 20, 30)).save(source)
+    registry = create_node_registry()
+    read = READ_IMAGE.create_instance("read", parameters={"path": tmp_path / "missing.png"})
+    path = SET_STRING.create_instance("path", parameters={"value": str(source)})
+    metrics = IMAGE_FLUENCY_METRICS.create_instance("metrics")
+    graph = WorkflowGraph([path, read, metrics])
+    graph.add_edge(WorkflowEdge("path", "value", "read", "path"), registry)
+    graph.add_edge(WorkflowEdge("read", "image", "metrics", "image"), registry)
+    if exported:
+        graph.export_output("contrast", "metrics", "contrast", registry)
+    else:
+        graph.add_node(registry.create_instance("show-value", "show"))
+        graph.add_edge(WorkflowEdge("metrics", "contrast", "show", "value"), registry)
+
+    result = WorkflowExecutor(registry).run(graph)
+
+    assert result.node_outputs["metrics"]["contrast"] == pytest.approx(0.0, abs=1e-15)
+    assert np.isnan(result.node_outputs["metrics"]["self_similarity"])
+    assert Path(read.parameters["path"]) == source
+
+    payload = json.dumps(workflow_to_dict(graph))
+    session_id = f"contrast-only-{size}-{exported}"
+    try:
+        for options in (None, {"session_id": session_id}):
+            response = json.loads(execute_workflow_json(payload, options))
+            assert response["status"] == "ok", response
+            outputs = response["nodes"]["outputs"]["metrics"]
+            assert outputs["contrast"] == pytest.approx(0.0, abs=1e-15)
+            assert all(value is None for port, value in outputs.items() if port != "contrast")
+    finally:
+        clear_execution_session(session_id)
 
 
 def test_image_operation_parameters_are_exported_parameter_ports() -> None:

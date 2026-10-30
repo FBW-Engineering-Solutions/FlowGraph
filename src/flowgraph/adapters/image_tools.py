@@ -80,9 +80,8 @@ def _metric_channels(image: Image) -> tuple[np.ndarray, ...]:
     return tuple(rgb[:, :, index] for index in range(3))
 
 
-def _rms_contrast(image: Image) -> float:
+def _rms_contrast(channels: tuple[np.ndarray, ...]) -> float:
     """Return the upstream imagefluency weighted per-channel RMS contrast."""
-    channels = _metric_channels(image)
     weights = (1.0,) if len(channels) == 1 else (0.2989, 0.5870, 0.1140)
     return float(
         sum(weight * np.std(channel / 255.0, ddof=1) for weight, channel in zip(weights, channels))
@@ -176,7 +175,7 @@ def _image_fluency_metrics(
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Compute fluency metrics and directional mirror symmetry."""
+    """Compute consumed metrics, or all metrics when called without a context."""
     image = _require_image(inputs)
     shift_range = parameters["symmetry_shift_range"]
     if (
@@ -185,33 +184,37 @@ def _image_fluency_metrics(
         or not 0 <= shift_range <= 1
     ):
         raise ImageFluencyError("Symmetry shift range must be a number between 0 and 1")
-    channels = _metric_channels(image)
-    weights = (1.0,) if len(channels) == 1 else (0.2989, 0.5870, 0.1140)
-    contrast = _rms_contrast(image)
-    self_similarity = sum(
-        weight * _self_similarity_channel(channel, parameters["self_similarity_full"])
-        for weight, channel in zip(weights, channels)
+    # The engine requires every declared output, even when it is not consumed.
+    results = dict.fromkeys(
+        ("contrast", "complexity", "self_similarity", "symmetry_vertical", "symmetry_horizontal"),
+        float("nan"),
     )
-
-    if _exec_context is None or "symmetry_vertical" in _exec_context.connected_output_ports:
-        symmetry_vertical = sum(
-            weight * _mirror_similarity(channel, "vertical", float(shift_range))
-            for weight, channel in zip(weights, channels)
-        )
-    else:
-        symmetry_vertical = np.nan
-
-    symmetry_horizontal = sum(
-        weight * _mirror_similarity(channel, "horizontal", float(shift_range))
-        for weight, channel in zip(weights, channels)
-    )
-    return {
-        "contrast": contrast,
-        "complexity": _compression_complexity(image, parameters["complexity_rotate"]),
-        "self_similarity": float(self_similarity),
-        "symmetry_vertical": float(symmetry_vertical),
-        "symmetry_horizontal": float(symmetry_horizontal),
-    }
+    requested = results.keys() if _exec_context is None else _exec_context.connected_output_ports
+    channel_metrics = {"contrast", "self_similarity", "symmetry_vertical", "symmetry_horizontal"}
+    if channel_metrics.intersection(requested):
+        channels = _metric_channels(image)
+        weights = (1.0,) if len(channels) == 1 else (0.2989, 0.5870, 0.1140)
+        if "contrast" in requested:
+            results["contrast"] = _rms_contrast(channels)
+        if "self_similarity" in requested:
+            results["self_similarity"] = float(
+                sum(
+                    weight * _self_similarity_channel(channel, parameters["self_similarity_full"])
+                    for weight, channel in zip(weights, channels)
+                )
+            )
+        for axis in ("vertical", "horizontal"):
+            port = f"symmetry_{axis}"
+            if port in requested:
+                results[port] = float(
+                    sum(
+                        weight * _mirror_similarity(channel, axis, float(shift_range))
+                        for weight, channel in zip(weights, channels)
+                    )
+                )
+    if "complexity" in requested:
+        results["complexity"] = _compression_complexity(image, parameters["complexity_rotate"])
+    return results
 
 
 def _positive_integer(parameters: Mapping[str, Any], name: str) -> int:
