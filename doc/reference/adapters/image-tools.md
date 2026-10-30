@@ -46,6 +46,45 @@ their declared keys with `NaN` placeholders (`null` in JSON responses). Direct
 executor calls without an execution context compute all metrics. Channels are
 converted once and shared by the requested channel-based metrics.
 
+The metrics retain the original full-resolution definitions: self-similarity
+keeps its historical square/BOX preprocessing and radial log-log regression;
+symmetry searches every configured shifted axis using absolute Pearson
+correlation. Radial powers are accumulated by ring in one pass, with geometry
+shared across RGB channels. Symmetry uses prefix statistics and chunked,
+zero-padded FFT self-convolution to evaluate the same pixel pairings without
+repeatedly copying image halves. Ill-conditioned candidates use the original
+direct correlation calculation. Inputs are not modified or downsampled for
+speed. Floating-point reduction order can change the last few decimal places.
+Geometry is execution-local; FFT scratch uses at most 32 image rows per chunk.
+
+The reproducible full-resolution browser benchmark is
+`tests/benchmark_fluency_wasm.cjs`. With the production editor served on port
+8082, run it using Node and an existing Playwright installation (set
+`PLAYWRIGHT_MODULE` to its module path if it is not locally resolvable).
+`FLOWGRAPH_URL` selects another editor URL and `FLUENCY_REPORT` sets the report
+filename. It measures three runs per metric group in the actual WASM worker,
+excludes warmup, checks 2850 × 2484 dimensions, and asserts reference outputs
+within `5e-12`. Browser benchmark tooling is not a runtime dependency.
+
+On October 30, 2026, the rebuilt production serial runtime measured the following
+three-run averages on the original 2850 × 2484 RGB `ColorCardboard.jpg`, in
+Chromium 156.0.8078.4. Runtime warmup is excluded. Metric times include all RGB
+channels; shared conversion/geometry and workflow overhead are included only in
+the complete workflow time.
+
+| Calculation | Original | Optimized | Speedup |
+| --- | ---: | ---: | ---: |
+| Self-similarity | 25.55 s | 0.979 s | 26.1× |
+| Horizontal symmetry | 61.68 s | 0.546 s | 112.9× |
+| Vertical symmetry (separate workflow) | 59.28 s | 0.362 s | 163.7× |
+| Contrast + complexity + self-similarity + horizontal symmetry workflow | 88.09 s | 2.433 s | 36.2× |
+
+The optimized four-metric workflow ranged from 2.233–2.778 s. Contrast,
+complexity, and self-similarity matched the browser reference exactly; maximum
+absolute symmetry differences were `1.25e-13` horizontally and `1.08e-12`
+vertically. These timings are environment-specific, not performance guarantees.
+Memory use was not measured; only temporary array sizes are bounded by design.
+
 **Pillow To ImageJ** has no
 parameters and produces an independent NumPy array rather than modifying the
 source Pillow image.

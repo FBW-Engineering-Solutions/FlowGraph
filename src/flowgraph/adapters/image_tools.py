@@ -115,7 +115,27 @@ def _normalise_for_fft(channel: np.ndarray) -> np.ndarray:
     return values
 
 
-def _self_similarity_channel(channel: np.ndarray, full: bool) -> float:
+def _radial_geometry(shape: tuple[int, int]) -> tuple[np.ndarray, np.ndarray]:
+    """Build shared ring labels without allocating full coordinate grids."""
+    size = min(shape)
+    size -= size % 2
+    x = np.arange(shape[1], dtype=np.float64) - size / 2
+    labels = np.empty(shape, dtype=np.int32)
+    counts = np.zeros(int(np.hypot(*shape)) + 1, dtype=np.int64)
+    for start in range(0, shape[0], 128):
+        stop = min(start + 128, shape[0])
+        y = np.arange(start, stop, dtype=np.float64) - size / 2
+        block = labels[start:stop]
+        block[:] = np.rint(np.hypot(y[:, None], x[None, :]))
+        counts += np.bincount(block.ravel(), minlength=len(counts))
+    return labels, counts
+
+
+def _self_similarity_channel(
+    channel: np.ndarray,
+    full: bool,
+    geometry: tuple[np.ndarray, np.ndarray] | None = None,
+) -> float:
     """Return the imagefluency-compatible log-log power-spectrum score."""
     height, width = channel.shape
     if min(height, width) < 22:
@@ -137,36 +157,89 @@ def _self_similarity_channel(channel: np.ndarray, full: bool) -> float:
     )
     values = _normalise_for_fft(np.asarray(square, dtype=np.float64))
     spectrum = np.abs(np.fft.fftshift(np.fft.fft2(values))) ** 2
-    yy, xx = np.indices(spectrum.shape)
-    radius = np.rint(np.hypot(xx - size / 2, yy - size / 2)).astype(np.int32)
+    radius, counts = geometry if geometry is not None else _radial_geometry(values.shape)
+    sums = np.zeros(len(counts), dtype=np.float64)
+    for row in range(0, values.shape[0], 128):
+        sums += np.bincount(
+            radius[row : row + 128].ravel(),
+            weights=spectrum[row : row + 128].ravel(),
+            minlength=len(counts),
+        )
     max_radius = size // 2
-    power = np.array(
-        [spectrum[radius == radius_value].mean() for radius_value in range(1, max_radius + 1)],
-        dtype=np.float64,
-    )
     start, stop = (1, max_radius) if full else (10, min(max_radius, 256))
-    if stop < start or np.any(power[start - 1 : stop] <= 0):
+    power = sums[start : stop + 1] / counts[start : stop + 1]
+    if stop < start or np.any(power <= 0):
         raise ImageFluencyError("Image does not contain enough valid spatial frequencies")
     frequencies = np.arange(start, stop + 1, dtype=np.float64)
-    slope = float(np.polyfit(np.log(frequencies), np.log(power[start - 1 : stop]), 1)[0])
+    slope = float(np.polyfit(np.log(frequencies), np.log(power), 1)[0])
     return float(-abs(slope + 2.0))
 
 
+def _direct_mirror_correlation(view: np.ndarray) -> float:
+    """Retain the original stable evaluation for degenerate/ill-conditioned halves."""
+    half = view.shape[1] // 2
+    left = view[:, :half].ravel()
+    right = view[:, -half:][:, ::-1].ravel()
+    if np.std(left, ddof=1) == 0 or np.std(right, ddof=1) == 0:
+        raise ImageFluencyError("Symmetry cannot be computed from a constant image half")
+    return abs(float(np.corrcoef(left, right)[0, 1]))
+
+
 def _mirror_similarity(channel: np.ndarray, axis: str, shift_range: float) -> float:
-    """Return maximum absolute half-image correlation around shifted mirror axes."""
+    """Evaluate the same shifted Pearson scores using prefix sums and convolution.
+
+    A crop [a:b] pairs columns whose indices sum to a+b-1. Its cross-product
+    is half that coefficient of the summed row self-convolutions, excluding
+    the unpaired central column for odd crops. Zero padding makes this linear,
+    not circular, convolution. Scratch storage is bounded to 32 rows.
+    """
     array = channel if axis == "vertical" else channel.T
-    width = array.shape[1]
+    rows, width = array.shape
     if width < 4:
         raise ImageFluencyError("Symmetry requires at least 4 pixels on both image dimensions")
+    fft_size = 1 << (2 * width - 2).bit_length()
+    products = np.zeros(fft_size // 2 + 1, dtype=np.complex128)
+    sums = np.zeros(width)
+    squares = np.zeros(width)
+    # Pearson correlation is translation invariant; centering protects the raw
+    # moment formula for bright, low-contrast images without a full-image copy.
+    offset = float(np.mean(array))
+    for row in range(0, rows, 32):
+        block = array[row : row + 32] - offset
+        sums += block.sum(axis=0)
+        squares += np.einsum("ij,ij->j", block, block)
+        transformed = np.fft.rfft(block, n=fft_size, axis=1)
+        transformed *= transformed
+        products += transformed.sum(axis=0)
+    convolution = np.fft.irfft(products, n=fft_size)
+    prefix = np.concatenate(([0.0], np.cumsum(sums)))
+    prefix_squares = np.concatenate(([0.0], np.cumsum(squares)))
+    tolerance = 1e-10 * max(float(prefix_squares[-1]), 1.0)
     maximum = 0.0
     for shift in range(int(np.floor(width * shift_range)) + 1):
-        for view in (array[:, : width - shift], array[:, shift:]):
-            half = view.shape[1]
-            left = view[:, : half // 2].ravel()
-            right = view[:, -(half // 2) :][:, ::-1].ravel()
-            if np.std(left, ddof=1) == 0 or np.std(right, ddof=1) == 0:
-                raise ImageFluencyError("Symmetry cannot be computed from a constant image half")
-            maximum = max(maximum, abs(float(np.corrcoef(left, right)[0, 1])))
+        intervals = ((0, width),) if shift == 0 else ((0, width - shift), (shift, width))
+        for a, b in intervals:
+            half = (b - a) // 2
+            count = rows * half
+            if count < 2:
+                maximum = max(maximum, _direct_mirror_correlation(array[:, a:b]))
+                continue
+            sx = prefix[a + half] - prefix[a]
+            sy = prefix[b] - prefix[b - half]
+            xx = prefix_squares[a + half] - prefix_squares[a]
+            yy = prefix_squares[b] - prefix_squares[b - half]
+            vx, vy = xx - sx * sx / count, yy - sy * sy / count
+            xy = convolution[a + b - 1]
+            if (b - a) % 2:
+                xy -= squares[a + half]
+            # Cancellation and FFT roundoff can dominate very small variances.
+            if not np.isfinite(vx + vy) or min(vx, vy) <= tolerance:
+                score = _direct_mirror_correlation(array[:, a:b])
+            else:
+                score = abs(float((xy / 2 - sx * sy / count) / np.sqrt(vx * vy)))
+                if score >= 1 - 1e-10:
+                    score = _direct_mirror_correlation(array[:, a:b])
+            maximum = max(maximum, score)
     return maximum
 
 
@@ -197,9 +270,20 @@ def _image_fluency_metrics(
         if "contrast" in requested:
             results["contrast"] = _rms_contrast(channels)
         if "self_similarity" in requested:
+            height, width = channels[0].shape
+            size = min(height, width)
+            if size < 22:
+                raise ImageFluencyError(
+                    "Self-similarity requires an image with at least 22 pixels in both dimensions"
+                )
+            size -= size % 2
+            geometry = _radial_geometry((size, size) if height != width else (height, width))
             results["self_similarity"] = float(
                 sum(
-                    weight * _self_similarity_channel(channel, parameters["self_similarity_full"])
+                    weight
+                    * _self_similarity_channel(
+                        channel, parameters["self_similarity_full"], geometry
+                    )
                     for weight, channel in zip(weights, channels)
                 )
             )
