@@ -107,7 +107,7 @@ def test_workflow_web_catalog_exports_plaid_dataset_sample_and_list_types() -> N
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 
-    assert len(nodes) == len(ADAPTERS.node_definitions) == 111
+    assert len(nodes) == len(ADAPTERS.node_definitions) == 113
     assert all(isinstance(node["requirements"], list) for node in nodes.values())
     assert all(
         isinstance(requirement, str)
@@ -123,6 +123,8 @@ def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> Non
     assert nodes["load-meshio"]["requirements"] == ["py:muscat", "py:meshio"]
     assert nodes["read-table"]["requirements"] == ["py:pandas", "py:openpyxl"]
     assert nodes["image-fluency-metrics"]["requirements"] == ["py:pillow", "py:numpy"]
+    assert nodes["extract-vector-value"]["requirements"] == ["py:numpy"]
+    assert nodes["scalars-to-array-1d"]["requirements"] == ["py:numpy"]
     assert nodes["delaunay-3d"]["requirements"] == ["py:muscat", "py:numpy", "py:scipy"]
     assert nodes["imagej-script"]["requirements"] == ["py:pyimagej", "py:numpy"]
     assert nodes["cosapp-workflow"]["requirements"] == ["py:cosapp"]
