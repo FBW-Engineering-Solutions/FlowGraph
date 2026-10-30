@@ -13,6 +13,7 @@ from flowgraph.application.workflow_core import (
     PortDirection,
 )
 
+from .calculator import CALCULATOR
 from .data_types import ARRAY_1D, FLOAT, INTEGER, ParameterKind
 
 
@@ -156,6 +157,12 @@ VECTOR_STATISTICS = NodeDefinition(
     executor=_vector_statistics,
 )
 
-AVAILABLE_NODES = (SCALARS_TO_ARRAY_1D, EXTRACT_VECTOR_VALUE, VECTOR_STATISTICS)
+AVAILABLE_NODES = (CALCULATOR, SCALARS_TO_ARRAY_1D, EXTRACT_VECTOR_VALUE, VECTOR_STATISTICS)
 
-__all__ = ["AVAILABLE_NODES", "EXTRACT_VECTOR_VALUE", "SCALARS_TO_ARRAY_1D", "VECTOR_STATISTICS"]
+__all__ = [
+    "AVAILABLE_NODES",
+    "CALCULATOR",
+    "EXTRACT_VECTOR_VALUE",
+    "SCALARS_TO_ARRAY_1D",
+    "VECTOR_STATISTICS",
+]
