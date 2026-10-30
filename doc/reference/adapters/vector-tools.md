@@ -8,6 +8,50 @@ description: Indexed value extraction and demand-driven statistics for numeric v
 
 # Vector Tools
 
+## Calculator (`calculator`)
+
+Evaluate a **trusted Python expression** with NumPy available as `np`. The
+exported Text parameter `formula` defaults to `0`; a connected Text output
+overrides the local formula. Statements and multiline scripts are not supported.
+
+Connect numeric scalars, Python lists, or NumPy arrays to up to **125** expandable
+Any inputs, `input_1` through `input_125`. Lists become NumPy arrays, so
+`input_1 * 2` performs numeric multiplication rather than list repetition.
+Arrays retain their shape and dtype and are exposed through read-only views
+without copying their data. Unconnected numbered inputs are undefined; gaps do
+not renumber connected inputs. Constants need no input connections.
+
+Formulas can use both numbered inputs and upstream **output port names**:
+
+- A unique upstream output named `temperature` also exposes `temperature`.
+- Repeated upstream names are omitted for **all** occurrences, even if they come
+  from the same source. Use numbered names instead.
+- Aliases matching `input_<number>` are always omitted, even for unused slots.
+- Invalid Python identifiers, Python keywords, `np`, `__builtins__`, and Python
+  builtin names such as `sum` are not aliases. Builtins keep their normal meaning.
+- Only data-input edges contribute aliases; the formula connection does not.
+- Names are exact and case-sensitive. Workflow boundary inputs without upstream
+  edge provenance are available only by their numbered names.
+
+Examples: `input_1 * 2 + input_2`, `np.sin(temperature)`,
+`np.mean(input_1)`, or `np.stack([input_1, input_2])`.
+
+The single Any output `result` contains a numeric scalar or a read-only NumPy
+array of any rank. NumPy scalars become Python scalars. Boolean and complex
+numeric values are supported, as are NaN and infinity. Lists, dictionaries,
+strings, and object arrays are not valid results; use `np.array(...)` for an
+array result. Downstream typed inputs still validate the actual result at runtime.
+Array results use a view rather than an additional data copy, including when the
+formula returns an input or a slice. Ordinary attempts to write through input
+views fail without changing upstream array writeability.
+
+**Security:** formulas execute Python with normal builtins in the runtime process.
+This is **not a sandbox**: formulas can perform I/O, import code, or deliberately
+bypass read-only views. Run only trusted formulas/workflows and do not mutate
+upstream data. The node runs on every requested execution rather than reusing
+cached results, since expressions may use randomness or external state. Formula
+syntax, missing names, broadcasting errors, and unsupported values report errors.
+
 ## Scalars to 1D Array (`scalars-to-array-1d`)
 
 Connect scalar outputs to the expandable `scalar: Float` input family, with up
