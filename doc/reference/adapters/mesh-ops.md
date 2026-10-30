@@ -8,6 +8,51 @@ description: Nodes for coordinate transforms, tetrahedralization, and tags.
 
 # Mesh-operation nodes
 
+## Merge Meshes (`merge-meshes`)
+
+Accepts 1–128 expandable `mesh_1` … `mesh_128: Mesh document` inputs, in numeric
+slot order, and emits `mesh: Mesh document`. Nodes are concatenated without
+welding; element connectivity is offset and grouped by Muscat element type.
+Same-name tags are unioned. Original node/element IDs are retained (and may
+overlap), while reserved FlowGraph IDs are regenerated as unique positional IDs.
+Mesh properties come from the first input. Coordinate dimensions must match.
+
+Fields with matching names must have matching component/tensor shapes. Compatible
+dtypes are promoted; incompatible shapes, object payloads and mixed numeric/text
+fields fail instead of silently flattening/stringifying. Missing numeric fields
+are zero-filled; missing text fields use empty strings. Field lengths must match
+their associations, and element fields follow the output's type-grouped order.
+Inputs remain unchanged; outputs expose read-only views of newly assembled data.
+Use Merge Duplicate Nodes and Remove Duplicate Elements afterward if welding is
+needed. Merge alone does not remove unused nodes or duplicate geometry.
+
+## Tag association conversion
+
+| Node | Meaning |
+| --- | --- |
+| **Node Tags to Element Tags** (`node-tags-to-element-tags`) | Tag existing elements whose nodes match the source node tag. `treatment="all"` requires all nodes; `"any"` requires at least one. Does not create new elements. |
+| **Element Tags to Node Tags** (`element-tags-to-node-tags`) | Tag the union of nodes referenced by elements carrying each source element tag. |
+
+Both take/emit `mesh: Mesh document`. Connectable parameters: `tags=[]` means all
+source tag names; `prefix=""` determines target names; `dimensionality=-1` means
+all element dimensions (or use 0–3); `mode="error"` controls existing target tags,
+with `append` and `replace` alternatives. Missing source names fail. Source tags
+are retained, no fields are changed, and unchanged buffers are shared read-only.
+
+## Add Tag from Selector (`add-tag`)
+
+Inputs `mesh: Mesh document`, `filter: Node Selector` (accepts both node and
+element selectors); output `mesh: Mesh document`. Connectable settings:
+`tagName=""`, `entity="element"` or `"node"`, `mode="append"` (`replace`, `error`
+also available), `dimensionality=-1`, `treatment="all"` or `"any"`.
+
+Element selectors tag their selected elements directly, or their referenced
+nodes when targeting nodes. Node selectors tag nodes directly, or select existing
+elements with all/any selected nodes. Dimensionality restricts **element targets**;
+it does not restrict direct node targets. Replacing a tag evaluates the selector
+before clearing it, so a selector may reference the tag being replaced. Appending
+uses set semantics (no duplicate IDs). The existing Create Tag node is unchanged.
+
 | Node (ID) | Inputs and outputs | Parameters/defaults |
 | --- | --- | --- |
 | **Mesh Transform** (`transform`) | Outputs `Transform` | `translation=[0,0,0]`, `first=[1,0,0]`, `second=[0,1,0]`; `keepNormalized=True`, `keepOrthogonal=True` (the last two are UI-only). |

@@ -8,6 +8,45 @@ description: Nodes that extract mesh fields and transfer fields and tags between
 
 # Field-operation nodes
 
+## Field association conversion
+
+- **Nodal Field to Element Field** (`nodal-to-element-field`) computes the
+  arithmetic mean of values at each element's nodes.
+- **Element Field to Nodal Field** (`element-to-nodal-field`) computes the equally
+  weighted mean of incident element values at each node. Unreferenced nodes get
+  zero. This is not volume-weighted, conservative, or an inverse of nodal averaging.
+
+Both require `mesh: Mesh document`, and emit an updated `mesh` plus the converted
+read-only `field: Array`. They convert a named mesh field, not an arbitrary array;
+use Set Mesh Field first to attach an array. Connectable settings:
+
+| Parameter | Default / meaning |
+| --- | --- |
+| `fieldName` | `""`; required source field name |
+| `targetName` | `""`; empty uses the source name in the other association |
+| `dimensionality` | `-1`: all elements, or select 0–3 |
+| `overwrite` | `False`; allow replacing an existing destination field |
+| `removeSource` | `False`; remove the source only from the output mesh |
+
+Scalar `(n,)` and multi-component `(n,c)` integer/float/complex fields are accepted.
+Averages promote to at least float64 (complex remains complex); nonfinite values
+propagate. Boolean, text, object, tensor-rank and mismatched-length fields fail.
+Arrays remain full-sized: excluded elements and nodes with no contributing
+selected elements receive zero. Selecting all dimensions includes boundary and
+volume elements together; select a dimension when that would bias node averages.
+Original fields, geometry, tags and IDs are retained unless source removal is
+requested. Reserved FlowGraph ID fields cannot be converted or overwritten.
+
+## Rename / Remove Mesh Field
+
+**Rename Mesh Field** (`rename-mesh-field`) and **Remove Mesh Field**
+(`remove-mesh-field`) require and emit `mesh: Mesh document`. Connectable settings
+are `entity="node"` (or `"element"`) and `fieldName=""`; Rename also requires
+`newName=""`. Missing fields, empty names and reserved FlowGraph IDs fail.
+Rename rejects existing destination names (renaming to the same name is a no-op).
+Only the output field dictionary changes: unchanged array storage is shared
+through read-only views and upstream inputs remain unchanged.
+
 ## Set Mesh Field (`set-mesh-field`)
 
 Requires `mesh: Mesh document` and `field: Array`; outputs `mesh: Mesh document`.
