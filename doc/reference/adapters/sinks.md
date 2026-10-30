@@ -111,6 +111,8 @@ Use the scheme, hostname and port from the editor address bar, with no path or
 trailing slash. `http://127.0.0.1:8082` is a different origin from
 `http://localhost:8082`. Repeat `--allow-origin` to allow additional trusted
 origins. HTTP uploads are disabled by default; wildcard origins are not accepted.
+Allowed origins must not contain carriage returns or line feeds. CORS responses
+use the exact matching configured origin rather than echoing the request header.
 Do not allow websites you do not trust to publish data to your local gateway.
 
 After updating the Python code, rebuild the WASM wheel and web deployment with
