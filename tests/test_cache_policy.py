@@ -184,9 +184,7 @@ def test_builtin_computations_and_exception_classification():
         print(item.cache_policy)
         assert item.cache_policy == "pure"
 
-    for item in (
-        READ_DIRECTORY_FILES,
-    ):
+    for item in (READ_DIRECTORY_FILES,):
         print(item.id)
         print(item.cache_policy)
         assert item.cache_policy == "always"
