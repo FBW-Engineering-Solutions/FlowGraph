@@ -8,6 +8,41 @@ description: Nodes that extract mesh fields and transfer fields and tags between
 
 # Field-operation nodes
 
+## Scalar Field Gradient (`scalar-field-gradient`)
+
+Select a scalar **node** field by its exact `fieldName`. Requires `mesh: Mesh
+document`; an optional `filter: Element selector` restricts the contributing
+elements. Without a selector, only the highest-dimensional elements are used.
+
+| Parameter | Default / meaning |
+| --- | --- |
+| `fieldName` | `""`; required scalar node field name |
+| `entity` | `"node"`: Nodes, or `"element"`: Cells / Elements |
+| `targetName` | `""`; empty uses `<fieldName>_gradient` |
+| `overwrite` | `False`; permit replacing an existing output field |
+
+Outputs the updated `mesh` and a read-only `gradient: 2D Array`, sharing the
+attached vector field. Rows follow the full node or global element ordering;
+columns are derivatives in coordinate order (one per mesh coordinate dimension).
+Unselected cells and nodes without contributing elements receive zero.
+
+All numerical computation uses Muscat: `NodeFieldToFEField`, followed by
+`TransferFEFieldToIPField` for each coordinate derivative. Cell output uses
+`GetCellRepresentation()` (the arithmetic mean of integration-point derivatives).
+Node output uses `GetIpFieldRepresentation().GetPointRepresentation()` with
+Muscat's default multiplicity weighting: local IP-to-node recovery, then equal
+weight per contributing element. This is not a custom volume-weighted recovery
+or a cell average of already-smoothed nodal gradients.
+
+Accepts finite real integer/float scalars of shape `(N,)` or `(N,1)` aligned with
+the mesh nodes. Vector, complex, boolean, nonfinite and misaligned fields fail.
+Selections must contain a single element dimension (1, 2 or 3); mixed dimensions
+and point elements fail. An empty selection produces a zero field. Supported
+element spaces, quadrature and embedded-element derivative behavior are Muscat's;
+degenerate elements may fail in its FE routines. Geometry, existing fields,
+tags and IDs are preserved through read-only views; upstream inputs are unchanged.
+Reserved FlowGraph ID fields cannot be differentiated or overwritten.
+
 ## Field association conversion
 
 - **Nodal Field to Element Field** (`nodal-to-element-field`) computes the
