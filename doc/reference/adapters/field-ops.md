@@ -8,6 +8,39 @@ description: Nodes that extract mesh fields and transfer fields and tags between
 
 # Field-operation nodes
 
+## Vector Field Gradient (`vector-field-gradient`)
+
+Uses the same inputs, settings, selector semantics and Muscat derivative/recovery
+APIs as Scalar Field Gradient below, but `fieldName` selects a finite real nodal
+vector of shape `(N,2)` or `(N,3)`. The vector component count need not equal the
+mesh coordinate dimension (for example, three-component displacement on a 2D
+mesh). Scalar, tensor, boolean, complex, nonfinite and misaligned fields fail.
+
+Outputs `mesh` plus read-only `gradient: 2D Array`, shared with the attached
+`<fieldName>_gradient` field (or `targetName`). The Jacobian is flattened into
+shape `(entities, components * coordinate_dimensions)` in **component-major**
+order: column `i * dimension + j` contains `d(vector_i)/d(x_j)`. For a 3D vector
+on a 3D mesh the nine columns are:
+
+```text
+du_x/dx, du_x/dy, du_x/dz,
+du_y/dx, du_y/dy, du_y/dz,
+du_z/dx, du_z/dy, du_z/dz
+```
+
+Reshape an array row to `(components, coordinate_dimensions)` for its gradient
+matrix; the flattened layout works with existing mesh field and VTK projection
+APIs. The result is the full gradient, not a symmetrized strain tensor.
+
+Choose `entity="node"` (default) or `"element"` for Cells / Elements. An optional
+element selector controls which elements contribute; absent one, only the highest
+dimension is used. Mixed dimensions and point elements fail, empty selections
+produce zeros, and excluded cells/unreferenced nodes receive zero. Cell output
+uses Muscat's mean IP representation, node output its multiplicity-weighted
+IP-to-node recovery, independently for each component and coordinate derivative.
+Existing-field conflicts require `overwrite=True`; reserved IDs are protected.
+Inputs and original metadata remain unchanged, with read-only output views.
+
 ## Scalar Field Gradient (`scalar-field-gradient`)
 
 Select a scalar **node** field by its exact `fieldName`. Requires `mesh: Mesh

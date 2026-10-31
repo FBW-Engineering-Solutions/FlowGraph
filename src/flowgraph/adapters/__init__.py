@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from flowgraph.adapters.controls import AVAILABLE_NODES as CONTROL_AVAILABLE_NODES
 from flowgraph.adapters.cosapp import AVAILABLE_NODES as COSAPP_AVAILABLE_NODES
 from flowgraph.adapters.documentation import AVAILABLE_NODES as DOCUMENTATION_AVAILABLE_NODES
-from flowgraph.adapters.field_gradient import SCALAR_FIELD_GRADIENT
+from flowgraph.adapters.field_gradient import SCALAR_FIELD_GRADIENT, VECTOR_FIELD_GRADIENT
 from flowgraph.adapters.field_ops import AVAILABLE_NODES as FIELD_OPS_AVAILABLE_NODES
 from flowgraph.adapters.file_conversion import MESH_FILE_CONVERSION
 from flowgraph.adapters.files import (
@@ -145,7 +145,7 @@ ADAPTERS = AdapterCatalog(
                 AdapterGroup(
                     "Field Ops",
                     FIELD_OPS_AVAILABLE_NODES
-                    + (SET_MESH_FIELD, SCALAR_FIELD_GRADIENT)
+                    + (SET_MESH_FIELD, SCALAR_FIELD_GRADIENT, VECTOR_FIELD_GRADIENT)
                     + FIELD_COMPOSITION_NODES,
                 ),
                 AdapterGroup("File Conversion", (MESH_FILE_CONVERSION,)),
