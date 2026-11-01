@@ -1,4 +1,20 @@
-New in Next :
+New in Next:
+**********************
+**********************
+
+Api Change:
+-
+
+New functionalities:
+-
+
+Corrections:
+-
+
+Improvement:
+-
+
+New in version 0.1.7:
 **********************
 **********************
 

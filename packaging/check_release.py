@@ -88,7 +88,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--artifacts", type=Path, required=True)
-    parser.add_argument("--tag", help="Exact release tag, e.g. v0.1.6")
+    parser.add_argument("--tag", help="Exact release tag, e.g. v0.1.7")
     args = parser.parse_args()
     try:
         version = check_release(args.root, args.artifacts, args.tag)
