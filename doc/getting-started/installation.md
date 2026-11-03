@@ -49,6 +49,18 @@ uv run flowgraph --help
 The binary package provides the headless `flowgraph` command for inspecting and
 executing workflow JSON.
 
+## Optional I/O libraries
+
+Install the `io` extra for workflows using meshio, Meshlane, pandas, h5py,
+Pillow, or openpyxl, including their mesh, table, and image operations:
+
+```bash
+uv pip install 'flowgraph[io]'
+```
+
+For a source checkout, use `uv sync --extra io`. For development and the full
+test suite, use `uv sync --extra dev --extra io`.
+
 ## Run temporarily with `uvx`
 
 For a temporary installation without creating a persistent environment, run the

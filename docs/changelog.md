@@ -3,7 +3,9 @@ New in Next:
 **********************
 
 Api Change:
--
+- Move meshio, Meshlane, pandas, h5py, Pillow, and openpyxl to the optional
+  `io` extra. Install `flowgraph[io]` (or use `uv sync --extra io` in a source
+  checkout) for workflows using these libraries. Version constraints are unchanged.
 
 New functionalities:
 -

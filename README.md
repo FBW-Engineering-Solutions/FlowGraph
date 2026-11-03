@@ -19,7 +19,7 @@ API, node safety contracts, transport options and resource limits.
 ## Development setup
 
 ```bash
-uv sync --extra dev
+uv sync --extra dev --extra io
 uv run pytest
 uv run ruff check .
 ```
@@ -167,6 +167,16 @@ behavior.
   compatibility, and capability boundaries.
 
 ## Optional integrations
+
+The `io` extra supplies meshio, Meshlane, pandas, h5py, Pillow, and openpyxl
+for mesh, table, and image I/O and image processing. Install it when your
+workflows use these libraries:
+
+```bash
+uv pip install 'flowgraph[io]'
+# From a source checkout:
+uv sync --extra io
+```
 
 The `ml` extra enables the PyPlaid adapter and the `cosapp` extra enables the
 CoSApp adapter. Neither extra is part of the minimum core support guarantee.

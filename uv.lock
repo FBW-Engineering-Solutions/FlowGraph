@@ -929,15 +929,9 @@ name = "flowgraph"
 version = "0.1.7"
 source = { editable = "." }
 dependencies = [
-    { name = "h5py" },
-    { name = "meshio" },
-    { name = "meshlane" },
     { name = "muscat" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "openpyxl" },
-    { name = "pandas" },
-    { name = "pillow" },
     { name = "scipy" },
     { name = "vtk" },
 ]
@@ -960,6 +954,14 @@ imagej = [
     { name = "pyimagej" },
     { name = "scyjava" },
 ]
+io = [
+    { name = "h5py" },
+    { name = "meshio" },
+    { name = "meshlane" },
+    { name = "openpyxl" },
+    { name = "pandas" },
+    { name = "pillow" },
+]
 ml = [
     { name = "pyplaid" },
 ]
@@ -969,14 +971,14 @@ requires-dist = [
     { name = "build", marker = "extra == 'dev'" },
     { name = "cosapp", marker = "extra == 'ci'", specifier = ">=1.6.1" },
     { name = "cosapp", marker = "extra == 'cosapp'", specifier = ">=1.6.1" },
-    { name = "h5py" },
-    { name = "meshio", specifier = ">=5.3" },
-    { name = "meshlane", specifier = ">=5.5.0" },
+    { name = "h5py", marker = "extra == 'io'" },
+    { name = "meshio", marker = "extra == 'io'", specifier = ">=5.3" },
+    { name = "meshlane", marker = "extra == 'io'", specifier = ">=5.5.0" },
     { name = "muscat", specifier = ">=2.5.2" },
     { name = "numpy", specifier = ">=1.24" },
-    { name = "openpyxl", specifier = ">=3.1.5" },
-    { name = "pandas" },
-    { name = "pillow", specifier = ">=10.0" },
+    { name = "openpyxl", marker = "extra == 'io'", specifier = ">=3.1.5" },
+    { name = "pandas", marker = "extra == 'io'" },
+    { name = "pillow", marker = "extra == 'io'", specifier = ">=10.0" },
     { name = "pycgns", marker = "extra == 'ci'" },
     { name = "pyimagej", marker = "extra == 'imagej'" },
     { name = "pyplaid", marker = "extra == 'ml'" },
@@ -987,7 +989,7 @@ requires-dist = [
     { name = "scyjava", marker = "extra == 'imagej'" },
     { name = "vtk", specifier = ">=9.2" },
 ]
-provides-extras = ["imagej", "dev", "ml", "cosapp", "ci"]
+provides-extras = ["io", "imagej", "dev", "ml", "cosapp", "ci"]
 
 [[package]]
 name = "fonttools"

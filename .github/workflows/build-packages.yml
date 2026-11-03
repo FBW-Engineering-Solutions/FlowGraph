@@ -40,11 +40,11 @@ jobs:
 
       - name: Install locked test environment with CGNS support
         if: matrix.os == 'ubuntu-latest'
-        run: uv sync --locked --extra dev --extra ci --extra imagej
+        run: uv sync --locked --extra dev --extra io --extra ci --extra imagej
 
       - name: Install locked test environment without CGNS support
         if: matrix.os != 'ubuntu-latest'
-        run: uv sync --locked --extra dev --extra cosapp --extra imagej
+        run: uv sync --locked --extra dev --extra io --extra cosapp --extra imagej
 
       - name: Run Ruff
         run: uv run ruff format --check . && uv run ruff check .

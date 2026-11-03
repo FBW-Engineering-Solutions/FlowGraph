@@ -120,6 +120,35 @@ def test_core_metadata_excludes_desktop_dependencies_and_entry_points() -> None:
     assert "vtk>=9.2" in dependencies
 
 
+def test_io_dependencies_are_optional() -> None:
+    """Keep I/O libraries opt-in with the same constraints in the lockfile."""
+    root = Path(__file__).parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    expected = [
+        "meshio>=5.3",
+        "meshlane>=5.5.0",
+        "pandas",
+        "h5py",
+        "pillow>=10.0",
+        "openpyxl>=3.1.5",
+    ]
+    assert project["optional-dependencies"]["io"] == expected
+    names = {dependency.split(">", 1)[0] for dependency in expected}
+    assert names.isdisjoint(dependency.split(">", 1)[0] for dependency in project["dependencies"])
+
+    requirements = {
+        line
+        for line in (root / "requirements.txt").read_text(encoding="utf-8").splitlines()
+        if line and not line.startswith("#")
+    }
+    assert requirements == set(project["dependencies"])
+
+    lock = tomllib.loads((root / "uv.lock").read_text(encoding="utf-8"))
+    package = next(package for package in lock["package"] if package["name"] == "flowgraph")
+    assert {dependency["name"] for dependency in package["optional-dependencies"]["io"]} == names
+    assert names.isdisjoint(dependency["name"] for dependency in package["dependencies"])
+
+
 def test_core_package_uses_standard_pure_python_build_configuration() -> None:
     """Require setuptools packaging without a Cython build dependency."""
     root = Path(__file__).parents[1]

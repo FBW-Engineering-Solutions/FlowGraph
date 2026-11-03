@@ -14,7 +14,7 @@ must preserve the headless import boundary, workflow-format contracts, and BSD
 Set up a locked development environment from the repository root:
 
 ```bash
-uv sync --locked --extra dev
+uv sync --locked --extra dev --extra io
 ```
 
 ## Development checks
@@ -25,7 +25,7 @@ Run the complete local quality gate before opening a pull request:
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest
-uv run python -m compileall -q src tools tests
+uv run python -m compileall -q src tests
 ```
 
 Run `uvx ty check src` when changing public APIs or type-sensitive application

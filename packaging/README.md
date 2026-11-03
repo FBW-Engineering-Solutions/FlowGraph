@@ -7,7 +7,7 @@ test data, catalog exporter, and the headless `flowgraph` command.
 ## Release package
 
 ```bash
-uv sync --extra dev
+uv sync --extra dev --extra io
 uv run pytest
 uv run ruff check .
 uv build --out-dir dist/
@@ -101,7 +101,7 @@ The version in `pyproject.toml` is the artifact version source of truth and
 `docs/changelog.md` is the release-note source of truth. From a clean checkout:
 
 ```bash
-uv sync --locked --extra dev
+uv sync --locked --extra dev --extra io
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest --cov=flowgraph --cov-report=term-missing
