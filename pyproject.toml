@@ -29,8 +29,6 @@ classifiers = [
 dependencies = [
   "vtk>=9.2",
   "muscat>=2.5.2",
-  "scipy>=1.10",
-  "numpy>=1.24",
 ]
 
 [project.optional-dependencies]

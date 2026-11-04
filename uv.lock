@@ -930,9 +930,6 @@ version = "0.1.7"
 source = { editable = "." }
 dependencies = [
     { name = "muscat" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "scipy" },
     { name = "vtk" },
 ]
 
@@ -975,7 +972,6 @@ requires-dist = [
     { name = "meshio", marker = "extra == 'io'", specifier = ">=5.3" },
     { name = "meshlane", marker = "extra == 'io'", specifier = ">=5.5.0" },
     { name = "muscat", specifier = ">=2.5.2" },
-    { name = "numpy", specifier = ">=1.24" },
     { name = "openpyxl", marker = "extra == 'io'", specifier = ">=3.1.5" },
     { name = "pandas", marker = "extra == 'io'" },
     { name = "pillow", marker = "extra == 'io'", specifier = ">=10.0" },
@@ -985,7 +981,6 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
-    { name = "scipy", specifier = ">=1.10" },
     { name = "scyjava", marker = "extra == 'imagej'" },
     { name = "vtk", specifier = ">=9.2" },
 ]
