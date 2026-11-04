@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import subprocess
 import sys
 import tomllib
@@ -188,6 +189,78 @@ def test_third_party_notice_inventory_matches_declared_dependencies() -> None:
     assert actual == expected
     for name, _, version in rows:
         assert version in versions[name], f"Stale locked version for {name}: {version}"
+
+
+def test_installation_guide_matches_python_requirement_and_runtime_extras() -> None:
+    """Keep installation guidance aligned with metadata, not retired binary releases."""
+    root = Path(__file__).parents[1]
+    guide = (root / "doc" / "getting-started" / "installation.md").read_text(encoding="utf-8")
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    minimum = project["requires-python"].removeprefix(">=")
+    assert f"Python {minimum} or newer" in guide
+    assert f'requires-python = "{project["requires-python"]}"' in guide
+    assert "pure-Python wheel" in guide
+    for retired in ["Python 3.10", "binary wheel", "binary package", "authoring-only"]:
+        assert retired not in guide
+    documented_extras = set(re.findall(r"^\| `([^`]+)` \|", guide, re.MULTILINE))
+    assert documented_extras == set(project["optional-dependencies"]) - {"dev", "ci"}
+    for spec in re.findall(r"flowgraph\[([^]]+)\]", guide):
+        assert set(spec.split(",")) <= documented_extras
+
+
+def test_installation_guide_cli_examples_execute(tmp_path: Path) -> None:
+    """Exercise the actual documented persistent CLI arguments without installing tools."""
+    from flowgraph.adapters.simple_sources import SET_STRING
+    from flowgraph.adapters.workflow_interfaces import WORKFLOW_OUTPUT
+    from flowgraph.application.node_registry import create_node_registry
+    from flowgraph.application.workflow_core import WorkflowEdge, WorkflowGraph
+    from flowgraph.application.workflow_io import save_workflow
+
+    registry = create_node_registry()
+    graph = WorkflowGraph()
+    for node_id, value, output_name in [
+        ("text_source", "saved-text", "text"),
+        ("label_source", "saved-label", "label"),
+        ("source", "saved-source", "result"),
+    ]:
+        graph.add_node(SET_STRING.create_instance(node_id, parameters={"value": value}))
+        target = f"{node_id}_output"
+        graph.add_node(WORKFLOW_OUTPUT.create_instance(target, parameters={"name": output_name}))
+        graph.add_edge(WorkflowEdge(node_id, "value", target, "value"), registry)
+    graph.sync_boundary_nodes(registry)
+    graph.export_input("text", "text_source", "value", registry)
+    graph.export_input("label", "label_source", "value", registry)
+    workflow = save_workflow(graph, tmp_path / "workflow.json")
+    original = workflow.read_bytes()
+    guide = (Path(__file__).parents[1] / "doc" / "getting-started" / "installation.md").read_text(
+        encoding="utf-8"
+    )
+    commands = re.findall(r"^uv run --no-project flowgraph (.+)$", guide, re.MULTILINE)
+    assert len(commands) == 4
+    for command in commands:
+        completed = subprocess.run(
+            [sys.executable, "-m", "flowgraph.core_cli", *shlex.split(command)],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        if command == "--help":
+            assert "inspect" in completed.stdout and "run" in completed.stdout
+        elif command.startswith("inspect "):
+            assert "text" in completed.stdout and "label" in completed.stdout
+        elif "--json-output" in command:
+            assert json.loads((tmp_path / "outputs.json").read_text(encoding="utf-8")) == {
+                "text": "hello",
+                "label": "example",
+                "result": "updated",
+            }
+        else:
+            assert all(
+                value in completed.stdout for value in ["saved-text", "saved-label", "saved-source"]
+            )
+            assert "warning" in completed.stderr.lower()
+    assert workflow.read_bytes() == original
 
 
 def test_io_dependencies_are_optional() -> None:

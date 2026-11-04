@@ -2,6 +2,9 @@ New in Next:
 **********************
 **********************
 
+- Update installation requirements, pure-Python packaging, runtime extras, and
+  persistent/source/temporary commands; test the documented CLI examples.
+
 - Correct third-party notices for BSD-3-Clause Core with a dated dependency and
   license-evidence overview, explicit review limits, and inventory regression tests.
 
