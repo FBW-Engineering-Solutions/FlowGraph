@@ -23,7 +23,6 @@ SPEC.loader.exec_module(CHECKER)
 def release_tree(tmp_path: Path) -> Path:
     """Create independent source declarations for a prospective release."""
     (tmp_path / "src/flowgraph").mkdir(parents=True)
-    (tmp_path / "packaging/conda").mkdir(parents=True)
     (tmp_path / "dist").mkdir()
     (tmp_path / "pyproject.toml").write_text(
         '[project]\nname = "flowgraph"\nversion = "0.1.5"\n', encoding="utf-8"
@@ -31,9 +30,6 @@ def release_tree(tmp_path: Path) -> Path:
     (tmp_path / "src/flowgraph/version.py").write_text('__version__ = "0.1.5"\n', encoding="utf-8")
     (tmp_path / "uv.lock").write_text(
         '[[package]]\nname = "flowgraph"\nversion = "0.1.5"\n', encoding="utf-8"
-    )
-    (tmp_path / "packaging/conda/meta.yaml").write_text(
-        '{% set version = "0.1.5" %}\n', encoding="utf-8"
     )
     write_artifacts(tmp_path / "dist")
     return tmp_path
@@ -82,7 +78,6 @@ def test_mismatched_tag_fails(release_tree: Path, tag: str) -> None:
     [
         ("src/flowgraph/version.py", "Runtime"),
         ("uv.lock", "Lockfile"),
-        ("packaging/conda/meta.yaml", "Conda"),
     ],
 )
 def test_source_version_drift_fails(release_tree: Path, path: str, message: str) -> None:

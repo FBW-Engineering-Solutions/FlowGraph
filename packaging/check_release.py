@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import re
 import sys
 import tarfile
 import tomllib
@@ -44,9 +43,6 @@ def check_release(root: Path, artifacts: Path, tag: str | None = None) -> str:
     lock = tomllib.loads((root / "uv.lock").read_text(encoding="utf-8"))
     if [entry["version"] for entry in lock["package"] if entry["name"] == "flowgraph"] != [version]:
         raise ValueError(f"Lockfile version does not match {version}")
-    recipe = (root / "packaging/conda/meta.yaml").read_text(encoding="utf-8")
-    if re.findall(r'^\{% set version = "([^"]+)" %\}$', recipe, re.MULTILINE) != [version]:
-        raise ValueError(f"Conda version does not match {version}")
 
     wheels = sorted(artifacts.glob("*.whl"))
     sdists = sorted(artifacts.glob("*.tar.gz"))
@@ -88,7 +84,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--artifacts", type=Path, required=True)
-    parser.add_argument("--tag", help="Exact release tag, e.g. v0.1.7")
+    parser.add_argument("--tag", help="Exact release tag, e.g. v0.1.8")
     args = parser.parse_args()
     try:
         version = check_release(args.root, args.artifacts, args.tag)

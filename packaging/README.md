@@ -61,34 +61,7 @@ Both production publication jobs wait for the complete artifact matrix and tag
 validation, then use the same named artifacts from that workflow run. Required
 human approvals must be configured separately in GitHub environment settings;
 the workflow alone does not establish those protections. This rehearsal does
-not validate Conda, optional extras, every workflow, or byte reproducibility.
-
-## Conda recipe
-
-The repository includes a `conda-build` recipe in `packaging/conda/meta.yaml`.
-It packages the published Python source distribution as a `noarch: python`
-package and maps the runtime dependencies to their Conda package names. The
-recipe deliberately installs with `--no-deps` so Conda remains the dependency
-resolver rather than mixing Conda and PyPI installations.
-
-Build and inspect it with `conda-build` from an environment that has access to
-the required dependency channels:
-
-```bash
-conda install -c conda-forge conda-build
-conda build packaging/conda
-```
-
-FlowGraph packages are distributed through the [`flowgraph` Anaconda
-channel](https://anaconda.org/channels/flowgraph). Install the package with:
-
-```bash
-conda install -c flowgraph flowgraph
-```
-
-The recipe and channel publication are separate release operations. Each
-release still requires maintainer approval and validation of the complete native
-dependency graph.
+not validate optional extras, every workflow, or byte reproducibility.
 
 ## Release procedure
 
@@ -118,10 +91,9 @@ must not be moved to include later fixes.
 
 Inspect both artifacts, install them in clean environments, run `flowgraph
 --help`, import `flowgraph`, and exercise a representative workflow before
-publishing. For Conda, also inspect the built package in a clean Conda
-environment and run the recipe tests. Retain dependency notices, SBOM, native
+publishing. Retain dependency notices, SBOM, native
 audit, preserved license texts, and checksums with the release record. Publish
-through GitHub Releases, PyPI, and the reviewed `flowgraph` Conda channel only
+through GitHub Releases and PyPI only
 after the release blockers in `TODO.md` and the compliance review are closed.
 
 ## Reproducibility limitations

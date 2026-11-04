@@ -2,7 +2,13 @@ New in Next:
 **********************
 **********************
 
+New in version 0.1.8:
+**********************
+**********************
+
 Api Change:
+- Remove the Conda packaging recipe and its release validation. Supported release
+  artifacts remain the Python wheel and source distribution on GitHub and PyPI.
 - Move meshio, Meshlane, pandas, h5py, Pillow, and openpyxl to the optional
   `io` extra. Install `flowgraph[io]` (or use `uv sync --extra io` in a source
   checkout) for workflows using these libraries. Version constraints are unchanged.
