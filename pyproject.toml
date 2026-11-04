@@ -63,6 +63,7 @@ ci = [
 
 [project.urls]
 Homepage = "https://github.com/FBW-Engineering-Solutions/FlowGraph"
+Documentation = "https://flowgraph.readthedocs.io/en/latest/"
 Repository = "https://github.com/FBW-Engineering-Solutions/FlowGraph.git"
 Issues = "https://github.com/FBW-Engineering-Solutions/FlowGraph/issues"
 

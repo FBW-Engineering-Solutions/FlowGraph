@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tomllib
@@ -118,6 +119,75 @@ def test_core_metadata_excludes_desktop_dependencies_and_entry_points() -> None:
         for dependency in dependencies
     )
     assert "vtk>=9.2" in dependencies
+
+
+def test_public_metadata_links_to_documentation() -> None:
+    """Publish the same documentation destination as the public README."""
+    root = Path(__file__).parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    documentation = project["urls"]["Documentation"]
+
+    assert documentation == "https://flowgraph.readthedocs.io/en/latest/"
+    assert f"[FlowGraph documentation]({documentation})" in (root / "README.md").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_python_classifiers_match_ci_support_targets() -> None:
+    """Keep version-specific classifiers aligned with test and artifact matrices."""
+    root = Path(__file__).parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    prefix = "Programming Language :: Python :: "
+    versions = {
+        classifier.removeprefix(prefix)
+        for classifier in project["classifiers"]
+        if classifier.startswith(prefix) and classifier.removeprefix(prefix).count(".") == 1
+    }
+    assert versions == {"3.11", "3.12", "3.13", "3.14"}
+    assert project["requires-python"] == ">=3.11"
+
+    workflow = (root / ".github" / "workflows" / "build-packages.yml").read_text(encoding="utf-8")
+    matrices = re.findall(r"^\s+python-version: (\[.*\])$", workflow, re.MULTILINE)
+    assert len(matrices) == 2
+    for matrix in matrices:
+        assert set(tomllib.loads(f"versions = {matrix}")["versions"]) == versions
+
+
+def test_third_party_notices_describe_open_source_core() -> None:
+    """Keep the notices scoped to the Core license rather than the retired product."""
+    root = Path(__file__).parents[1]
+    notices = (root / "doc" / "reference" / "third-party-notices.md").read_text(encoding="utf-8")
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+
+    assert f"FlowGraph Core is licensed under **{project['license']}**" in notices
+    assert "proprietary" not in notices.lower()
+    assert "id: reference.third-party-notices\n" in notices
+
+
+def test_third_party_notice_inventory_matches_declared_dependencies() -> None:
+    """Check direct dependency groups and snapshot versions without network access."""
+    root = Path(__file__).parents[1]
+    notices = (root / "doc" / "reference" / "third-party-notices.md").read_text(encoding="utf-8")
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    lock = tomllib.loads((root / "uv.lock").read_text(encoding="utf-8"))
+    versions = {}
+    for package in lock["package"]:
+        versions.setdefault(package["name"], set()).add(package["version"])
+    groups = {"required": project["dependencies"], **project["optional-dependencies"]}
+    expected = set()
+    for group, dependencies in groups.items():
+        for dependency in dependencies:
+            match = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", dependency)
+            assert match is not None, dependency
+            name = re.sub(r"[-_.]+", "-", match.group()).lower()
+            expected.add((name, group))
+
+    rows = re.findall(r"^\| `([^`]+)` \| `([^`]+)` \| `([^`]+)` \|", notices, re.MULTILINE)
+    actual = {(name, group) for name, group, _ in rows}
+    assert len(rows) == len(actual), "Duplicate dependency/group rows"
+    assert actual == expected
+    for name, _, version in rows:
+        assert version in versions[name], f"Stale locked version for {name}: {version}"
 
 
 def test_io_dependencies_are_optional() -> None:

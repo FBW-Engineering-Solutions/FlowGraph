@@ -17,8 +17,22 @@ set.
 
 The CI workflow is configured to test Python 3.11, 3.12, 3.13, and 3.14. Other Python 3.11+
 versions are declaration-level support targets until they are added to the CI
-matrix and verified. A release must not claim that every Python version has been
-tested until that matrix exists.
+matrix and verified. A configured matrix alone is not evidence of passing tests.
+
+### Classifier evidence review — November 5, 2026
+
+Retain the Python 3.11, 3.12, 3.13, and 3.14 package classifiers. GitHub Actions
+[run 41818885673](https://github.com/FBW-Engineering-Solutions/FlowGraph/actions/runs/41818885673),
+completed on November 4, 2026 for commit
+`55ea019a221cc2546848bc8c7784e5072a20f081`, passed all 12 source-test jobs and
+all 24 wheel/sdist installation smoke jobs across those Python versions on
+Ubuntu, Windows, and macOS. Non-Linux source-test jobs exclude
+`tests/test_plaid_bridge.py`; this is not evidence for every optional integration.
+
+This passing run supports the declared version targets, not a blanket guarantee
+for later commits or releases. Recheck the exact release candidate's matrix
+before publishing. Do not add classifiers for newer Python versions based only
+on the open-ended `requires-python` constraint or local interpreter availability.
 
 ## Operating systems and architectures
 

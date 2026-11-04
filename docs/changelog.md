@@ -2,6 +2,12 @@ New in Next:
 **********************
 **********************
 
+- Correct third-party notices for BSD-3-Clause Core with a dated dependency and
+  license-evidence overview, explicit review limits, and inventory regression tests.
+
+- Add the documentation URL to package metadata and record passing CI evidence
+  for the existing Python 3.11–3.14 classifiers, with metadata consistency tests.
+
 New in version 0.1.8:
 **********************
 **********************
