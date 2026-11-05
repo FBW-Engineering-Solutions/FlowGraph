@@ -2,6 +2,9 @@ New in Next:
 **********************
 **********************
 
+- Target CI dependency audits at exact installed project-environment pins, with
+  logged inventory, explicit local-project exclusion, and regression coverage.
+
 - Remove local-machine build notes from package configuration and use ignored,
   repository-relative rehearsal output with `uv run python` artifact checks.
 

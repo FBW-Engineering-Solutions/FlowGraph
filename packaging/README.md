@@ -69,6 +69,37 @@ not validate optional extras, every workflow, or byte reproducibility.
 
 ## Release procedure
 
+### Dependency audit scope
+
+After the locked test-environment installation, each CI matrix job snapshots all
+installed Python distributions with the project interpreter. This includes its
+selected extras, transitive dependencies, and development/test tools. Only the
+local FlowGraph project is excluded from the package-advisory lookup; its version
+is logged separately. The interpreter, environment prefix, exact pins and package
+count are printed in the job log. The requirements file is temporary CI output,
+not a durable release-evidence archive.
+
+To reproduce against an already synchronized project environment, run from the
+repository root:
+
+```bash
+uv run --no-sync python packaging/audit_requirements.py --output .validation-dist/audit-requirements.txt
+uvx --from pip-audit pip-audit --requirement .validation-dist/audit-requirements.txt --no-deps --disable-pip --strict
+```
+
+The isolated audit tool reads the explicit inventory instead of auditing its own
+environment. Exact pins and disabled dependency resolution prevent it from
+selecting different package versions. Collection errors and vulnerability findings
+fail CI; do not suppress them or automatically modify dependencies. Network access
+to the advisory service is required. A local snapshot reflects the local installed
+environment, not necessarily every CI job's extras or platform selection.
+
+This checks known Python-package advisories, not all native libraries, Java
+components, optional clients, or uninstalled integrations. An empty findings list
+does not establish security or license compliance.
+
+### Build and publication
+
 Version `0.1.8` is the planned first MVP baseline. This is not a publication
 announcement or a stable API commitment; the `0.1.x` series remains alpha.
 Pre-MVP releases are outside this release-readiness documentation scope.
