@@ -2,6 +2,9 @@ New in Next:
 **********************
 **********************
 
+- Remove local-machine build notes from package configuration and use ignored,
+  repository-relative rehearsal output with `uv run python` artifact checks.
+
 - Refresh security, maintainer, support, and release guidance for ongoing Core
   alpha operations; distinguish release checks from the maintenance backlog and
   keep platform/client support conditional on relevant validation.

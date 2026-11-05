@@ -45,15 +45,19 @@ installed CLI's help, inspection, and execution with an expected JSON result.
 The build uses isolation and `--no-sources`; archive installations resolve
 runtime dependencies independently of the development lockfile.
 
-Run the same checks locally from `/home/fbw/repos/FlowGraph/FlowGraph`:
+Run the same checks locally from the repository root:
 
 ```bash
-uv build --no-sources --out-dir /tmp/flowgraph-rehearsal-artifacts
-python packaging/test_artifact.py --artifacts /tmp/flowgraph-rehearsal-artifacts --kind wheel
-python packaging/test_artifact.py --artifacts /tmp/flowgraph-rehearsal-artifacts --kind sdist
+uv build --no-sources --out-dir .validation-dist/rehearsal
+uv run python packaging/test_artifact.py --artifacts .validation-dist/rehearsal --kind wheel
+uv run python packaging/test_artifact.py --artifacts .validation-dist/rehearsal --kind sdist
 ```
 
-Use a new, empty output directory per rehearsal. Python 3.11+ and `uv` on PATH
+Use a new, empty output directory per rehearsal; if `.validation-dist/rehearsal`
+already contains artifacts, choose a different empty subdirectory under the
+ignored `.validation-dist/` directory and use it in all three commands. Artifact
+output may be inside the checkout; the runner creates its installation and smoke
+test environments outside the checkout. Python 3.11+ and `uv` on PATH
 are required; network access is needed for uncached dependencies/build tools.
 The commands do not upload anything. CI archives are retained for one day.
 

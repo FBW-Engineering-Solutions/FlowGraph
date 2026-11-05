@@ -317,6 +317,49 @@ def test_legacy_cython_packaging_files_are_absent() -> None:
     assert not (packaging_directory / "pyproject.toml").exists()
 
 
+def test_packaging_configuration_has_no_machine_specific_paths() -> None:
+    """Check comments too, since TOML parsing would discard local build notes."""
+    root = Path(__file__).parents[1]
+    for path in (root / "pyproject.toml", root / "packaging/README.md"):
+        text = path.read_text(encoding="utf-8")
+        assert re.search(r"/(?:home|Users)/|(?<![A-Za-z])[A-Za-z]:[\\/]", text) is None
+
+
+def test_packaging_rehearsal_commands_use_consistent_relative_output() -> None:
+    """Keep portable examples aligned with the artifact runner's CLI contract."""
+    root = Path(__file__).parents[1]
+    guide = (root / "packaging/README.md").read_text(encoding="utf-8")
+    section = guide.split("Run the same checks locally from the repository root:", 1)[1]
+    block = section.split("```bash\n", 1)[1].split("\n```", 1)[0]
+    build, wheel, sdist = [shlex.split(line) for line in block.splitlines()]
+    assert build[:4] == ["uv", "build", "--no-sources", "--out-dir"]
+    output = build[4]
+    assert Path(output).parts[0] == ".validation-dist"
+    assert not Path(output).is_absolute()
+    assert ".validation-dist/" in (root / ".gitignore").read_text(encoding="utf-8").splitlines()
+    for command, kind in ((wheel, "wheel"), (sdist, "sdist")):
+        assert command == [
+            "uv",
+            "run",
+            "python",
+            "packaging/test_artifact.py",
+            "--artifacts",
+            output,
+            "--kind",
+            kind,
+        ]
+        completed = subprocess.run(
+            [sys.executable, str(root / command[3]), "--help"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert "--artifacts" in completed.stdout
+        assert "--kind {wheel,sdist}" in completed.stdout
+    assert "new, empty output directory per rehearsal" in section
+    assert "environments outside the checkout" in section
+
+
 def test_conda_recipe_is_absent() -> None:
     """Keep the retired Conda recipe out of the packaging workflow."""
     root = Path(__file__).parents[1]
