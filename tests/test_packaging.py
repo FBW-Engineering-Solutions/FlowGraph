@@ -298,7 +298,7 @@ def test_core_package_uses_standard_pure_python_build_configuration() -> None:
     metadata = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
 
     assert metadata["build-system"] == {
-        "requires": ["setuptools>=68"],
+        "requires": ["setuptools>=84.1.0"],
         "build-backend": "setuptools.build_meta",
     }
     assert all(
@@ -358,6 +358,17 @@ def test_packaging_rehearsal_commands_use_consistent_relative_output() -> None:
         assert "--kind {wheel,sdist}" in completed.stdout
     assert "new, empty output directory per rehearsal" in section
     assert "environments outside the checkout" in section
+
+
+def test_reviewed_dependency_advisories_remain_remediated() -> None:
+    """Prevent the reviewed lock/build versions regressing below patched floors."""
+    from packaging.version import Version
+
+    root = Path(__file__).parents[1]
+    lock = tomllib.loads((root / "uv.lock").read_text(encoding="utf-8"))
+    versions = {package["name"]: Version(package["version"]) for package in lock["package"]}
+    assert versions["setuptools"] >= Version("84.1.0")
+    assert versions["urllib3"] >= Version("2.8.0")
 
 
 def test_conda_recipe_is_absent() -> None:

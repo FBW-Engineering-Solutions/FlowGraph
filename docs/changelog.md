@@ -2,6 +2,9 @@ New in Next:
 **********************
 **********************
 
+- Remediate four dependency advisories by locking setuptools 84.1.0 and urllib3
+  2.8.0, and require setuptools 84.1.0 or newer for isolated package builds.
+
 - Target CI dependency audits at exact installed project-environment pins, with
   logged inventory, explicit local-project exclusion, and regression coverage.
 
