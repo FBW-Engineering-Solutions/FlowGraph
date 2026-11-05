@@ -21,6 +21,44 @@ fixes, preserving provenance and license notices, and publishing releases only
 after applicable release checks pass and relevant unresolved risks have been
 reviewed and recorded. Optional improvements are not automatic release blockers.
 
+## Contribution and repository protections
+
+The single-maintainer policy requires pull requests into `master`, resolved
+review conversations, and passing Core CI, but zero mandatory approvals so the
+maintainer can merge their own work. No routine administrator bypass is intended.
+Keep deletion and force-push protection. DCO sign-offs remain mandatory for each
+contribution commit; the maintainer checks them manually before merging. There
+is no automated DCO check, and cryptographic commit signatures are not DCO sign-offs.
+
+Core CI is the stable aggregate of source tests (including lint and dependency
+audit), package building, and wheel/sdist installation tests. Failed, cancelled,
+or skipped prerequisites must fail this gate. Configure `Core CI` as a required
+check with GitHub Actions as its expected source, requiring the branch to be
+up to date before merging. Do not require tag-only publication jobs on PRs.
+
+**Rollout pending:** these are the approved target settings, not a claim that
+remote enforcement is active. Push the workflow changes and obtain a successful
+hosted Core CI run before activating required checks. Then verify the effective
+rules for `master`: PR required, zero approvals, conversations resolved, Core CI
+required from GitHub Actions, up-to-date branch required, no deletion/force push,
+and no routine bypass. Read back both the rules and their branch targeting.
+
+Use separate rulesets for `v*` release-tag creation and immutability. Restrict
+creation to trusted repository administrators; the creation-only ruleset allows
+that role to bypass. Separately restrict tag updates and deletion with no routine
+bypass, so creation permission does not permit moving existing release tags.
+Verify both tag rulesets and their targeting after activation. Tag restrictions
+alone do not establish that a commit was reviewed or passed CI.
+
+External contributions run through `pull_request`, not `pull_request_target`.
+The workflow defaults to read-only contents access; release writes and publishing
+OIDC permissions are confined to tag-push jobs. Never grant fork PRs release
+credentials. After rollout, rehearse an external fork PR: check any required
+workflow approval, confirm Core CI runs, and verify publication jobs are skipped
+and no write/OIDC job is executed. Local regression tests do not replace this
+hosted rehearsal. PyPI environment and trusted-publisher restrictions are a
+separate control and must not be inferred from branch/tag protection.
+
 ## Succession and continuity
 
 FlowGraph is maintained by one developer. The current policy does not require

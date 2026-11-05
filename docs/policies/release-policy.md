@@ -64,6 +64,14 @@ a release.
 
 ## Release operations
 
+Create release tags only from an exact commit already merged into `master` with
+a successful Core CI run for that commit. Confirm the commit and its hosted
+checks before pushing a new tag; permission to create tags is not evidence that
+the target was reviewed or validated. The single maintainer performs this
+verification. Tag-push artifact/version validation remains required before either
+GitHub or PyPI publication. See the [governance guide](../maintainers/governance.md)
+for the approved branch/tag rules and pending remote rollout.
+
 The release manager must retain the source commit, signed tag when available,
 locked-environment hash, build logs, artifact hashes, checksums, compliance
 compliance outputs, approvals, and publication time. A failed or compromised

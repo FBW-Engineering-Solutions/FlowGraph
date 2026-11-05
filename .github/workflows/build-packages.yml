@@ -144,6 +144,26 @@ jobs:
       - name: Install and exercise the distribution outside the checkout
         run: python packaging/test_artifact.py --artifacts downloaded-packages --kind ${{ matrix.artifact }}
 
+  core-ci:
+    name: Core CI
+    if: always()
+    needs: [test, build, test-artifacts]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful source, build, and artifact checks
+        shell: bash
+        env:
+          SOURCE_RESULT: ${{ needs.test.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          ARTIFACT_RESULT: ${{ needs.test-artifacts.result }}
+        run: |
+          for result in "$SOURCE_RESULT" "$BUILD_RESULT" "$ARTIFACT_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "Core CI requires every prerequisite to succeed; observed: $result"
+              exit 1
+            fi
+          done
+
   validate-release:
     name: Validate tag against downloaded release artifacts
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')

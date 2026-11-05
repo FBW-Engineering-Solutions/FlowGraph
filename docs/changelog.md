@@ -2,6 +2,10 @@ New in Next:
 **********************
 **********************
 
+- Add the stable Core CI aggregate gate, fail-closed prerequisite tests, and
+  PR publication-permission regressions. Document single-maintainer branch/tag
+  policy and manual DCO review; remote protection rollout is still pending.
+
 - Remediate four dependency advisories by locking setuptools 84.1.0 and urllib3
   2.8.0, and require setuptools 84.1.0 or newer for isolated package builds.
 

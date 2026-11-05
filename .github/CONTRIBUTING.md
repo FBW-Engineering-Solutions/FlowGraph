@@ -80,6 +80,11 @@ Signed-off-by: Jane Developer <jane@example.org>
 Use `git commit -s` to add the line. By signing, you certify the contribution
 under the terms in [`DCO.md`](../docs/maintainers/dco.md). Do not sign on behalf of another person.
 
+The maintainer verifies sign-offs manually before merging; no automated DCO
+check is currently required. Sign-offs are contribution certifications, not
+cryptographic commit signatures. Repository protection policy and its rollout
+status are described in the [governance guide](../docs/maintainers/governance.md).
+
 ## Release notes
 
 The release manager maintains `docs/changelog.md` using Keep a Changelog headings.
