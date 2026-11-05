@@ -13,7 +13,8 @@ include:
 - the version tag;
 - the source distribution (`.tar.gz`);
 - the Python wheel (`.whl`);
-- SHA-256 checksums;
+- SHA-256 digests exposed in release asset metadata (a separate public checksum
+  manifest is optional);
 - release notes and upgrade information;
 - license and third-party-notice files when required; and
 - SBOM artifacts when generated for the release.

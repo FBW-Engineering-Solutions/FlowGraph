@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import io
+import json
 import os
 import subprocess
 import sys
@@ -234,6 +236,64 @@ def test_branch_and_pr_runs_include_packaging_matrix() -> None:
     assert "os: [ubuntu-latest, windows-latest, macos-latest]" in artifacts
     assert "name: flowgraph-core-packages" in artifacts
     assert "python packaging/test_artifact.py" in artifacts
+
+
+def test_ci_artifact_retention_is_a_download_window_not_durable_storage() -> None:
+    workflow = (ROOT / ".github/workflows/build-packages.yml").read_text(encoding="utf-8")
+    upload = workflow.split("      - name: Upload FlowGraph Core packages\n", 1)[1]
+    upload = upload.split("\n  test-artifacts:\n", 1)[0]
+    assert "retention-days: 30\n" in upload
+    policy = " ".join((ROOT / "docs/policies/release-policy.md").read_text().split())
+    assert "for the lifetime of the project" in policy
+    assert "second independent verified copy" in policy
+    assert "expiring Actions artifacts/logs are not durable evidence storage" in policy
+    assert "does not establish that a backup exists" in policy
+
+
+def test_release_archive_commands_capture_all_attempts_and_publication_metadata() -> None:
+    guide = (ROOT / "packaging/README.md").read_text(encoding="utf-8")
+    archive = guide.split("## Published-release evidence archive\n", 1)[1]
+    archive = archive.split("## Reproducibility limitations", 1)[0]
+    for command in (
+        "git archive --format=tar",
+        'git show "$SHA:uv.lock"',
+        'gh release download "$TAG"',
+        'for attempt in $(seq 1 "$ATTEMPTS"); do',
+        "attempts/$attempt/logs",
+        "attempts/$attempt/jobs?per_page=100",
+        "--paginate --jq '.jobs[]'",
+        "https://pypi.org/pypi/flowgraph/$VERSION/json",
+    ):
+        assert command in archive
+    assert "gh release create" not in archive
+    assert "gh release upload" not in archive
+    assert "twine upload" not in archive
+    assert "Recompute hashes from that second copy" in archive
+
+
+def test_documented_release_archive_manifest_hashes_files_and_refuses_overwrite(
+    tmp_path: Path,
+) -> None:
+    guide = (ROOT / "packaging/README.md").read_text(encoding="utf-8")
+    script = guide.split("uv run --no-sync python - \"$EVIDENCE_DIR\" <<'PY'\n", 1)[1]
+    script = script.split("\nPY\n", 1)[0]
+    (tmp_path / "packages").mkdir()
+    package = tmp_path / "packages/example.whl"
+    package.write_bytes(b"exact published package bytes")
+    (tmp_path / "uv.lock").write_bytes(b"lock contents\n")
+    command = [sys.executable, "-", str(tmp_path)]
+    result = subprocess.run(command, input=script, text=True, capture_output=True, check=False)
+    assert result.returncode == 0, result.stderr
+    manifest = tmp_path / "SHA256.json"
+    original = manifest.read_bytes()
+    assert json.loads(original) == {
+        "packages/example.whl": hashlib.sha256(package.read_bytes()).hexdigest(),
+        "uv.lock": hashlib.sha256(b"lock contents\n").hexdigest(),
+    }
+    repeated = subprocess.run(command, input=script, text=True, capture_output=True, check=False)
+    assert repeated.returncode != 0
+    assert "FileExistsError" in repeated.stderr
+    assert manifest.read_bytes() == original
 
 
 def test_core_ci_gate_runs_after_all_prerequisites_even_on_failure() -> None:

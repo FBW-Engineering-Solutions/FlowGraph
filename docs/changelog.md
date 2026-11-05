@@ -2,6 +2,9 @@ New in Next:
 **********************
 **********************
 
+- Retain CI packages for 30 days and document durable manual release-evidence
+  capture, publication-hash comparisons, and independent backup verification.
+
 - Make the Core CI gate and its regression tests portable with Python instead
   of invoking the WSL Bash launcher on Windows.
 

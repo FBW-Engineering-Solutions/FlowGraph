@@ -108,8 +108,8 @@ jobs:
           path: dist-wheels/*
           compression-level: 0
           if-no-files-found: error
-          # Keep CI artifacts for one day.
-          retention-days: 1
+          # Download window only; published-release evidence is archived separately.
+          retention-days: 30
 
   test-artifacts:
     name: Test ${{ matrix.artifact }} (${{ matrix.os }}, Python ${{ matrix.python-version }})
