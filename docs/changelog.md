@@ -2,6 +2,9 @@ New in Next:
 **********************
 **********************
 
+- Make the Core CI gate and its regression tests portable with Python instead
+  of invoking the WSL Bash launcher on Windows.
+
 - Add the stable Core CI aggregate gate, fail-closed prerequisite tests, and
   PR publication-permission regressions. Document single-maintainer branch/tag
   policy and manual DCO review; remote protection rollout is still pending.
