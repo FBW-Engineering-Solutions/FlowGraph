@@ -242,7 +242,7 @@ def test_core_ci_gate_runs_after_all_prerequisites_even_on_failure() -> None:
     assert "name: Core CI\n" in gate
     assert "if: always()\n" in gate
     assert "needs: [test, build, test-artifacts]\n" in gate
-    assert "shell: bash\n" in gate
+    assert "shell: python\n" in gate
     for variable, job in (
         ("SOURCE_RESULT", "test"),
         ("BUILD_RESULT", "build"),
@@ -255,7 +255,7 @@ def test_core_ci_gate_runs_after_all_prerequisites_even_on_failure() -> None:
 
 @pytest.mark.parametrize("result", ["success", "failure", "cancelled", "skipped", ""])
 @pytest.mark.parametrize("variable", ["SOURCE_RESULT", "BUILD_RESULT", "ARTIFACT_RESULT"])
-def test_core_ci_shell_rejects_every_unsuccessful_prerequisite(variable: str, result: str) -> None:
+def test_core_ci_script_rejects_every_unsuccessful_prerequisite(variable: str, result: str) -> None:
     workflow = (ROOT / ".github/workflows/build-packages.yml").read_text(encoding="utf-8")
     gate = workflow.split("\n  core-ci:\n", 1)[1].split("\n  validate-release:\n", 1)[0]
     script = gate.split("        run: |\n", 1)[1]
@@ -265,7 +265,7 @@ def test_core_ci_shell_rejects_every_unsuccessful_prerequisite(variable: str, re
     )
     env[variable] = result
     completed = subprocess.run(
-        ["bash", "-c", script], env=env, capture_output=True, text=True, check=False
+        [sys.executable, "-c", script], env=env, capture_output=True, text=True, check=False
     )
     assert completed.returncode == (0 if result == "success" else 1)
     if result != "success":

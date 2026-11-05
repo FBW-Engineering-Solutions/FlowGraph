@@ -151,18 +151,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Require successful source, build, and artifact checks
-        shell: bash
+        shell: python
         env:
           SOURCE_RESULT: ${{ needs.test.result }}
           BUILD_RESULT: ${{ needs.build.result }}
           ARTIFACT_RESULT: ${{ needs.test-artifacts.result }}
         run: |
-          for result in "$SOURCE_RESULT" "$BUILD_RESULT" "$ARTIFACT_RESULT"; do
-            if [ "$result" != "success" ]; then
-              echo "Core CI requires every prerequisite to succeed; observed: $result"
-              exit 1
-            fi
-          done
+          import os
+          import sys
+
+          for variable in ("SOURCE_RESULT", "BUILD_RESULT", "ARTIFACT_RESULT"):
+              result = os.environ.get(variable, "")
+              if result != "success":
+                  print(f"Core CI requires every prerequisite to succeed; observed: {result}")
+                  sys.exit(1)
 
   validate-release:
     name: Validate tag against downloaded release artifacts
