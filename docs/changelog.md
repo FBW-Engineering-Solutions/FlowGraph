@@ -1,6 +1,11 @@
-New in Next:
+New in version 0.1.8:
 **********************
 **********************
+
+Planned first MVP baseline, not a publication announcement or a stable API
+commitment. The `0.1.x` series remains alpha.
+
+Improvement:
 
 - Strip location/capture metadata from the ColorCardboard fixture while preserving
   decoded pixels, and make ParaView gateway examples independent of personal paths.
@@ -41,28 +46,12 @@ New in Next:
 - Add the documentation URL to package metadata and record passing CI evidence
   for the existing Python 3.11–3.14 classifiers, with metadata consistency tests.
 
-New in version 0.1.8:
-**********************
-**********************
-
-Planned first MVP baseline, not a publication announcement or a stable API
-commitment. The `0.1.x` series remains alpha.
-
 Api Change:
 - Remove the Conda packaging recipe and its release validation. Supported release
   artifacts remain the Python wheel and source distribution on GitHub and PyPI.
 - Move meshio, Meshlane, pandas, h5py, Pillow, and openpyxl to the optional
   `io` extra. Install `flowgraph[io]` (or use `uv sync --extra io` in a source
   checkout) for workflows using these libraries. Version constraints are unchanged.
-
-New functionalities:
--
-
-Corrections:
--
-
-Improvement:
--
 
 New in version 0.1.7:
 **********************
