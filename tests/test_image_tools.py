@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -36,6 +37,21 @@ from flowgraph.application.workflow_core import (
 )
 from flowgraph.application.workflow_execution import clear_execution_session, execute_workflow_json
 from flowgraph.application.workflow_io import workflow_to_dict
+
+
+def test_color_cardboard_fixture_has_no_location_metadata() -> None:
+    path = Path(__file__).parents[1] / "src/flowgraph/testdata/ColorCardboard.jpg"
+    # Pin sanitized file bytes, not decoded pixels: JPEG decoders may differ by platform.
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == (
+        "66dc88879b355a2d666288f74d56b27572ae2625848026cdb540f0c5b358a7f5"
+    )
+    with PillowImage.open(path) as image:
+        assert image.size == (2850, 2484)
+        assert image.mode == "RGB"
+        assert not image.getexif()
+        assert "exif" not in image.info
+        assert "xmp" not in image.info
+        assert "XML:com.adobe.xmp" not in image.info
 
 
 def test_image_data_type_accepts_pillow_images() -> None:

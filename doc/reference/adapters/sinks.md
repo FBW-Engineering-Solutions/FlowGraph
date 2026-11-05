@@ -59,11 +59,11 @@ inputs; the node's cache policy is `always`.
 
 Use the **pvpython from the same ParaView installation as the GUI**. The script
 is standalone and needs no FlowGraph/Muscat/Pillow installation in pvpython.
-From this source checkout, for example:
+Add that installation's `bin` directory to your `PATH` so `pvpython` resolves to
+the matching executable. From the FlowGraph Core repository root:
 
 ```bash
-/home/fbw/Apps/ParaView-6.2.0-MPI-Linux-Python3.12-x86_64/bin/pvpython --no-mpi \
-  /home/fbw/repos/FlowGraph/FlowGraph/src/flowgraph/paraview_gateway.py
+pvpython --no-mpi src/flowgraph/paraview_gateway.py
 ```
 
 For a wheel installation, locate the script using the FlowGraph environment:
@@ -102,8 +102,7 @@ gateway port **33333** and publish the same VTK data and node IDs.
 Explicitly allow your editor's exact origin when starting the gateway:
 
 ```bash
-/home/fbw/Apps/ParaView-6.2.0-MPI-Linux-Python3.12-x86_64/bin/pvpython --no-mpi \
-  /home/fbw/repos/FlowGraph/FlowGraph/src/flowgraph/paraview_gateway.py \
+pvpython --no-mpi src/flowgraph/paraview_gateway.py \
   --allow-origin http://localhost:8082
 ```
 
@@ -116,7 +115,7 @@ use the exact matching configured origin rather than echoing the request header.
 Do not allow websites you do not trust to publish data to your local gateway.
 
 After updating the Python code, rebuild the WASM wheel and web deployment with
-`make build` in `/home/fbw/repos/FlowGraph/FlowGraph_web`, then reload the editor
+`make build` from the `FlowGraph_web` repository root, then reload the editor
 to create a fresh worker. A gateway restart alone does not update Python code
 already loaded in the browser. The production build uses the same command.
 
