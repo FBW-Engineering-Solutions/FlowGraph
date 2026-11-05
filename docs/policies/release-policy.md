@@ -5,6 +5,10 @@
 
 ## Current release status
 
+Version `0.1.8` is the planned first MVP baseline, not a publication announcement
+or a stable API commitment. Pre-MVP releases are outside this release-readiness
+documentation scope.
+
 The `0.1.x` series is an **alpha** series. FlowGraph Core is usable for
 evaluation, development, experimentation, and early adopter feedback, but it is
 not a stable API commitment.
@@ -32,8 +36,8 @@ version in `pyproject.toml` is the source of truth for package artifacts.
 
 The release tag must be exactly `v` followed by that version. Validate both
 artifact filenames and internal wheel/sdist metadata with
-`packaging/check_release.py` before publication. Historical exceptions are
-recorded in `docs/release-reconciliation.md`; they do not permit future mismatches.
+`packaging/check_release.py` before publication. Source declarations, release tags,
+artifact filenames, and internal package metadata must agree.
 
 - Increment the patch component for compatible fixes and small improvements.
 - Increment the minor component when adding features or making broader changes;

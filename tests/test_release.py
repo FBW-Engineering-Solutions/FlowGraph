@@ -19,6 +19,25 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECKER)
 
 
+def test_release_docs_use_planned_mvp_baseline_without_missing_audit() -> None:
+    """Keep the MVP scope explicit without depending on a missing pre-MVP audit."""
+    packaging = (ROOT / "packaging/README.md").read_text(encoding="utf-8")
+    policy = (ROOT / "docs/policies/release-policy.md").read_text(encoding="utf-8")
+    changelog = (ROOT / "docs/changelog.md").read_text(encoding="utf-8")
+    for document in (packaging, policy, changelog):
+        document = " ".join(document.split())
+        assert "release-reconciliation.md" not in document
+        assert "planned first mvp baseline" in document.lower()
+        assert "not a publication announcement" in document
+        assert "stable API commitment" in document
+    for document in (packaging, policy):
+        assert "`0.1.8`" in document
+        assert "Pre-MVP releases are outside this release-readiness" in document
+        assert "packaging/check_release.py" in document
+    assert "New in version 0.1.7:" in changelog
+    assert "New in version 0.1.5:" in changelog
+
+
 @pytest.fixture
 def release_tree(tmp_path: Path) -> Path:
     """Create independent source declarations for a prospective release."""

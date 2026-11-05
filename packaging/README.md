@@ -65,10 +65,9 @@ not validate optional extras, every workflow, or byte reproducibility.
 
 ## Release procedure
 
-See `docs/release-reconciliation.md` for the October 22, 2026 audit: historical
-GitHub tags `v0.1.2.1`, `v0.1.3`, and `v0.1.4` attach packages labeled `0.1.2`.
-Source `0.1.5` is not proof of a PyPI publication. Historical tags and assets
-are preserved rather than silently replaced.
+Version `0.1.8` is the planned first MVP baseline. This is not a publication
+announcement or a stable API commitment; the `0.1.x` series remains alpha.
+Pre-MVP releases are outside this release-readiness documentation scope.
 
 The version in `pyproject.toml` is the artifact version source of truth and
 `docs/changelog.md` is the release-note source of truth. From a clean checkout:
@@ -86,8 +85,8 @@ python packaging/check_release.py --artifacts dist/ --tag "v$(python -c 'import 
 The validator compares source declarations, filenames, and internal wheel/sdist
 metadata to the exact tag. Omit `--tag` only for untagged development builds.
 CI validates downloaded artifacts before either GitHub or PyPI publication.
-Choose a new, unused tag/version for corrections; `v0.1.5` already exists and
-must not be moved to include later fixes.
+Choose a new, unused tag/version for corrections; do not move existing release
+tags to include later fixes or reuse a published version for different bytes.
 
 Inspect both artifacts, install them in clean environments, run `flowgraph
 --help`, import `flowgraph`, and exercise a representative workflow before

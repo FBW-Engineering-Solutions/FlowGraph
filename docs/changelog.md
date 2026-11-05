@@ -2,6 +2,9 @@ New in Next:
 **********************
 **********************
 
+- Establish 0.1.8 as the planned first MVP baseline and remove obsolete historical
+  release-audit references. Release-version validation remains required.
+
 - Update installation requirements, pure-Python packaging, runtime extras, and
   persistent/source/temporary commands; test the documented CLI examples.
 
@@ -14,6 +17,9 @@ New in Next:
 New in version 0.1.8:
 **********************
 **********************
+
+Planned first MVP baseline, not a publication announcement or a stable API
+commitment. The `0.1.x` series remains alpha.
 
 Api Change:
 - Remove the Conda packaging recipe and its release validation. Supported release
@@ -106,9 +112,6 @@ New in version 0.1.5:
 **********************
 **********************
 
-Source version (not a publication announcement). As of October 22, 2026,
-PyPI's latest version is `0.1.2`; see `release-reconciliation.md` for the
-historical tag/asset mismatches and correction policy.
 The `0.1.x` series is alpha. APIs, workflow behavior, and compatibility
 guarantees may change before the `1.0.0` stability milestone.
 
