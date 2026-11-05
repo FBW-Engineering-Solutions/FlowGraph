@@ -2,6 +2,10 @@ New in Next:
 **********************
 **********************
 
+- Strip location/capture metadata from the ColorCardboard fixture while preserving
+  decoded pixels, and make ParaView gateway examples independent of personal paths.
+  This does not replace previously published packages or rewrite history.
+
 - Retain CI packages for 30 days and document durable manual release-evidence
   capture, publication-hash comparisons, and independent backup verification.
 

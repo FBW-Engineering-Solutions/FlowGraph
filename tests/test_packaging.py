@@ -14,6 +14,16 @@ from flowgraph.adapters import ADAPTERS
 from flowgraph.version import __version__
 
 
+def test_paraview_documentation_uses_portable_source_checkout_commands() -> None:
+    root = Path(__file__).parents[1]
+    guide = (root / "doc/reference/adapters/sinks.md").read_text(encoding="utf-8")
+    assert "pvpython --no-mpi src/flowgraph/paraview_gateway.py" in guide
+    assert "`FlowGraph_web` repository root" in guide
+    assert "installation's `bin` directory to your `PATH`" in guide
+    assert not re.search(r"/(?:home|Users)/[^/\s]+/|[A-Za-z]:\\Users\\", guide)
+    assert (root / "src/flowgraph/paraview_gateway.py").is_file()
+
+
 def test_website_documents_every_registered_adapter_node() -> None:
     """Catch missing node IDs and adapter families in the website reference."""
     root = Path(__file__).parents[1]
