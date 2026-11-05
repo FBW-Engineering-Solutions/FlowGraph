@@ -10,9 +10,9 @@ operating system, a minimal reproduction, and relevant error output.
 Do not report security vulnerabilities in public issues. Follow
 [`SECURITY.md`](../SECURITY.md) instead.
 
-## Initial maintainership
+## Maintainership
 
-Felipe Bordeu is the initial maintainer and release manager for FlowGraph Core.
+Felipe Bordeu is the maintainer and release manager for FlowGraph Core.
 Issues are handled on a best-effort basis; no response-time or support-level
 agreement is offered.
 
@@ -21,4 +21,5 @@ agreement is offered.
 Support covers the public, GUI-free FlowGraph Core package, its documented
 command-line interface, and its published package artifacts. Private projects,
 unpublished integrations, and custom workflow development are outside this
-repository's public support scope.
+repository's public support scope. Optional Desktop and Web clients have their
+own support scope; their behavior is not covered by Core package validation.

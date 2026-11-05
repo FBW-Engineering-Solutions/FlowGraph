@@ -1,17 +1,17 @@
 # FlowGraph Core Support Policy
 
 **Decision date:** September 20, 2026  
-**Scope:** Initial public FlowGraph Core release
+**Scope:** FlowGraph Core alpha releases
 
-This is the initial best-effort support policy for the standalone, GUI-free core
+This is the best-effort support policy for the standalone, GUI-free core
 package. It describes what the project intends to support; it does not override
 the dependency requirements or guarantee that every dependency works on every
 platform. The current `0.1.x` series is alpha, so these support statements are
-initial targets rather than a stable API commitment.
+conditional support targets rather than a stable API commitment.
 
 ## Python versions
 
-FlowGraph Core declares `requires-python = ">=3.11"` and initially supports
+FlowGraph Core declares `requires-python = ">=3.11"` and targets
 Python 3.11 and newer versions that are compatible with the declared dependency
 set.
 
@@ -78,7 +78,7 @@ When practical, a public feature or behavior scheduled for removal will be
 documented in release notes and marked as deprecated before removal. The project
 does not currently promise a fixed number of releases or months between
 deprecation and removal because it is an early-stage pre-1.0 project maintained
-by one initial maintainer.
+by one maintainer.
 
 Security fixes, dependency removals, and urgent correctness changes may require
 shorter timelines. Such changes must be explained in the release notes.
@@ -96,10 +96,11 @@ security-reporting channels.
 
 ## Unsupported use cases
 
-The initial public core release does not promise support for:
+Core releases do not promise support for:
 
-- GUI or native desktop behavior from this repository;
-- Windows, macOS, or unverified Linux architectures as supported platforms;
+- optional Desktop or Web client behavior through Core package validation;
+- OS/Python combinations or architectures without passing release-candidate
+  evidence, including unverified Linux architectures;
 - optional integrations that have not been tested for the release;
 - production execution of arbitrary user code, external tools, or untrusted
   workflows without independent security review;

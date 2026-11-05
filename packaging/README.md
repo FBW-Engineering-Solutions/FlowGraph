@@ -92,8 +92,10 @@ Inspect both artifacts, install them in clean environments, run `flowgraph
 --help`, import `flowgraph`, and exercise a representative workflow before
 publishing. Retain dependency notices, SBOM, native
 audit, preserved license texts, and checksums with the release record. Publish
-through GitHub Releases and PyPI only
-after the release blockers in `TODO.md` and the compliance review are closed.
+through GitHub Releases and PyPI only after applicable release checks pass and
+relevant unresolved risks have been reviewed and recorded. Optional improvements
+are not automatic release blockers. Required security and artifact reviews still
+apply. Core package validation does not validate optional Desktop or Web clients.
 
 ## Reproducibility limitations
 

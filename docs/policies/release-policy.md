@@ -57,8 +57,10 @@ Before publishing an alpha release:
 - document workflow-format changes and migration guidance; and
 - verify the release through the supported GitHub and PyPI channels.
 
-The open-source release checklist remains authoritative when it imposes stricter
-requirements than this policy.
+Apply these requirements to each release candidate. Review and record relevant
+unresolved security, dependency, licensing, and support risks before publication.
+Unrelated owner decisions and optional improvements do not automatically block
+a release.
 
 ## Release operations
 

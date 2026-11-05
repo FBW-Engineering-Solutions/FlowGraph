@@ -2,6 +2,10 @@ New in Next:
 **********************
 **********************
 
+- Refresh security, maintainer, support, and release guidance for ongoing Core
+  alpha operations; distinguish release checks from the maintenance backlog and
+  keep platform/client support conditional on relevant validation.
+
 - Establish 0.1.8 as the planned first MVP baseline and remove obsolete historical
   release-audit references. Release-version validation remains required.
 

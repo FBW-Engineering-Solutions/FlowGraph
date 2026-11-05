@@ -1,7 +1,7 @@
 # FlowGraph Core Release Channels
 
 **Decision date:** September 22, 2026
-**Scope:** Initial public FlowGraph Core release
+**Scope:** FlowGraph Core alpha releases
 
 ## Supported channels
 
@@ -20,18 +20,18 @@ include:
 
 ### PyPI
 
-PyPI is the canonical installation channel for Python users. The project will
-publish the FlowGraph Core source distribution and wheel to the `flowgraph`
-project using the protected project owner account and a reviewed release
-workflow.
+PyPI is the canonical installation channel for Python users. Publish the
+FlowGraph Core source distribution and wheel to the `flowgraph` project using
+the reviewed release workflow. The release manager must verify account and
+publisher protections separately; this policy does not establish their status.
 
 PyPI publication must use the final BSD-3-Clause metadata, the Felipe Bordeu
 author/maintainer metadata, the correct project URLs, and artifact validation
 before upload.
 
-## Not supported for the initial release
+## Unsupported distribution channels
 
-The initial public release does not promise or publish through:
+Core release procedures do not provide publication or support through:
 
 - Conda channels (the repository recipe was removed on November 5, 2026);
 - Docker Hub or other container registries;
@@ -48,10 +48,12 @@ Users may clone the repository and build it locally with `uv`, but source
 checkout usage is not a separate supported distribution channel. The supported
 release artifacts are the GitHub source release and the PyPI package.
 
+Optional Desktop and Web clients have separate distribution and validation
+procedures; Core wheel/sdist checks do not establish client support.
+
 ## Publication ownership
 
-Felipe Bordeu is the initial and current release manager. The project is
-maintained by one developer, so no independent backup owner is required for the
-initial alpha release. Release continuity depends on securing the maintainer's
-GitHub and PyPI accounts, configuring account recovery, enabling MFA, and
+Felipe Bordeu is the release manager. The current single-maintainer policy does
+not require an independent backup owner. Release continuity depends on securing
+the maintainer's GitHub and PyPI accounts, configuring account recovery, enabling MFA, and
 retaining private release backups and artifact records.

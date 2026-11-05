@@ -4,29 +4,29 @@
 
 Do not report suspected vulnerabilities in public GitHub issues.
 
-Use GitHub private vulnerability reporting for this repository. Before the
-repository is made public, the repository owner must enable private vulnerability
-reporting in the repository security settings and verify that reports reach
-Felipe Bordeu.
+Use GitHub private vulnerability reporting for this repository. The repository
+owner is responsible for keeping this channel available and verifying that
+reports reach Felipe Bordeu. Report-delivery verification remains an open
+maintainer task; this policy does not establish that delivery has been tested.
 
 Include a clear description of the issue, affected FlowGraph version, impact,
 reproduction steps or proof of concept, and any suggested mitigation. Do not
 include secrets, customer data, or other sensitive material unless it is strictly
 necessary to demonstrate the issue.
 
-If private vulnerability reporting is unavailable, contact the initial security
-contact through the private contact mechanism configured for the public
-repository. Do not use a public issue, pull request, or package metadata field
-for sensitive reports.
+If private vulnerability reporting is unavailable, no verified fallback private
+contact route is documented here. You may request restoration of the reporting
+channel in a public issue without including vulnerability details. Do not use a
+public issue, pull request, or package metadata field for sensitive reports.
 
-## Initial security contact and handling
+## Security contact and handling
 
-Felipe Bordeu is the initial security contact and is responsible for triage and
+Felipe Bordeu is the security contact and is responsible for triage and
 release coordination. Reports are acknowledged when practical, normally within
 seven calendar days, but no guaranteed response or remediation timeframe is
-offered while the project has a single initial maintainer.
+offered while the project has a single maintainer.
 
-The initial process is:
+The handling process is:
 
 1. Acknowledge and assess the report privately.
 2. Determine affected versions and practical mitigation.
@@ -61,8 +61,8 @@ been exposed, including credentials found in deleted history or CI logs.
 
 ## Continuity and recovery
 
-FlowGraph is initially maintained by one developer. An independent backup owner
-is not required for the initial alpha release. The maintainer must protect the
+FlowGraph is maintained by one developer. The current single-maintainer policy
+does not require an independent backup owner. The maintainer must protect the
 GitHub and PyPI accounts with MFA, configure account recovery, retain a private
 repository backup, and preserve release artifacts, checksums, and publication
 records. A second maintainer or backup owner can be added later as the project

@@ -1,7 +1,7 @@
 # Governance
 
-FlowGraph Core is initially maintained by Felipe Bordeu, who serves as the
-initial maintainer, release manager, and security contact. The project is
+FlowGraph Core is maintained by Felipe Bordeu, who serves as the
+maintainer, release manager, and security contact. The project is
 pre-1.0 and decisions prioritize correctness, reproducibility, security,
 licensing clarity, and preservation of the headless core boundary.
 
@@ -18,12 +18,13 @@ private procedures and are not decided in public threads.
 The maintainer is responsible for reviewing contributions, protecting release
 credentials, maintaining the supported-version policy, coordinating security
 fixes, preserving provenance and license notices, and publishing releases only
-after the release checklist is satisfied.
+after applicable release checks pass and relevant unresolved risks have been
+reviewed and recorded. Optional improvements are not automatic release blockers.
 
 ## Succession and continuity
 
-FlowGraph is initially maintained by one developer. The initial release does not
-require an independent backup owner. The maintainer is responsible for account
+FlowGraph is maintained by one developer. The current policy does not require
+an independent backup owner. The maintainer is responsible for account
 security, MFA, recovery methods, private repository backups, and release-record
 retention. Any future change in maintainership or repository ownership must be
 recorded in a dated project decision and reflected in the public support and

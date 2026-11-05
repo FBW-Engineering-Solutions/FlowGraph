@@ -38,6 +38,47 @@ def test_release_docs_use_planned_mvp_baseline_without_missing_audit() -> None:
     assert "New in version 0.1.5:" in changelog
 
 
+def test_security_reporting_docs_keep_unverified_delivery_explicit() -> None:
+    security = " ".join((ROOT / "SECURITY.md").read_text(encoding="utf-8").split())
+    assert "GitHub private vulnerability reporting" in security
+    assert "Report-delivery verification remains an open maintainer task" in security
+    assert "no verified fallback private contact route is documented here" in security
+    assert "without including vulnerability details" in security
+    assert "seven calendar days" in security
+    assert "no guaranteed response or remediation timeframe" in security
+    assert "Before the repository is made public" not in security
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["docs/maintainers/governance.md", "docs/policies/release-policy.md", "packaging/README.md"],
+)
+def test_release_guidance_is_self_contained_and_keeps_applicable_checks(path: str) -> None:
+    document = " ".join((ROOT / path).read_text(encoding="utf-8").split())
+    assert "optional improvements" in document.lower()
+    assert "relevant unresolved" in document
+    assert "reviewed and recorded" in document or "Review and record" in document
+    assert "after the release checklist is satisfied" not in document
+    assert "todo.md" not in document.lower()
+
+
+def test_support_docs_keep_platform_and_client_validation_separate() -> None:
+    support = " ".join(
+        (ROOT / "docs/policies/support-policy.md").read_text(encoding="utf-8").split()
+    )
+    assert "Windows, macOS, or unverified Linux architectures as supported platforms" not in support
+    assert "without passing release-candidate evidence" in support
+    assert "corresponding matrix jobs pass for the release candidate" in support
+    for path in (
+        "docs/policies/support-policy.md",
+        "docs/policies/release-channels.md",
+        ".github/SUPPORT.md",
+    ):
+        document = " ".join((ROOT / path).read_text(encoding="utf-8").split())
+        assert "Desktop" in document and "Web" in document
+        assert "Initial public FlowGraph Core release" not in document
+
+
 @pytest.fixture
 def release_tree(tmp_path: Path) -> Path:
     """Create independent source declarations for a prospective release."""
