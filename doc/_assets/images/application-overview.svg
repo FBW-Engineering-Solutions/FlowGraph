@@ -1,8 +1,608 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="800" height="360" viewBox="0 0 800 360" role="img" aria-label="FlowGraph application overview">
-  <rect width="800" height="360" fill="#263238"/>
-  <rect x="24" y="24" width="450" height="312" rx="8" fill="#37474f"/>
-  <rect x="496" y="24" width="280" height="312" rx="8" fill="#1e88e5" opacity=".55"/>
-  <circle cx="636" cy="178" r="94" fill="#90caf9" opacity=".8"/>
-  <text x="48" y="66" fill="#eceff1" font-family="sans-serif" font-size="24">Workflow editor</text>
-  <text x="536" y="66" fill="#eceff1" font-family="sans-serif" font-size="24">3D view</text>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="811.18048"
+   height="424"
+   viewBox="0 0 811.18048 424"
+   role="img"
+   aria-labelledby="title desc"
+   version="1.1"
+   id="svg53"
+   sodipodi:docname="flowgraph-editor-preview.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <sodipodi:namedview
+     id="namedview53"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.1534211"
+     inkscape:cx="237.55418"
+     inkscape:cy="125.71298"
+     inkscape:window-width="3424"
+     inkscape:window-height="1224"
+     inkscape:window-x="4234"
+     inkscape:window-y="426"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="g7" />
+  <title
+     id="title">FlowGraph Web editor preview</title>
+  <desc
+     id="desc">Conceptual preview of the FlowGraph editor, with a node catalog, a Read Mesh to Apply Transform to Write Mesh workflow, and an inspector showing that inputs are connected.</desc>
+  <defs
+     id="defs1">
+    <pattern
+       inkscape:collect="always"
+       xlink:href="#dots"
+       id="pattern54"
+       patternTransform="matrix(0.96520455,0,0,1,5.0801368,0)" />
+    <clipPath
+       id="frame">
+      <rect
+         x="0.5"
+         y="0.5"
+         width="1131"
+         height="424"
+         rx="8.5"
+         id="rect1" />
+    </clipPath>
+    <pattern
+       id="dots"
+       x="146"
+       y="89"
+       width="10"
+       height="10"
+       patternUnits="userSpaceOnUse">
+      <circle
+         cx="5"
+         cy="5"
+         r="0.7"
+         fill="#77808e"
+         fill-opacity="0.5"
+         id="circle1" />
+    </pattern>
+  </defs>
+  <!-- Native vector shapes and editable text; no external assets or HTML. -->
+  <g
+     clip-path="url(#frame)"
+     font-family="Inter, 'DejaVu Sans', Arial, sans-serif"
+     font-size="10.88px"
+     fill="#e8edf6"
+     id="g53"
+     transform="translate(-0.5,-0.5)">
+    <!-- Application toolbar and embedded FlowGraph logo. -->
+    <rect
+       x="0.5"
+       y="0.5"
+       width="810.68048"
+       height="424.91956"
+       rx="8.5"
+       fill="none"
+       stroke="#454c59"
+       id="rect53"
+       style="fill:#262a32;fill-opacity:1" />
+    <g
+       transform="matrix(0.09,0,0,0.09,19.5,16.5)"
+       id="g7">
+      <rect
+         x="17"
+         y="14"
+         width="23"
+         height="23"
+         rx="5"
+         fill="#111a29"
+         id="rect3"
+         style="display:inline"
+         transform="matrix(11.111111,0,0,11.111111,-216.66667,-183.33333)" />
+      <rect
+         width="200"
+         height="200"
+         rx="36"
+         fill="#0f172a"
+         id="rect4"
+         x="0"
+         y="0" />
+      <path
+         d="m 60,140 q 40,0 40,-40 0,-40 40,-40"
+         fill="none"
+         stroke="#38bdf8"
+         stroke-width="8"
+         stroke-linecap="round"
+         id="path4" />
+      <path
+         d="m 60,60 80,80"
+         fill="none"
+         stroke="#06b6d4"
+         stroke-width="8"
+         stroke-linecap="round"
+         opacity="0.6"
+         id="path5" />
+      <circle
+         cx="60"
+         cy="60"
+         r="10"
+         fill="#06b6d4"
+         id="circle5" />
+      <circle
+         cx="140"
+         cy="140"
+         r="10"
+         fill="#38bdf8"
+         id="circle6" />
+      <circle
+         cx="100"
+         cy="100"
+         r="12"
+         fill="#f43f5e"
+         id="circle7" />
+    </g>
+    <text
+       x="47"
+       y="29.5"
+       fill="#ffffff"
+       font-weight="750"
+       id="text7">FlowGraph Web</text>
+    <g
+       font-weight="650"
+       id="g13">
+      <text
+         x="156"
+         y="29.5"
+         id="text8">File</text>
+      <text
+         x="189"
+         y="29.5"
+         id="text9">Edit</text>
+      <text
+         x="224"
+         y="29.5"
+         id="text10">Run</text>
+      <text
+         x="261"
+         y="29.5"
+         id="text11">Nodes</text>
+      <text
+         x="310"
+         y="29.5"
+         id="text12">Demos</text>
+      <text
+         x="364"
+         y="29.5"
+         id="text13">Help</text>
+    </g>
+    <rect
+       x="700"
+       y="11"
+       width="95"
+       height="29"
+       rx="3"
+       fill="#90caf9"
+       id="rect13" />
+    <text
+       x="747.5"
+       y="29.5"
+       text-anchor="middle"
+       fill="#07111e"
+       font-weight="700"
+       id="text14">Run workflow</text>
+    <path
+       d="M 1,50 H 810.987"
+       stroke="#454c59"
+       id="path14"
+       sodipodi:nodetypes="cc" />
+    <!-- Node catalog. -->
+    <rect
+       x="1"
+       y="51"
+       width="145"
+       height="329"
+       fill="#262a32"
+       id="rect14" />
+    <text
+       x="13"
+       y="79"
+       fill="#ffffff"
+       font-size="12px"
+       font-weight="700"
+       id="text15">Nodes</text>
+    <rect
+       x="13.5"
+       y="95.5"
+       width="120"
+       height="31"
+       rx="3"
+       fill="#191c23"
+       stroke="#565e6d"
+       id="rect15" />
+    <text
+       x="22"
+       y="115"
+       fill="#b6c1d1"
+       font-size="9.92px"
+       id="text16">Search nodes</text>
+    <g
+       fill="none"
+       stroke="#b6c1d1"
+       stroke-width="1"
+       id="g16">
+      <circle
+         cx="120"
+         cy="108"
+         r="3"
+         id="circle16" />
+      <path
+         d="m 118,111 -3,4"
+         id="path16" />
+    </g>
+    <g
+       fill="#90caf9"
+       font-size="9.12px"
+       font-weight="800"
+       letter-spacing="0.73"
+       id="g19">
+      <text
+         x="13"
+         y="151"
+         id="text17">INPUTS</text>
+      <text
+         x="13"
+         y="234"
+         id="text18">TOOLS</text>
+      <text
+         x="13"
+         y="326"
+         id="text19">WORKFLOW</text>
+    </g>
+    <g
+       fill="#9eb1c9"
+       font-size="9.92px"
+       id="g26">
+      <text
+         x="13"
+         y="174"
+         id="text20">› Files</text>
+      <text
+         x="13"
+         y="197"
+         id="text21">› Scalars &amp; vectors</text>
+      <text
+         x="13"
+         y="257"
+         id="text22">› Mesh tools</text>
+      <text
+         x="13"
+         y="280"
+         id="text23">› Image tools</text>
+      <text
+         x="13"
+         y="303"
+         id="text24">› Table tools</text>
+      <text
+         x="13"
+         y="349"
+         id="text25">› Controls</text>
+      <text
+         x="13"
+         y="372"
+         id="text26">› Outputs</text>
+    </g>
+    <!-- Workflow canvas. -->
+    <rect
+       x="146"
+       y="51"
+       width="520.80518"
+       height="329"
+       fill="#20242b"
+       id="rect26"
+       style="stroke-width:1.01402" />
+    <rect
+       x="146"
+       y="89"
+       width="520.76154"
+       height="291.4335"
+       fill="url(#dots)"
+       id="rect27"
+       style="fill:url(#pattern54);stroke-width:0.982448" />
+    <rect
+       x="146"
+       y="51"
+       width="521.21313"
+       height="36"
+       fill="#262a32"
+       id="rect28" />
+    <path
+       d="M 146,87 H 667.82616"
+       stroke="#454c59"
+       id="path28"
+       sodipodi:nodetypes="cc" />
+    <g
+       fill="#90caf9"
+       font-size="9.44px"
+       id="g29">
+      <text
+         x="158"
+         y="73"
+         id="text28">Root workflow</text>
+      <text
+         x="654"
+         y="73"
+         text-anchor="end"
+         id="text29">Mesh transformation</text>
+    </g>
+    <!-- Connections are behind the nodes, with endpoints at the port centers. -->
+    <g
+       fill="none"
+       stroke="#58abe3"
+       stroke-width="2"
+       stroke-opacity="0.8"
+       id="g30"
+       transform="translate(-86)">
+      <path
+         d="m 416,190 c 17,0 17,25 35,25"
+         id="path29" />
+      <path
+         d="m 576,215 c 17,0 17,40 35,40"
+         id="path30" />
+    </g>
+    <!-- Subtle vector-only node shadows and selected-node halo. -->
+    <g
+       fill="#000000"
+       fill-opacity="0.16"
+       id="g31">
+      <rect
+         x="188"
+         y="157"
+         width="140.30139"
+         height="82"
+         rx="3.0903392"
+         id="rect30"
+         style="stroke-width:0.786173" />
+      <rect
+         x="523"
+         y="222"
+         width="89.365967"
+         height="80.049278"
+         rx="5"
+         id="rect31" />
+    </g>
+    <rect
+       x="360"
+       y="170"
+       width="136.81589"
+       height="91"
+       rx="5.1305962"
+       fill="#58abe3"
+       fill-opacity="0.06"
+       id="rect32"
+       style="stroke-width:0.755027" />
+    <rect
+       x="363"
+       y="173"
+       width="129.73854"
+       height="85"
+       rx="3.8810678"
+       fill="#58abe3"
+       fill-opacity="0.1"
+       id="rect33"
+       style="stroke-width:0.744606" />
+    <rect
+       x="187.89342"
+       y="150.89342"
+       width="140.15981"
+       height="78.21315"
+       rx="3.0872204"
+       fill="#292f39"
+       stroke="#565e6d"
+       id="rect34"
+       style="stroke-width:0.786849" />
+    <rect
+       x="365.73743"
+       y="175.73744"
+       width="122.61981"
+       height="78.525131"
+       rx="2.700877"
+       fill="#292f39"
+       stroke="#90caf9"
+       stroke-width="1.47487"
+       id="rect35" />
+    <rect
+       x="523.00104"
+       y="216.00101"
+       width="89.980904"
+       height="73.400101"
+       rx="5.0202107"
+       fill="#292f39"
+       stroke="#565e6d"
+       id="rect36"
+       style="stroke-width:1.00201" />
+    <g
+       fill="#90caf9"
+       font-size="8px"
+       font-weight="800"
+       letter-spacing="0.8"
+       id="g38">
+      <text
+         x="198"
+         y="171"
+         id="text36">INPUT</text>
+      <text
+         x="382"
+         y="196"
+         id="text37">PROCESS</text>
+      <text
+         x="539"
+         y="236"
+         id="text38">OUTPUT</text>
+    </g>
+    <g
+       fill="#ffffff"
+       font-size="10.4px"
+       font-weight="700"
+       id="g41">
+      <text
+         x="198"
+         y="190"
+         id="text39">Read Mesh</text>
+      <text
+         x="382"
+         y="215"
+         id="text40">Apply Transform</text>
+      <text
+         x="539"
+         y="255"
+         id="text41">Write Mesh</text>
+    </g>
+    <g
+       fill="#b6c1d1"
+       font-family="'DejaVu Sans Mono', Consolas, monospace"
+       font-size="8.32px"
+       id="g44">
+      <text
+         x="198"
+         y="212"
+         id="text42">Mesh document</text>
+      <text
+         x="382"
+         y="237"
+         id="text43">Mesh document</text>
+      <text
+         x="539"
+         y="277"
+         id="text44">Mesh document</text>
+    </g>
+    <g
+       fill="#58abe3"
+       stroke="#90caf9"
+       stroke-width="2"
+       id="g47"
+       transform="translate(-86)">
+      <circle
+         cx="416"
+         cy="190"
+         r="2.5"
+         id="circle44" />
+      <circle
+         cx="451"
+         cy="215"
+         r="2.5"
+         id="circle45" />
+      <circle
+         cx="574"
+         cy="215"
+         r="2.5"
+         id="circle46" />
+      <circle
+         cx="609"
+         cy="255"
+         r="2.5"
+         id="circle47" />
+    </g>
+    <!-- Inspector. -->
+    <rect
+       x="666"
+       y="51"
+       width="145"
+       height="329"
+       fill="#262a32"
+       id="rect47" />
+    <path
+       d="M 146,51 V 380 M 667.21311,51 v 329"
+       stroke="#454c59"
+       id="path47"
+       sodipodi:nodetypes="cccc" />
+    <text
+       x="679"
+       y="79"
+       fill="#ffffff"
+       font-size="12px"
+       font-weight="700"
+       id="text47">Inspector</text>
+    <text
+       x="679"
+       y="105"
+       fill="#90caf9"
+       font-size="9.92px"
+       id="text48">Apply Transform</text>
+    <path
+       d="M 679,129 H 799 M 679,213 H 799"
+       stroke="#454c59"
+       id="path48" />
+    <g
+       fill="#d9e4f5"
+       font-size="10.4px"
+       font-weight="700"
+       id="g50"
+       transform="translate(-320)">
+      <text
+         x="999"
+         y="156"
+         id="text49">Parameters</text>
+      <text
+         x="999"
+         y="240"
+         id="text50">Validation</text>
+    </g>
+    <text
+       x="679"
+       y="175"
+       fill="#b6c1d1"
+       font-size="9.92px"
+       id="text51"><tspan
+         x="679"
+         id="tspan50">Configure the selected</tspan><tspan
+         x="679"
+         dy="14.4"
+         id="tspan51">operation.</tspan></text>
+    <path
+       d="m 680,259 3,3 6,-7"
+       fill="none"
+       stroke="#86efac"
+       stroke-width="1.2"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       id="path51" />
+    <text
+       x="693"
+       y="262"
+       fill="#86efac"
+       font-size="9.6px"
+       id="text52">Inputs connected</text>
+    <!-- Preview caption. -->
+    <rect
+       x="1"
+       y="381"
+       width="798.33905"
+       height="45.758713"
+       fill="#242830"
+       id="rect52" />
+    <path
+       d="M 1,380 H 810.987"
+       stroke="#454c59"
+       id="path52"
+       sodipodi:nodetypes="cc" />
+    <text
+       x="17"
+       y="407"
+       fill="#879bb4"
+       id="text53">Conceptual preview · Connect, configure, and run a workflow.</text>
+  </g>
+  <metadata
+     id="metadata54">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:title>FlowGraph Web editor preview</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
 </svg>
