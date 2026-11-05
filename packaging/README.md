@@ -132,6 +132,102 @@ relevant unresolved risks have been reviewed and recorded. Optional improvements
 are not automatic release blockers. Required security and artifact reviews still
 apply. Core package validation does not validate optional Desktop or Web clients.
 
+## Published-release evidence archive
+
+The release manager archives evidence promptly after each intended publication,
+before Actions logs or artifacts expire. Package artifacts have a 30-day download
+window; the repository's Actions retention is currently 90 days. Neither is
+durable storage. Keep public packages and notes on GitHub Releases, and retain
+the complete evidence archive in maintainer-controlled backup storage outside
+the repository, with a second independent copy, for the lifetime of the project.
+Keep archives for yanked and superseded releases too. This procedure does not
+assert that an archive or backup has already been created.
+
+Retain the exact published wheel/sdist (not a rebuild), tag and commit SHA,
+source snapshot including `pyproject.toml`, `uv.lock`, and workflow, lockfile hash,
+Python/uv/build-tool versions, runner image information, installed dependency
+inventory, complete relevant workflow logs and results for every run attempt,
+and applicable audit/compliance outputs. Preserve relevant PR decisions, risk
+review and environment approval evidence, plus GitHub and PyPI publication
+metadata, timestamps and file hashes. Save separate prerequisite PR/branch runs
+when relied upon; one tag run is not evidence of every review or earlier check.
+Retain only actually generated compliance outputs; note unavailable evidence
+explicitly rather than claiming that an SBOM or native audit exists.
+
+The following Bash commands use an authenticated GitHub CLI, curl, Git, and uv
+from the repository root. Set `TAG` to the published tag, `RUN_ID` to its exact
+publishing workflow run, and `EVIDENCE_DIR` to a new absolute directory in your
+external backup storage. Do not use an existing directory or overwrite an archive.
+These commands download evidence; they do not create a release or upload to PyPI.
+
+```bash
+: "${TAG:?Set the published tag}" "${RUN_ID:?Set the publishing run ID}"
+: "${EVIDENCE_DIR:?Set a new absolute external archive directory}"
+REPO=FBW-Engineering-Solutions/FlowGraph
+mkdir "$EVIDENCE_DIR" || exit 1
+mkdir "$EVIDENCE_DIR/packages"
+gh api "repos/$REPO/actions/runs/$RUN_ID" > "$EVIDENCE_DIR/run.json"
+SHA=$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq .head_sha)
+ATTEMPTS=$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq .run_attempt)
+git rev-parse "$TAG^{commit}"
+printf 'Publishing commit: %s\n' "$SHA"
+# Stop if the tag's commit differs from SHA or run.json is not the intended tag run.
+git archive --format=tar --output="$EVIDENCE_DIR/source.tar" "$SHA"
+git show "$SHA:uv.lock" > "$EVIDENCE_DIR/uv.lock"
+gh api "repos/$REPO/releases/tags/$TAG" > "$EVIDENCE_DIR/github-release.json"
+gh release download "$TAG" --repo "$REPO" --dir "$EVIDENCE_DIR/packages"
+for attempt in $(seq 1 "$ATTEMPTS"); do
+  gh api "repos/$REPO/actions/runs/$RUN_ID/attempts/$attempt" \
+    > "$EVIDENCE_DIR/attempt-$attempt.json"
+  gh api --paginate --jq '.jobs[]' \
+    "repos/$REPO/actions/runs/$RUN_ID/attempts/$attempt/jobs?per_page=100" \
+    > "$EVIDENCE_DIR/jobs-$attempt.jsonl"
+  gh api "repos/$REPO/actions/runs/$RUN_ID/attempts/$attempt/logs" \
+    > "$EVIDENCE_DIR/logs-$attempt.zip"
+done
+VERSION=${TAG#v}
+curl --fail --silent --show-error "https://pypi.org/pypi/flowgraph/$VERSION/json" \
+  > "$EVIDENCE_DIR/pypi-release.json"
+```
+
+Check every command for failure; empty files or an unavailable log download are
+not successful evidence capture. Inspect the metadata to confirm the repository,
+tag, commit, workflow, run attempts and publication results. Download and compare
+the PyPI wheel/sdist if necessary: their filenames and SHA-256 hashes must match
+the exact saved packages and GitHub metadata. Investigate any mismatch; never
+silently substitute a rebuilt artifact. Save the relevant review/approval and
+risk records alongside these downloads (keep sensitive records private).
+
+After adding all records, generate a local integrity manifest. This manifest
+supports backup verification; it is not a signature or proof of provenance.
+
+```bash
+uv run --no-sync python - "$EVIDENCE_DIR" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+hashes = {}
+for path in sorted(root.rglob("*")):
+    if path.is_file() and path != root / "SHA256.json":
+        with path.open("rb") as stream:
+            hashes[path.relative_to(root).as_posix()] = hashlib.file_digest(stream, "sha256").hexdigest()
+with (root / "SHA256.json").open("x", encoding="utf-8") as stream:
+    json.dump(hashes, stream, indent=2)
+    stream.write("\n")
+PY
+```
+
+Verify the archive is readable (including log ZIPs and source TAR), compare its
+manifest with the independent publication hashes, and copy the complete archive
+to a second independent backup location. Recompute hashes from that second copy
+and compare with `SHA256.json`; confirm a restore/read succeeds. Record archive
+locations, capture date, verification result and any missing evidence in the
+private release record. Do not put credentials, recovery codes or local backup
+paths into public release notes. A successful CI run does not verify these backups.
+
 ## Reproducibility limitations
 
 The wheel and source archive are intended to be portable, but consecutive local

@@ -72,10 +72,17 @@ verification. Tag-push artifact/version validation remains required before eithe
 GitHub or PyPI publication. See the [governance guide](../maintainers/governance.md)
 for the approved branch/tag rules and pending remote rollout.
 
-The release manager must retain the source commit, signed tag when available,
-locked-environment hash, build logs, artifact hashes, checksums, compliance
-compliance outputs, approvals, and publication time. A failed or compromised
-release must
+The release manager must archive the exact source commit and tag, source/build
+configuration and lockfile hash, build environment, all relevant run-attempt logs
+and results, exact published packages and hashes, applicable compliance outputs,
+reviews, approvals, and publication metadata/times promptly after publication.
+Keep the complete archive in maintainer-controlled storage outside the repository,
+with a second independent verified copy, for the lifetime of the project,
+including yanked or superseded releases. GitHub Releases retain public packages
+and notes; expiring Actions artifacts/logs are not durable evidence storage.
+Follow the [evidence archive procedure](../../packaging/README.md#published-release-evidence-archive)
+and record capture/restore verification privately. Defining this policy does not
+establish that a backup exists. A failed or compromised release must
 be stopped, the relevant PyPI version yanked or superseded when appropriate,
 GitHub release notes annotated, exposed credentials rotated, and a replacement release
 documented in the changelog. Release automation uses GitHub-hosted runners and
