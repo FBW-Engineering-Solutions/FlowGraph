@@ -8,6 +8,13 @@ description: Nodes that define a workflow's public inputs and outputs.
 
 # Workflow nodes
 
+## Conditional Workflow (`conditional-workflow`)
+
+Selects one of two editable child workflows with a boolean condition. The
+`false` and `true` children expose matching public interfaces; only the selected
+child executes. Its common output acts as an implicit join for downstream nodes.
+See [Control nodes](controls.md#conditional-workflow-conditional-workflow).
+
 The **Workflow** menu contains orange boundary nodes used to define the public
 interface of a workflow and composite nodes that execute child workflows.
 

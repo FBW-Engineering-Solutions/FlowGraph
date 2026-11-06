@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from flowgraph.adapters.controls import AVAILABLE_NODES as CONTROL_AVAILABLE_NODES
 from flowgraph.adapters.cosapp import AVAILABLE_NODES as COSAPP_AVAILABLE_NODES
 from flowgraph.adapters.documentation import AVAILABLE_NODES as DOCUMENTATION_AVAILABLE_NODES
+from flowgraph.adapters.field_gradient import SCALAR_FIELD_GRADIENT, VECTOR_FIELD_GRADIENT
 from flowgraph.adapters.field_ops import AVAILABLE_NODES as FIELD_OPS_AVAILABLE_NODES
 from flowgraph.adapters.file_conversion import MESH_FILE_CONVERSION
 from flowgraph.adapters.files import (
@@ -14,13 +15,18 @@ from flowgraph.adapters.files import (
 )
 from flowgraph.adapters.filters import (
     CREATE_MUSCAT_ELEMENT_FILTER,
+    CREATE_MUSCAT_NODE_FILTER,
     FILTER_MESH_WITH_MUSCAT,
+    SELECTOR_OPERATORS,
 )
 from flowgraph.adapters.image_tools import AVAILABLE_NODES as IMAGE_TOOLS_AVAILABLE_NODES
 from flowgraph.adapters.imagej import AVAILABLE_NODES as IMAGEJ_AVAILABLE_NODES
+from flowgraph.adapters.mesh_analysis import MESH_NODES, SET_MESH_FIELD
+from flowgraph.adapters.mesh_composition import FIELD_COMPOSITION_NODES, MESH_COMPOSITION_NODES
 from flowgraph.adapters.mesh_creation_tools import AVAILABLE_NODES as MESH_CREATION_AVAILABLE_NODES
 from flowgraph.adapters.mesh_generations import CSV_TO_MESH
 from flowgraph.adapters.mesh_ops import AVAILABLE_NODES as MESH_OPS_AVAILABLE_NODES
+from flowgraph.adapters.paraview import PARAVIEW_BRIDGE
 from flowgraph.adapters.plaid_bridge import AVAILABLE_NODES as PLAID_AVAILABLE_NODES
 from flowgraph.adapters.readers import (
     LOAD_CSV,
@@ -31,22 +37,27 @@ from flowgraph.adapters.readers import (
 )
 from flowgraph.adapters.remote_files import DOWNLOAD_URL
 from flowgraph.adapters.simple_sources import (
+    SET_ARRAY_1D,
+    SET_BOOLEAN,
     SET_FLOAT,
     SET_INT,
-    SET_LIST_FLOAT,
     SET_LIST_INT,
     SET_LIST_STR,
     SET_STRING,
+    SET_VEC2D,
+    SET_VEC2DI,
     SET_VEC3D,
 )
 from flowgraph.adapters.sinks import AVAILABLE_NODES as SINKS_AVAILABLE_NODES
 from flowgraph.adapters.table_tools import AVAILABLE_NODES as TABLE_TOOLS_AVAILABLE_NODES
 from flowgraph.adapters.user_code import AVAILABLE_NODES as USER_CODE_AVAILABLE_NODES
+from flowgraph.adapters.vector_tools import AVAILABLE_NODES as VECTOR_TOOLS_AVAILABLE_NODES
 from flowgraph.adapters.workflow import AVAILABLE_NODES as WORKFLOW_AVAILABLE_NODES
 from flowgraph.adapters.workflow_interfaces import (
     AVAILABLE_NODES as WORKFLOW_INTERFACE_AVAILABLE_NODES,
 )
 from flowgraph.adapters.writers import WRITE_MESHIO, WRITE_MESHLANE, WRITE_MUSCAT, WRITE_TABLE
+from flowgraph.adapters.zones import AVAILABLE_NODES as ZONE_AVAILABLE_NODES
 from flowgraph.application.workflow_core import NodeDefinition
 
 
@@ -96,9 +107,13 @@ ADAPTERS = AdapterCatalog(
         AdapterGroup(
             "Inputs",
             subgroups=(
-                AdapterGroup("Scalars", (SET_STRING, SET_INT, SET_FLOAT)),
                 AdapterGroup(
-                    "Lists/Vectors", (SET_LIST_STR, SET_LIST_INT, SET_LIST_FLOAT, SET_VEC3D)
+                    "Scalars",
+                    (SET_STRING, SET_BOOLEAN, SET_INT, SET_FLOAT) + CONTROL_AVAILABLE_NODES,
+                ),
+                AdapterGroup(
+                    "Lists/Vectors",
+                    (SET_LIST_STR, SET_LIST_INT, SET_ARRAY_1D, SET_VEC2D, SET_VEC2DI, SET_VEC3D),
                 ),
                 AdapterGroup(
                     "Files",
@@ -113,24 +128,36 @@ ADAPTERS = AdapterCatalog(
                     "Readers",
                     (LOAD_MUSCAT, LOAD_MESHIO, LOAD_MESHLANE, LOAD_CSV, READ_TABLE),
                 ),
-                AdapterGroup("Mesh Gens", (CSV_TO_MESH,)),
-                AdapterGroup("Mesh Creation", MESH_CREATION_AVAILABLE_NODES),
+                AdapterGroup("Mesh Creation", (CSV_TO_MESH,) + MESH_CREATION_AVAILABLE_NODES),
                 AdapterGroup(
                     "Filters",
-                    (CREATE_MUSCAT_ELEMENT_FILTER, FILTER_MESH_WITH_MUSCAT),
+                    (
+                        CREATE_MUSCAT_ELEMENT_FILTER,
+                        CREATE_MUSCAT_NODE_FILTER,
+                        FILTER_MESH_WITH_MUSCAT,
+                    )
+                    + SELECTOR_OPERATORS,
+                    subgroups=(AdapterGroup("Zones", ZONE_AVAILABLE_NODES),),
                 ),
-                AdapterGroup("Mesh Ops", MESH_OPS_AVAILABLE_NODES),
-                AdapterGroup("Field Ops", FIELD_OPS_AVAILABLE_NODES),
+                AdapterGroup(
+                    "Mesh Ops", MESH_OPS_AVAILABLE_NODES + MESH_NODES + MESH_COMPOSITION_NODES
+                ),
+                AdapterGroup(
+                    "Field Ops",
+                    FIELD_OPS_AVAILABLE_NODES
+                    + (SET_MESH_FIELD, SCALAR_FIELD_GRADIENT, VECTOR_FIELD_GRADIENT)
+                    + FIELD_COMPOSITION_NODES,
+                ),
                 AdapterGroup("File Conversion", (MESH_FILE_CONVERSION,)),
                 AdapterGroup("Writers", (WRITE_MUSCAT, WRITE_MESHLANE, WRITE_MESHIO, WRITE_TABLE)),
             ),
         ),
-        AdapterGroup("Controls", CONTROL_AVAILABLE_NODES),
         AdapterGroup("Image Tools", IMAGE_TOOLS_AVAILABLE_NODES),
         AdapterGroup("Table Tools", TABLE_TOOLS_AVAILABLE_NODES),
+        AdapterGroup("Vector Tools", VECTOR_TOOLS_AVAILABLE_NODES),
         AdapterGroup("Code", USER_CODE_AVAILABLE_NODES + IMAGEJ_AVAILABLE_NODES),
         AdapterGroup("Workflow", WORKFLOW_INTERFACE_AVAILABLE_NODES + WORKFLOW_AVAILABLE_NODES),
-        AdapterGroup("Sinks", SINKS_AVAILABLE_NODES),
+        AdapterGroup("Sinks", SINKS_AVAILABLE_NODES + (PARAVIEW_BRIDGE,)),
         AdapterGroup("Doc", DOCUMENTATION_AVAILABLE_NODES),
         AdapterGroup(
             "External Tools",

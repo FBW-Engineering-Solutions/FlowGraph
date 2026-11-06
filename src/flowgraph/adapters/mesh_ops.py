@@ -11,6 +11,7 @@ from Muscat.MeshContainers.ElementsContainers import AllElements, ElementsContai
 from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter
 from Muscat.MeshContainers.Filters.FilterOperators import FilterOperatorBase
 from Muscat.MeshTools.MeshCreationTools import QuadToLin
+from Muscat.MeshTools.MeshModificationTools import CleanLonelyNodes
 from Muscat.MeshTools.Remesh import Remesh as MuscatRemesh
 from Muscat.Types import MuscatIndex
 from scipy.spatial import Delaunay
@@ -74,6 +75,28 @@ def _apply_transform(
                     fields[name] = np.ascontiguousarray(apply_transform_direction(field))
 
     return {"mesh": transformed_document}
+
+
+def _remove_lonely_nodes(
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Remove unused points while retaining metadata and leaving the source unchanged."""
+    source = inputs["mesh"].mesh
+    mesh = source.View()
+    # Structured containers have read-only connectivity properties. Materialize
+    # ordinary containers so Muscat can renumber both structured and other meshes.
+    mesh.elements = AllElements()
+    for source_elements in source.elements:
+        elements = ElementsContainer(source_elements.elementType)
+        elements.connectivity = np.array(source_elements.connectivity, copy=True)
+        elements.cpt = source_elements.GetNumberOfElements()
+        elements.originalIds = np.array(source_elements.originalIds, copy=True)
+        elements.tags = source_elements.tags.View()
+        mesh.elements.AddContainer(elements)
+    _, mesh = CleanLonelyNodes(mesh, inPlace=True)
+    return {"mesh": MeshDocument(mesh)}
 
 
 def _delaunay_3d(
@@ -455,12 +478,27 @@ REMESH_NODE = NodeDefinition(
     executor=_remesh,
 )
 
+REMOVE_LONELY_NODES_NODE = NodeDefinition(
+    id="remove-lonely-nodes",
+    requirements=("py:muscat",),
+    icon="mdi-vector-point-minus",
+    label="Remove Lonely Nodes",
+    description="Remove mesh nodes unused by any element without changing the input mesh.",
+    ports=(
+        PortDefinition("mesh", PortDirection.INPUT, MESH_DOCUMENT, "Mesh"),
+        PortDefinition("mesh", PortDirection.OUTPUT, MESH_DOCUMENT, "Cleaned mesh"),
+    ),
+    executor=_remove_lonely_nodes,
+)
+
+
 AVAILABLE_NODES = (
     TRANSFORM_NODE,
     APPLY_TRANSFORM_NODE,
     DELAUNAY_3D_NODE,
     QUAD_TO_LIN_NODE,
     REMESH_NODE,
+    REMOVE_LONELY_NODES_NODE,
     RENAME_TAG_NODE,
     MERGE_TAGS_NODE,
     REMOVE_TAG_NODE,

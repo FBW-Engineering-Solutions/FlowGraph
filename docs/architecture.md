@@ -43,6 +43,16 @@ completed independent work.
 Composite nodes contain nested workflows. Boundary nodes map named child inputs
 and outputs to the parent workflow.
 
+`NodeInstance.subworkflows` maps non-empty string keys to owned child graphs.
+Single-child composites use `"default"`; Conditional Workflow uses `"false"` and
+`"true"`. Its adapter validates matching public input/output names and types and
+invokes the existing executor only for the selected child. No scheduler or skip
+semantics change. Branch-local producers must live inside the child to avoid
+executing when that branch is not selected. The legacy `subworkflow` property
+remains a compatibility view of the `"default"` child; new code should use the
+dictionary. Definition factories now use `subworkflows_factory` and return a
+fresh dictionary of independent graphs.
+
 ## Persistence
 
 Workflows are UTF-8 JSON documents with format identifier
@@ -78,6 +88,23 @@ flowgraph run workflow.json --json-output results.json
 
 `-i` is an alias for `--input`; either option can be repeated for multiple
 published inputs.
+
+`execute_cli_workflow()` applies node parameter overrides before resolving public
+inputs. Explicit input assignments take precedence. For omitted inputs,
+`application/workflow_defaults.py` follows Workflow Input boundary connections
+and nested public-input mappings to instance parameter values. It also handles
+directly exported parameters. Resolution does not execute nodes and uses the
+published input type and registered value conversions to normalize saved values.
+Multiple candidate values must agree; conflicting values fail rather than
+selecting an arbitrary target. Inputs without usable saved values remain required.
+
+Each fallback emits a warning to stderr naming the input, chosen value, and
+source parameter address. Workflow output formatting and `--json-output` remain
+separate from those warnings. This policy is specific to CLI execution; it does
+not alter `WorkflowGraph.execute()` or the workflow JSON schema, and execution
+does not persist overrides or fallback values. See the
+[workflow user guide](../doc/user-guide/workflows.md#omitted-inputs-and-saved-parameter-values)
+for examples.
 
 ## External-client interfaces
 

@@ -143,7 +143,6 @@ reference for each group is split into the following pages:
 | Inputs | [Input nodes](adapters/inputs.md) |
 | Files | [File nodes](adapters/file.md) |
 | Readers | [Reader nodes](adapters/readers.md) |
-| Mesh Gens | [Mesh-generation nodes](adapters/mesh-gens.md) |
 | Mesh Creation | [Mesh-creation nodes](adapters/mesh-creation-tools.md) |
 | Filters | [Filter nodes](adapters/filters.md) |
 | Mesh Ops | [Mesh-operation nodes](adapters/mesh-ops.md) |
@@ -162,10 +161,11 @@ reference for each group is split into the following pages:
 
 ## GUI slider nodes
 
-The **Nodes → GUI** submenu contains **Float Slider** and **Integer Slider**.
+The **Nodes → Inputs → Scalars** submenu contains **Float Slider** and **Integer Slider**.
 Configure the current value in the node editor; the current value is displayed as a
-slider and is emitted from the typed `value` output. The `min` and `max` parameters
-are exported input ports, so other nodes can provide dynamic slider bounds.
+slider and is emitted from the typed `value` output. The `min`, `max`, and `value`
+parameters are optional exported input ports, so other nodes can override the
+local slider bounds and current value.
 
 The float slider emits a `Float` and the integer slider emits an `Integer`. Slider
 values must remain within the configured inclusive minimum and maximum.

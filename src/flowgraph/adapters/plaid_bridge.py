@@ -3,6 +3,8 @@
 from collections.abc import Mapping
 from typing import Any
 
+import numpy as np
+
 from flowgraph.application.workflow_core import (
     DataType,
     ExecContext,
@@ -13,9 +15,10 @@ from flowgraph.application.workflow_core import (
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
-from .data_types import MESH_DOCUMENT, ParameterKind
+from .data_types import ARRAY_1D, LIST_STR, MESH_DOCUMENT, ParameterKind
 
-PLAID_SAMPLE = DataType("plaid-dataset", "Plaid sample", object)
+PLAID_DATASET = DataType("plaid-dataset", "Plaid dataset", object)
+PLAID_SAMPLE = DataType("plaid-sample", "Plaid sample", object)
 PLAID_INFO = DataType("plaid-info", "Plaid info", object)
 PLAID_DATA_PRODUCTION = DataType("plaid-data-production", "Plaid data production", object)
 PLAID_OPTIONAL_STRING = DataType("plaid-optional-string", "Optional Text", (str, type(None)))
@@ -27,7 +30,7 @@ def _load_plaid_sample(
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Load one sample from a Plaid dataset stored on disk."""
+    """Load a Plaid dataset, its metadata, and available split names from disk."""
     path = parameters.get("path", "")
 
     if not isinstance(path, str) or not path:
@@ -45,7 +48,11 @@ def _load_plaid_sample(
     infos = load_infos_from_disk(path)
     datasetdict, converterdict = init_from_disk(path)
 
-    return {"dataset": (datasetdict, converterdict), "infos": infos}
+    return {
+        "dataset": (datasetdict, converterdict),
+        "infos": infos,
+        "splits": list(datasetdict),
+    }
 
 
 LOAD_PLAID_DATASET = NodeDefinition(
@@ -55,8 +62,9 @@ LOAD_PLAID_DATASET = NodeDefinition(
     label="Load Plaid Dataset",
     description="Loads dataset from a Plaid dataset on disk.",
     ports=(
-        PortDefinition("dataset", PortDirection.OUTPUT, PLAID_SAMPLE, "Sample"),
-        PortDefinition("infos", PortDirection.OUTPUT, PLAID_INFO, "Infos"),
+        PortDefinition("dataset", PortDirection.OUTPUT, PLAID_DATASET, "Dataset"),
+        PortDefinition("infos", PortDirection.OUTPUT, PLAID_INFO, "Info"),
+        PortDefinition("splits", PortDirection.OUTPUT, LIST_STR, "Split names"),
     ),
     executor=_load_plaid_sample,
     parameters=(ParameterDefinition("path", ParameterKind.FILE, "Path", "", "/path/to/plaid"),),
@@ -68,7 +76,7 @@ def _extract_plaid_sample(
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Convert one stored Plaid dataset item into a Plaid ``Sample``."""
+    """Convert one stored Plaid dataset item into a sample and float time values."""
     dataset_and_converters = inputs.get("dataset")
     infos = inputs.get("infos")
     split = parameters.get("split", "")
@@ -80,7 +88,7 @@ def _extract_plaid_sample(
         or not isinstance(dataset_and_converters[0], Mapping)
         or not isinstance(dataset_and_converters[1], Mapping)
     ):
-        raise TypeError("The PLAID_SAMPLE input must contain dataset and converter mappings")
+        raise TypeError("The PLAID_DATASET input must contain dataset and converter mappings")
     if infos is None:
         raise ValueError("The PLAID_INFO input is required")
     if not isinstance(split, str) or not split:
@@ -95,24 +103,27 @@ def _extract_plaid_sample(
         dataset = datasetdict[split]
         converter = converterdict[split]
         sample = converter.to_plaid(dataset, sample_number)
-    except (KeyError, IndexError, TypeError, ValueError, OSError) as error:
+        timesteps = np.fromiter((float(time) for time in sample.get_all_time_values()), dtype=float)
+        timesteps.setflags(write=False)
+    except (AttributeError, KeyError, IndexError, TypeError, ValueError, OSError) as error:
         raise ValueError(
             f"Could not extract Plaid sample: split={split!r}, sample_number={sample_number}"
         ) from error
 
-    return {"sample": sample}
+    return {"sample": sample, "timesteps": timesteps}
 
 
 EXTRACT_PLAID_SAMPLE = NodeDefinition(
     id="extract-plaid-sample",
-    requirements=("py:pyplaid",),
+    requirements=("py:pyplaid", "py:numpy"),
     icon="mdi-database-search-outline",
     label="Extract Plaid sample",
     description="Converts one item from a loaded Plaid dataset into a Plaid Sample.",
     ports=(
-        PortDefinition("dataset", PortDirection.INPUT, PLAID_SAMPLE, "PLAID_SAMPLE"),
+        PortDefinition("dataset", PortDirection.INPUT, PLAID_DATASET, "Dataset"),
         PortDefinition("infos", PortDirection.INPUT, PLAID_INFO, "PLAID_INFO"),
         PortDefinition("sample", PortDirection.OUTPUT, PLAID_SAMPLE, "Sample"),
+        PortDefinition("timesteps", PortDirection.OUTPUT, ARRAY_1D, "Time steps"),
     ),
     executor=_extract_plaid_sample,
     parameters=(

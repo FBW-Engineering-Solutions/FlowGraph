@@ -5,6 +5,8 @@ import math
 from collections.abc import Mapping
 from typing import Any
 
+import numpy as np
+
 from flowgraph.application.workflow_core import (
     ExecContext,
     NodeDefinition,
@@ -13,7 +15,19 @@ from flowgraph.application.workflow_core import (
     PortDirection,
 )
 
-from .data_types import FLOAT, INTEGER, LIST_FLOAT, LIST_INT, LIST_STR, STRING, VEC3D, ParameterKind
+from .data_types import (
+    ARRAY_1D,
+    BOOLEAN,
+    FLOAT,
+    INTEGER,
+    LIST_INT,
+    LIST_STR,
+    STRING,
+    VEC2D,
+    VEC2DI,
+    VEC3D,
+    ParameterKind,
+)
 
 
 def _set_string(
@@ -37,6 +51,30 @@ SET_STRING = NodeDefinition(
     ports=(PortDefinition("value", PortDirection.OUTPUT, STRING, "Value"),),
     executor=_set_string,
     parameters=(ParameterDefinition("value", ParameterKind.TEXT, "Value", "", "Enter text"),),
+)
+
+
+def _set_boolean(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Output the configured boolean value."""
+    value = parameters.get("value", False)
+    if not isinstance(value, bool):
+        raise TypeError("The configured boolean value must be a boolean")
+    return {"value": value}
+
+
+SET_BOOLEAN = NodeDefinition(
+    id="set-boolean",
+    requirements=(),
+    icon="mdi-toggle-switch-outline",
+    label="Boolean Input",
+    description="Outputs a configured boolean value.",
+    ports=(PortDefinition("value", PortDirection.OUTPUT, BOOLEAN, "Value"),),
+    executor=_set_boolean,
+    parameters=(ParameterDefinition("value", ParameterKind.BOOLEAN, "Value", False),),
 )
 
 
@@ -88,6 +126,64 @@ SET_FLOAT = NodeDefinition(
     ports=(PortDefinition("value", PortDirection.OUTPUT, FLOAT, "Value"),),
     executor=_set_float,
     parameters=(ParameterDefinition("value", ParameterKind.FLOAT, "Value", 0.0, "0.0"),),
+)
+
+
+def _set_vec2d(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Output a configured finite two-dimensional vector."""
+    components = tuple(parameters.get(axis, 0.0) for axis in ("x", "y"))
+    if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in components):
+        raise TypeError("The configured vector components must be numeric")
+
+    vector = [float(value) for value in components]
+    if not all(math.isfinite(value) for value in vector):
+        raise ValueError("The configured vector components must be finite")
+    return {"value": list(vector)}
+
+
+SET_VEC2D = NodeDefinition(
+    id="set-vec2d",
+    requirements=(),
+    icon="mdi-axis-arrow",
+    label="2D Vector Input",
+    description="Outputs a configured two-dimensional vector.",
+    ports=(PortDefinition("value", PortDirection.OUTPUT, VEC2D, "Value"),),
+    executor=_set_vec2d,
+    parameters=(
+        ParameterDefinition("x", ParameterKind.FLOAT, "X", 0.0, "0.0"),
+        ParameterDefinition("y", ParameterKind.FLOAT, "Y", 0.0, "0.0"),
+    ),
+)
+
+
+def _set_vec2di(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Output a configured two-dimensional integer vector."""
+    components = [parameters.get(axis, 0) for axis in ("x", "y")]
+    if any(isinstance(value, bool) or not isinstance(value, int) for value in components):
+        raise TypeError("The configured integer vector components must be integers")
+    return {"value": components}
+
+
+SET_VEC2DI = NodeDefinition(
+    id="set-vec2di",
+    requirements=(),
+    icon="mdi-axis-arrow",
+    label="2D Integer Vector Input",
+    description="Outputs a configured two-dimensional integer vector.",
+    ports=(PortDefinition("value", PortDirection.OUTPUT, VEC2DI, "Value"),),
+    executor=_set_vec2di,
+    parameters=(
+        ParameterDefinition("x", ParameterKind.INTEGER, "X", 0, "0"),
+        ParameterDefinition("y", ParameterKind.INTEGER, "Y", 0, "0"),
+    ),
 )
 
 
@@ -185,29 +281,31 @@ SET_LIST_INT = NodeDefinition(
 )
 
 
-def _set_float_list(
+def _set_array_1d(
     _inputs: Mapping[str, Any],
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Output a configured finite list of floating-point values."""
+    """Output a configured finite, read-only one-dimensional float array."""
     value = _parse_list_parameter(parameters)
     if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in value):
         raise TypeError("The configured float list must contain only numbers")
     normalized = [float(item) for item in value]
     if any(not math.isfinite(item) for item in normalized):
         raise ValueError("The configured float list must contain only finite numbers")
-    return {"value": normalized}
+    array = np.asarray(normalized, dtype=float)
+    array.setflags(write=False)
+    return {"value": array}
 
 
-SET_LIST_FLOAT = NodeDefinition(
-    id="set-list[float]",
-    requirements=(),
+SET_ARRAY_1D = NodeDefinition(
+    id="set-array-1d",
+    requirements=("py:numpy",),
     icon="mdi-format-list-numbered-rtl",
-    label="Float List Input",
-    description="Outputs a configured list of float.",
-    ports=(PortDefinition("value", PortDirection.OUTPUT, LIST_FLOAT, "Value"),),
-    executor=_set_float_list,
+    label="1D Array Input",
+    description="Outputs a configured one-dimensional float array.",
+    ports=(PortDefinition("value", PortDirection.OUTPUT, ARRAY_1D, "Value"),),
+    executor=_set_array_1d,
     parameters=(
         ParameterDefinition("value", ParameterKind.LIST_FLOAT, "Value", [], "[1.0, 2.0, 3.0]"),
     ),
@@ -226,10 +324,13 @@ def _select_file(_inputs: Mapping[str, Any], parameters: Mapping[str, Any]) -> M
 
 AVAILABLE_NODES = (
     SET_STRING,
+    SET_BOOLEAN,
     SET_INT,
     SET_FLOAT,
+    SET_VEC2D,
+    SET_VEC2DI,
     SET_VEC3D,
     SET_LIST_STR,
     SET_LIST_INT,
-    SET_LIST_FLOAT,
+    SET_ARRAY_1D,
 )

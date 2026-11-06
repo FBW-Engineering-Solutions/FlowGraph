@@ -14,7 +14,7 @@ from flowgraph.application.workflow_core import (
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
-from .data_types import MESH_DOCUMENT, STRING, TABLE_DOCUMENT, ParameterKind
+from .data_types import MESH_DOCUMENT, TABLE_DOCUMENT, ParameterKind
 
 LOGGER = logging.getLogger(__name__)
 
@@ -215,7 +215,7 @@ LOAD_MUSCAT = NodeDefinition(
     requirements=("py:muscat",),
     icon="/__flowgraph_ui/LOAD_MUSCAT.svg",
     label="Read Mesh (Muscat)",
-    description="Loads a file path into the canonical mesh document.",
+    description="Loads a file path into the canonical mesh document. Companion changes must update the principal file timestamp.",
     ports=(PortDefinition("mesh", PortDirection.OUTPUT, MESH_DOCUMENT, "Mesh"),),
     executor=_load_muscat,
     parameters=(
@@ -231,7 +231,7 @@ LOAD_MESHIO = NodeDefinition(
     requirements=("py:muscat", "py:meshio"),
     icon="/__flowgraph_ui/LOAD_MESHIO.svg",
     label="Read Mesh (MeshIO)",
-    description="Loads a file with meshio through Muscat's meshio bridge.",
+    description="Loads a file with meshio through Muscat's meshio bridge. Companion changes must update the principal file timestamp.",
     ports=(PortDefinition("mesh", PortDirection.OUTPUT, MESH_DOCUMENT, "Mesh"),),
     executor=_load_meshio,
     parameters=(
@@ -247,7 +247,7 @@ LOAD_MESHLANE = NodeDefinition(
     requirements=("py:muscat", "py:meshlane"),
     icon="/__flowgraph_ui/LOAD_MESHLANE.svg",
     label="Read Mesh (MeshLane)",
-    description="Loads a file with the optional MeshLane adapter.",
+    description="Loads a file with the optional MeshLane adapter. Companion changes must update the principal file timestamp.",
     ports=(PortDefinition("mesh", PortDirection.OUTPUT, MESH_DOCUMENT, "Mesh"),),
     executor=_load_meshlane,
     parameters=(
@@ -264,9 +264,11 @@ LOAD_CSV = NodeDefinition(
     icon="mdi-file-table-outline",
     label="Read Table (Pandas)",
     description="Loads a csv file with the optional Panda adapter.",
-    ports=(
-        PortDefinition("path", PortDirection.INPUT, STRING, "File path"),
-        PortDefinition("table", PortDirection.OUTPUT, TABLE_DOCUMENT, "Table"),
+    ports=(PortDefinition("table", PortDirection.OUTPUT, TABLE_DOCUMENT, "Table"),),
+    parameters=(
+        ParameterDefinition(
+            "path", ParameterKind.FILE, "File path", "", "/path/to/csvfile", port=True
+        ),
     ),
     executor=load_csv,
 )

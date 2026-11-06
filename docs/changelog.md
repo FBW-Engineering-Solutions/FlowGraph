@@ -1,8 +1,133 @@
-New in version Master:
+New in version 0.1.8:
 **********************
 **********************
 
-First public release
+Planned first MVP baseline, not a publication announcement or a stable API
+commitment. The `0.1.x` series remains alpha.
+
+Improvement:
+
+- Strip location/capture metadata from the ColorCardboard fixture while preserving
+  decoded pixels, and make ParaView gateway examples independent of personal paths.
+  This does not replace previously published packages or rewrite history.
+
+- Retain CI packages for 30 days and document durable manual release-evidence
+  capture, publication-hash comparisons, and independent backup verification.
+
+- Make the Core CI gate and its regression tests portable with Python instead
+  of invoking the WSL Bash launcher on Windows.
+
+- Add the stable Core CI aggregate gate, fail-closed prerequisite tests, and
+  PR publication-permission regressions. Document single-maintainer branch/tag
+  policy and manual DCO review; remote protection rollout is still pending.
+
+- Remediate four dependency advisories by locking setuptools 84.1.0 and urllib3
+  2.8.0, and require setuptools 84.1.0 or newer for isolated package builds.
+
+- Target CI dependency audits at exact installed project-environment pins, with
+  logged inventory, explicit local-project exclusion, and regression coverage.
+
+- Remove local-machine build notes from package configuration and use ignored,
+  repository-relative rehearsal output with `uv run python` artifact checks.
+
+- Refresh security, maintainer, support, and release guidance for ongoing Core
+  alpha operations; distinguish release checks from the maintenance backlog and
+  keep platform/client support conditional on relevant validation.
+
+- Establish 0.1.8 as the planned first MVP baseline and remove obsolete historical
+  release-audit references. Release-version validation remains required.
+
+- Update installation requirements, pure-Python packaging, runtime extras, and
+  persistent/source/temporary commands; test the documented CLI examples.
+
+- Correct third-party notices for BSD-3-Clause Core with a dated dependency and
+  license-evidence overview, explicit review limits, and inventory regression tests.
+
+- Add the documentation URL to package metadata and record passing CI evidence
+  for the existing Python 3.11–3.14 classifiers, with metadata consistency tests.
+
+Api Change:
+- Remove the Conda packaging recipe and its release validation. Supported release
+  artifacts remain the Python wheel and source distribution on GitHub and PyPI.
+- Move meshio, Meshlane, pandas, h5py, Pillow, and openpyxl to the optional
+  `io` extra. Install `flowgraph[io]` (or use `uv sync --extra io` in a source
+  checkout) for workflows using these libraries. Version constraints are unchanged.
+
+New in version 0.1.7:
+**********************
+**********************
+
+Api Change:
+- Replace `flowgraph.application.wasm_execution` with the transport-independent
+  `flowgraph.application.workflow_execution` module. No compatibility alias is
+  retained. `execute_workflow_json()` and its response format are unchanged;
+  browser workers must update their imports and rebuild/stage the core wheel.
+- Composite nodes now store string-keyed `subworkflows`; definition factories use
+  `subworkflows_factory`. The single-child `subworkflow` property remains as a
+  compatibility view of the `"default"` child. Workflow JSON is version 3;
+  existing version 1/2 workflows remain readable and migrate on export.
+
+New functionalities:
+- Include token and actual bound port in hosted `Open editor` launch fragments
+  for one-click local backend selection; native editor links remain unchanged.
+- Always print an `Open editor` address at server startup pointing to the
+  independently hosted allowed client origin.
+- Default `flowgraph serve` to the public editor origin `https://flowgraph-web.fbw-es.com`
+  and port 8765. Explicit repeatable `--allow-origin` values replace the default;
+  loopback binding and bearer authentication remain unchanged.
+- Permit explicitly allowed HTTP loopback editor origins for local development,
+  including the serial editor at `http://127.0.0.1:8082`; public origins still require HTTPS.
+- Add opt-in `serve --allow-origin HTTPS_ORIGIN` for public editor connections to
+  loopback Python: restricted CORS/preflight support with unchanged bearer and
+  Host validation, no wildcard origins or network exposure.
+- Add the experimental `flowgraph serve --workspace ...` loopback-only HTTP API,
+  with generated bearer authentication, Host/Origin checks, runtime/catalog
+  metadata, workspace file operations, and one cancellable native execution job
+  at a time. Jobs use the shared execution boundary in fresh subprocesses.
+  Includes request/result limits, execution timeout, shutdown cleanup and real
+  HTTP integration tests. API only; no editor hosting or frontend adapter yet.
+- Conditional Workflow executes only its selected `"true"` or `"false"` child,
+  including branch-local producers, and exposes matching published branch
+  outputs as an implicit join. Its boolean condition accepts a saved value or
+  connected input. Named children are included in CLI inspection, code warnings,
+  default resolution, and catalog metadata.
+
+Corrections:
+-
+
+Improvement:
+- CI source and wheel/sdist tests now include Python 3.12 and 3.14 alongside
+  Python 3.11 and 3.13 on Ubuntu, Windows, and macOS.
+
+New in version 0.1.6:
+**********************
+**********************
+
+Api Change:
+-
+
+New functionalities:
+- `flowgraph run` resolves omitted published inputs from compatible saved
+  downstream parameter values, including nested workflow inputs and directly
+  exported parameters. Each fallback emits a warning to stderr with the input,
+  chosen value, and source parameter. Explicit inputs take precedence; missing
+  defaults and conflicting downstream values still require explicit inputs.
+
+Corrections:
+- Release validation now compares tags, source version declarations, artifact
+  filenames, and internal wheel/sdist metadata before GitHub or PyPI publication.
+
+Improvement:
+- Branch and pull-request CI now rehearses packaging without publishing: wheel
+  and sdist installs are tested independently across the OS/Python matrix,
+  including packaged resources and installed CLI workflow execution. Manual
+  dispatch never publishes; actual version-tag pushes remain the release trigger.
+
+
+New in version 0.1.5:
+**********************
+**********************
+
 The `0.1.x` series is alpha. APIs, workflow behavior, and compatibility
 guarantees may change before the `1.0.0` stability milestone.
 

@@ -10,10 +10,13 @@ from enum import Enum
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, get_args, get_origin
 
+from flowgraph.application.file_dependencies import declared_file_dependencies
+
 if TYPE_CHECKING:
     from flowgraph.application.port_conversions import PortConversion
 
 T = TypeVar("T")
+_ARRAY_TYPE_RANKS = {"array": None, "array-1d": 1, "array-2d": 2}
 NodeExecutor = Callable[
     [Mapping[str, Any], Mapping[str, Any], "ExecContext"], Mapping[str, Any] | None
 ]
@@ -34,7 +37,7 @@ EdgeAwareInstanceExecutor = Callable[
     ],
     Mapping[str, Any] | None,
 ]
-SubworkflowFactory = Callable[[], "WorkflowGraph"]
+SubworkflowFactory = Callable[[], dict[str, "WorkflowGraph"]]
 WorkflowExecutorFunction = Callable[
     [Mapping[str, Any], Mapping[str, Any] | None], Mapping[str, Any]
 ]
@@ -82,6 +85,14 @@ class DataType(Generic[T]):
 
     def accepts(self, value: object) -> bool:
         """Return whether *value* satisfies this workflow type at runtime."""
+        if self.id in _ARRAY_TYPE_RANKS:
+            rank = _ARRAY_TYPE_RANKS[self.id]
+            return isinstance(value, self.python_type) and (rank is None or value.ndim == rank)
+        vector_dimensions = {"VEC2D": 2, "VEC2DI": 2, "VEC3D": 3, "VEC3DI": 3}
+        if self.id in vector_dimensions and (
+            not isinstance(value, list) or len(value) != vector_dimensions[self.id]
+        ):
+            return False
         origin = get_origin(self.python_type)
         if origin is not None:
             if isinstance(value, origin):
@@ -96,11 +107,16 @@ class DataType(Generic[T]):
         return isinstance(value, self.python_type)
 
     def is_compatible_with(self, target: DataType[Any]) -> bool:
-        """Use stable type identity; conversions require an explicit node."""
+        """Return direct compatibility; checked conversions are resolved separately."""
         if self.python_type is object or target.python_type is object:
             return True
+        if self.id in _ARRAY_TYPE_RANKS or target.id in _ARRAY_TYPE_RANKS:
+            return self.id == target.id or (self.id in _ARRAY_TYPE_RANKS and target.id == "array")
         if target.python_type is list and get_origin(self.python_type) is list:
             return True
+        vector_ids = {"VEC2D", "VEC2DI", "VEC3D", "VEC3DI"}
+        if self.id in vector_ids and target.id in vector_ids:
+            return self.id == target.id
         return self.python_type == target.python_type
 
 
@@ -199,7 +215,18 @@ class WorkflowPort:
 
 @dataclass(frozen=True)
 class NodeDefinition:
-    """Reusable behavior, port contract, and direct execution requirements for a node."""
+    """Reusable behavior, port contract, and direct execution requirements for a node.
+
+    Executors must treat every input as read-only, including nested containers,
+    arrays, mesh data and objects reachable through views. Inputs can be shared
+    with other branches and retained between runs. Produce new output data when
+    transforming values; copy only the storage that needs modification. Neither
+    stateless nor session execution provides mutation detection or rollback.
+    Cache policy controls reuse and side effects, not input ownership. Omitted
+    policy resolves to pure, or external for typed file inputs/parameters or a
+    supplied dependency resolver. Explicit policies override inference; path-only
+    nodes must explicitly declare pure, and actions must explicitly declare always.
+    """
 
     id: str
     icon: str
@@ -214,11 +241,36 @@ class NodeDefinition:
     instance_port_resolver: InstancePortResolver | None = None
     instance_executor: InstanceExecutor | None = None
     edge_aware_instance_executor: EdgeAwareInstanceExecutor | None = None
-    subworkflow_factory: SubworkflowFactory | None = None
+    subworkflows_factory: SubworkflowFactory | None = None
     color: str | None = None
     requirements: tuple[str, ...] = ()
+    cache_policy: str | None = None
+    cache_revision: str = "1"
+    cache_dependencies: Callable[[Mapping[str, Any], Mapping[str, Any]], Any] | None = None
 
     def __post_init__(self) -> None:
+        # None distinguishes omission from an explicit pure path-only override.
+        file_names = tuple(
+            dict.fromkeys(
+                [p.name for p in self.parameters if p.kind.id in {"filename", "ServerFile"}]
+                + [
+                    p.name
+                    for p in self.ports
+                    if p.direction is PortDirection.INPUT
+                    and any(t.id in {"filename", "ServerFile"} for t in p.accepted_types)
+                ]
+            )
+        )
+        policy = self.cache_policy
+        if policy is None:
+            policy = "external" if file_names or self.cache_dependencies is not None else "pure"
+        object.__setattr__(self, "cache_policy", policy)
+        if policy == "external" and self.cache_dependencies is None and file_names:
+            object.__setattr__(self, "cache_dependencies", declared_file_dependencies(file_names))
+        if self.cache_policy not in {"always", "pure", "external", "composite"}:
+            raise ValueError("cache_policy must be always, pure, external, or composite")
+        if self.cache_policy == "external" and self.cache_dependencies is None:
+            raise ValueError("External cache policy requires a dependency resolver")
 
         # add paramters as ports
         parameter_ports = tuple(
@@ -377,7 +429,7 @@ class NodeDefinition:
             parameters=configured_parameters,
             x=x,
             y=y,
-            subworkflow=None if self.subworkflow_factory is None else self.subworkflow_factory(),
+            subworkflows={} if self.subworkflows_factory is None else self.subworkflows_factory(),
         )
 
     def create_icon_arguments(self) -> dict[str, str]:
@@ -400,7 +452,26 @@ class NodeInstance:
     parameters: dict[str, Any] = field(default_factory=dict)
     x: float = 0
     y: float = 0
-    subworkflow: WorkflowGraph | None = None
+    subworkflows: dict[str, WorkflowGraph] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.subworkflows, dict) or any(
+            not isinstance(key, str) or not key or not isinstance(graph, WorkflowGraph)
+            for key, graph in self.subworkflows.items()
+        ):
+            raise ValueError("Subworkflows must map non-empty string keys to workflow graphs")
+
+    @property
+    def subworkflow(self) -> WorkflowGraph | None:
+        """Return the default child for compatibility with single-child callers."""
+        return self.subworkflows.get("default")
+
+    @subworkflow.setter
+    def subworkflow(self, graph: WorkflowGraph | None) -> None:
+        if graph is None:
+            self.subworkflows.pop("default", None)
+        else:
+            self.subworkflows["default"] = graph
 
     def pprint(self):
         print(f"{self.id}")
@@ -1270,6 +1341,7 @@ class WorkflowExecutor:
                                 node.definition_id,
                                 f"conversion {conversion.label} failed for {edge.id}: {error}",
                             )
+                            first_error.__cause__ = error
                         input_error = True
                         continue
                 target_port = definition.input_for_instance(edge.target_port, node)
@@ -1320,6 +1392,7 @@ class WorkflowExecutor:
             except Exception as error:  # noqa: BLE001
                 if first_error is None:
                     first_error = NodeExecutionError(node.id, node.definition_id, str(error))
+                    first_error.__cause__ = error
                 continue
             try:
                 self._validate_outputs(node, definition, node_outputs)

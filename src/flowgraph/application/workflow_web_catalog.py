@@ -100,9 +100,13 @@ def _node_to_dict(definition: NodeDefinition) -> dict[str, Any]:
         "color": definition.color,
         "presentation": definition.presentation,
         "requirements": list(definition.requirements),
+        "cache_policy": definition.cache_policy,
         "ports": [_port_to_dict(port) for port in definition.ports],
         "parameters": [_parameter_to_dict(parameter) for parameter in definition.parameters],
-        "creates_subworkflow": definition.subworkflow_factory is not None,
+        "creates_subworkflow": definition.subworkflows_factory is not None,
+        "subworkflow_keys": list(definition.subworkflows_factory())
+        if definition.subworkflows_factory is not None
+        else [],
         "has_dynamic_ports": (
             definition.port_resolver is not None or definition.instance_port_resolver is not None
         ),

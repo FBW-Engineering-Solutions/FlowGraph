@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=84.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "flowgraph"
-version = "0.1.2"
+version = "0.1.8"
 description = "Headless typed workflow engine and execution runtime"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -29,24 +29,26 @@ classifiers = [
 dependencies = [
   "vtk>=9.2",
   "muscat>=2.5.2",
-  "meshio>=5.3",
-  "meshlane>=5.5.0",
-  "scipy>=1.10",
-  "pandas",
-  "h5py",
-  "pillow>=10.0",
-  "numpy>=1.24",
-  "openpyxl>=3.1.5",
 ]
 
 [project.optional-dependencies]
+io = [
+  "meshio>=5.3",
+  "meshlane>=5.5.0",
+  "pandas",
+  "h5py",
+  "pillow>=10.0",
+  "openpyxl>=3.1.5",
+]
 imagej = [
   "pyimagej",
+  "scyjava",
 ]
 dev = [
   "pytest>=8.0",
   "pytest-cov>=5.0",
   "ruff>=0.6",
+  "build",
 ]
 ml = [
   "pyplaid",
@@ -61,6 +63,7 @@ ci = [
 
 [project.urls]
 Homepage = "https://github.com/FBW-Engineering-Solutions/FlowGraph"
+Documentation = "https://flowgraph.readthedocs.io/en/latest/"
 Repository = "https://github.com/FBW-Engineering-Solutions/FlowGraph.git"
 Issues = "https://github.com/FBW-Engineering-Solutions/FlowGraph/issues"
 
@@ -85,17 +88,3 @@ pythonpath = [".", "src"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-
-#[tool.uv.sources]
-#muscat = { git = "https://gitlab.com/drti/muscat.git", rev = "ParMmg" }
-##micromamba install -n uv_muscat_build_packages scotch mmgsuite=*=h* kokkos=*=h*
-## uv pip install ipywidgets
-## uv pip install jupyterlab
-##export OMP_PROC_BIND=spread
-##export OMP_PLACES=threads
-##LD_LIBRARY_PATH=/home/fbw/.local/share/mamba/envs/uv_muscat_build_packages/lib/ uv run jupyter lab
-
-#[tool.uv]
-#config-settings-package = {muscat = {"cmake.args" = ["-DCMAKE_PREFIX_PATH=/home/fbw/.local/share/mamba/envs/uv_muscat_build_packages/lib/cmake/",
-#"-DSCOTCH_ROOT=/home/fbw/.local/share/mamba/envs/uv_muscat_build_packages/"
-#]}}

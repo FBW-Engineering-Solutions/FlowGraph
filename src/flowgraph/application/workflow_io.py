@@ -23,7 +23,7 @@ from flowgraph.domain.filepath import FilePath
 from flowgraph.resources import package_resource_path
 
 WORKFLOW_FORMAT = "flowgraph-workflow"
-WORKFLOW_FORMAT_VERSION = 2
+WORKFLOW_FORMAT_VERSION = 3
 LEGACY_WORKFLOW_FORMAT_VERSION = 1
 
 
@@ -41,6 +41,14 @@ def _workflow_to_dict(workflow: WorkflowGraph, ancestors: set[int]) -> dict[str,
     if id(workflow) in ancestors:
         raise WorkflowPersistenceError("Workflow contains a recursive nested workflow")
     ancestors = {*ancestors, id(workflow)}
+    for node in workflow.nodes:
+        if not isinstance(node.subworkflows, dict) or any(
+            not isinstance(key, str) or not key or not isinstance(child, WorkflowGraph)
+            for key, child in node.subworkflows.items()
+        ):
+            raise WorkflowPersistenceError(
+                "Subworkflows must map non-empty string keys to workflow graphs"
+            )
     testdata_root = package_resource_path("testdata").resolve()
     payload = {
         "format": WORKFLOW_FORMAT,
@@ -50,13 +58,24 @@ def _workflow_to_dict(workflow: WorkflowGraph, ancestors: set[int]) -> dict[str,
                 "id": node.id,
                 "definition_id": node.definition_id,
                 "parameters": {
-                    name: _serialize_testdata_value(value, testdata_root)
+                    name: (
+                        value.split("\n")
+                        if node.definition_id == "user-function"
+                        and name == "code"
+                        and isinstance(value, str)
+                        else _serialize_testdata_value(value, testdata_root)
+                    )
                     for name, value in node.parameters.items()
                 },
                 "position": {"x": node.x, "y": node.y},
                 **(
-                    {"subworkflow": _workflow_to_dict(node.subworkflow, ancestors)}
-                    if node.subworkflow is not None
+                    {
+                        "subworkflows": {
+                            key: _workflow_to_dict(child, ancestors)
+                            for key, child in node.subworkflows.items()
+                        }
+                    }
+                    if node.subworkflows
                     else {}
                 ),
             }
@@ -98,10 +117,10 @@ def workflow_from_dict(payload: Mapping[str, Any], registry: NodeRegistry) -> Wo
             f"Unsupported workflow format {payload.get('format')!r}; expected {WORKFLOW_FORMAT!r}"
         )
     version = payload.get("version")
-    if version not in {LEGACY_WORKFLOW_FORMAT_VERSION, WORKFLOW_FORMAT_VERSION}:
+    if type(version) is not int or version not in {1, 2, WORKFLOW_FORMAT_VERSION}:
         raise WorkflowPersistenceError(
             f"Unsupported workflow version {payload.get('version')!r}; "
-            f"expected {LEGACY_WORKFLOW_FORMAT_VERSION} or {WORKFLOW_FORMAT_VERSION}"
+            f"expected 1, 2 or {WORKFLOW_FORMAT_VERSION}"
         )
 
     nodes_payload = payload.get("nodes")
@@ -242,6 +261,18 @@ def _parse_node(
         raise WorkflowPersistenceError(
             f"Parameters for node {node_id!r} must be an object with string keys"
         )
+    if definition_id == "user-function" and "code" in parameters:
+        code = parameters["code"]
+        if isinstance(code, list):
+            if not code or any(not isinstance(line, str) or "\n" in line for line in code):
+                raise WorkflowPersistenceError(
+                    f"Code for node {node_id!r} must be a non-empty array of lines without newlines"
+                )
+            parameters = {**parameters, "code": "\n".join(code)}
+        elif not isinstance(code, str):
+            raise WorkflowPersistenceError(
+                f"Code for node {node_id!r} must be a string or an array of lines"
+            )
     position = raw_node.get("position", {})
     if not isinstance(position, Mapping):
         raise WorkflowPersistenceError(f"Position for node {node_id!r} must be an object")
@@ -249,6 +280,20 @@ def _parse_node(
     y = _coordinate(position.get("y", 0), node_id, "y")
     subworkflow_payload = raw_node.get("subworkflow")
     subworkflow: WorkflowGraph | None = None
+    if "subworkflows" in raw_node:
+        if version != WORKFLOW_FORMAT_VERSION or "subworkflow" in raw_node:
+            raise WorkflowPersistenceError(
+                "Named subworkflows require version 3 and no legacy child"
+            )
+        children = raw_node["subworkflows"]
+        if not isinstance(children, Mapping) or any(
+            not isinstance(key, str) or not key for key in children
+        ):
+            raise WorkflowPersistenceError(
+                "Subworkflows must be an object with non-empty string keys"
+            )
+        subworkflows = {key: workflow_from_dict(child, registry) for key, child in children.items()}
+        return NodeInstance(node_id, definition_id, deepcopy(dict(parameters)), x, y, subworkflows)
     if subworkflow_payload is not None:
         if not isinstance(subworkflow_payload, Mapping):
             raise WorkflowPersistenceError(f"Subworkflow for node {node_id!r} must be an object")
@@ -262,9 +307,25 @@ def _parse_node(
                 source_name=f"legacy nested workflow in node {node_id!r}",
             )
         parameters = {name: value for name, value in parameters.items() if name != "workflow"}
-    elif (definition := registry.get(definition_id)) is not None and definition.subworkflow_factory:
-        subworkflow = definition.subworkflow_factory()
-    return NodeInstance(node_id, definition_id, deepcopy(dict(parameters)), x, y, subworkflow)
+    elif (
+        definition := registry.get(definition_id)
+    ) is not None and definition.subworkflows_factory:
+        return NodeInstance(
+            node_id,
+            definition_id,
+            deepcopy(dict(parameters)),
+            x,
+            y,
+            definition.subworkflows_factory(),
+        )
+    return NodeInstance(
+        node_id,
+        definition_id,
+        deepcopy(dict(parameters)),
+        x,
+        y,
+        {} if subworkflow is None else {"default": subworkflow},
+    )
 
 
 def _resolve_testdata_paths(payload: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -285,7 +346,11 @@ def _resolve_testdata_paths(payload: Mapping[str, Any]) -> Mapping[str, Any]:
         parameters = node.get("parameters")
         if isinstance(parameters, dict):
             node["parameters"] = {
-                name: _resolve_testdata_value(value, testdata_root)
+                name: (
+                    value
+                    if node.get("definition_id") == "user-function" and name == "code"
+                    else _resolve_testdata_value(value, testdata_root)
+                )
                 for name, value in parameters.items()
             }
         subworkflow = node.get("subworkflow")

@@ -36,5 +36,3 @@ workflow canvas, local runtime, and browser editor fit together.
 - [Adapter Node Catalog](reference/adapters/index.md)
 - [Keyboard Shortcuts](reference/shortcuts.md)
 - [Third-Party Notices](reference/third-party-notices.md)
-
-Read more about [Kitware](https://www.kitware.com/).

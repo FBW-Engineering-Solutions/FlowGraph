@@ -4,12 +4,32 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from flowgraph.adapters.data_types import FLOAT, IMAGE, IMAGEJ, INTEGER, STRING, VEC3D
+from flowgraph.adapters.data_types import (
+    ARRAY,
+    ARRAY_1D,
+    ARRAY_2D,
+    BOOLEAN,
+    FLOAT,
+    IMAGE,
+    IMAGEJ,
+    INTEGER,
+    LIST_ANY,
+    LIST_FLOAT,
+    LIST_INT,
+    MUSCAT_ELEMENT_FILTER,
+    MUSCAT_NODE_FILTER,
+    STRING,
+    VEC2D,
+    VEC2DI,
+    VEC3D,
+    VEC3DI,
+)
 from flowgraph.application.workflow_core import DataType
 from flowgraph.domain.filepath import FilePath
 
@@ -23,6 +43,17 @@ class PortConversion:
     label: str
     convert: Callable[[Any], Any]
 
+
+BOOLEAN_TO_STRING = PortConversion("boolean", "string", "Boolean → Text", str)
+BOOLEAN_TO_INTEGER = PortConversion("boolean", "integer", "Boolean → Integer", int)
+BOOLEAN_TO_FLOAT = PortConversion("boolean", "float", "Boolean → Float", float)
+
+ELEMENT_FILTER_TO_NODE_FILTER = PortConversion(
+    MUSCAT_ELEMENT_FILTER.id,
+    MUSCAT_NODE_FILTER.id,
+    "Element Selector → Node Selector",
+    lambda value: value,
+)
 
 INTEGER_TO_FLOAT = PortConversion("integer", "float", "Integer → Float", float)
 INTEGER_TO_STRING = PortConversion("integer", "string", "Integer → string", str)
@@ -59,7 +90,90 @@ PILLOW_TO_IMAGEJ = PortConversion(
 )
 
 
+def _array_to_1d(value: np.ndarray) -> np.ndarray:
+    """Check rank and expose a column array as a vector without copying data."""
+    if not ARRAY.accepts(value):
+        raise TypeError("1D Array conversion requires a NumPy array")
+    if value.ndim == 1:
+        return value
+    if value.ndim == 2 and value.shape[1] == 1:
+        return value[:, 0]
+    raise ValueError(f"1D Array requires shape (n,) or (n, 1); received shape {value.shape}")
+
+
+def _array_to_2d(value: np.ndarray) -> np.ndarray:
+    """Narrow a generic array to a two-dimensional array without reshaping."""
+    if not ARRAY.accepts(value):
+        raise TypeError("2D Array conversion requires a NumPy array")
+    if value.ndim != 2:
+        raise ValueError(f"2D Array requires shape (n, m); received shape {value.shape}")
+    return value
+
+
+def _real_array_to_float_list(value: np.ndarray) -> list[float]:
+    """Bridge numeric arrays to APIs explicitly requiring Python float lists."""
+    if not ARRAY_1D.accepts(value) or value.dtype.kind not in "iuf":
+        raise TypeError("List Floats requires a 1D array of real integer or floating-point values")
+    return [float(item) for item in value]
+
+
+def _sequence_to_array(value: list) -> np.ndarray:
+    """Materialize a numeric sequence as a read-only one-dimensional array."""
+    array = np.asarray(value)
+    if array.ndim != 1 or array.dtype.kind not in "iuf":
+        raise TypeError("1D Array requires a one-dimensional numeric sequence")
+    array.setflags(write=False)
+    return array
+
+
+ARRAY_CONVERSIONS = (
+    # Also publish widening rules for static clients, which only know type IDs.
+    PortConversion(ARRAY_1D.id, ARRAY.id, "1D Array → Array", lambda value: value),
+    PortConversion(ARRAY_2D.id, ARRAY.id, "2D Array → Array", lambda value: value),
+    PortConversion(ARRAY.id, ARRAY_1D.id, "Array → 1D Array", _array_to_1d),
+    PortConversion(ARRAY.id, ARRAY_2D.id, "Array → 2D Array", _array_to_2d),
+    PortConversion(ARRAY_2D.id, ARRAY_1D.id, "2D Array → 1D Array", _array_to_1d),
+    PortConversion(LIST_FLOAT.id, ARRAY_1D.id, "List Floats → 1D Array", _sequence_to_array),
+    PortConversion(LIST_INT.id, ARRAY_1D.id, "List Ints → 1D Array", _sequence_to_array),
+    PortConversion(
+        FLOAT.id, ARRAY_1D.id, "Float → 1D Array", lambda value: _sequence_to_array([value])
+    ),
+    PortConversion(ARRAY_1D.id, LIST_FLOAT.id, "1D Array → List Floats", _real_array_to_float_list),
+    PortConversion(ARRAY_1D.id, LIST_ANY.id, "1D Array → List Any", lambda value: value.tolist()),
+    *(
+        PortConversion(vector.id, ARRAY_1D.id, f"{vector.label} → 1D Array", _sequence_to_array)
+        for vector in (VEC2D, VEC2DI, VEC3D, VEC3DI)
+    ),
+)
+
+
+def _convert_vector(value: list[Any], *, dimensions: int, integer: bool) -> list[Any]:
+    """Resize a vector and cast components without modifying the source list."""
+    cast = round if integer else float
+    components = value[:dimensions] + [0] * max(0, dimensions - len(value))
+    return [cast(component) for component in components]
+
+
+_VECTOR_TYPES = ((VEC2D, 2, False), (VEC3D, 3, False), (VEC2DI, 2, True), (VEC3DI, 3, True))
+VECTOR_CONVERSIONS = tuple(
+    PortConversion(
+        source.id,
+        target.id,
+        f"{source.label} → {target.label}",
+        partial(_convert_vector, dimensions=dimensions, integer=integer),
+    )
+    for source, _, _ in _VECTOR_TYPES
+    for target, dimensions, integer in _VECTOR_TYPES
+    if source.id != target.id
+)
+
+
 PORT_CONVERSIONS = (
+    *ARRAY_CONVERSIONS,
+    ELEMENT_FILTER_TO_NODE_FILTER,
+    BOOLEAN_TO_STRING,
+    BOOLEAN_TO_INTEGER,
+    BOOLEAN_TO_FLOAT,
     INTEGER_TO_FLOAT,
     INTEGER_TO_STRING,
     INTEGER_TO_LIST_INT,
@@ -72,6 +186,7 @@ PORT_CONVERSIONS = (
     PILLOW_TO_IMAGEJ,
     FILE_TO_STR,
     STR_TO_FILE,
+    *VECTOR_CONVERSIONS,
 )
 
 
@@ -87,16 +202,28 @@ def resolve_port_conversion(source: DataType[Any], target: DataType[Any]) -> Por
 
 
 _SOURCE_DATA_TYPES = {
+    ARRAY.id: ARRAY,
+    ARRAY_1D.id: ARRAY_1D,
+    ARRAY_2D.id: ARRAY_2D,
+    LIST_FLOAT.id: LIST_FLOAT,
+    LIST_INT.id: LIST_INT,
+    BOOLEAN.id: BOOLEAN,
     STRING.id: STRING,
     INTEGER.id: INTEGER,
     FLOAT.id: FLOAT,
     VEC3D.id: VEC3D,
+    VEC2D.id: VEC2D,
+    VEC2DI.id: VEC2DI,
+    VEC3DI.id: VEC3DI,
     IMAGE.id: IMAGE,
 }
 
 
 def resolve_value_conversion(value: Any, target: DataType[Any]) -> PortConversion | None:
     """Return a registered conversion for a runtime value and target type."""
+    # bool subclasses int, but an integer target must receive an actual int.
+    if isinstance(value, bool) and target.id == INTEGER.id:
+        return resolve_port_conversion(BOOLEAN, target)
     if target.accepts(value):
         return None
     for conversion in PORT_CONVERSIONS:

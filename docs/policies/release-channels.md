@@ -1,7 +1,7 @@
 # FlowGraph Core Release Channels
 
 **Decision date:** September 22, 2026
-**Scope:** Initial public FlowGraph Core release
+**Scope:** FlowGraph Core alpha releases
 
 ## Supported channels
 
@@ -13,43 +13,28 @@ include:
 - the version tag;
 - the source distribution (`.tar.gz`);
 - the Python wheel (`.whl`);
-- SHA-256 checksums;
+- SHA-256 digests exposed in release asset metadata (a separate public checksum
+  manifest is optional);
 - release notes and upgrade information;
 - license and third-party-notice files when required; and
 - SBOM artifacts when generated for the release.
 
 ### PyPI
 
-PyPI is the canonical installation channel for Python users. The project will
-publish the FlowGraph Core source distribution and wheel to the `flowgraph`
-project using the protected project owner account and a reviewed release
-workflow.
+PyPI is the canonical installation channel for Python users. Publish the
+FlowGraph Core source distribution and wheel to the `flowgraph` project using
+the reviewed release workflow. The release manager must verify account and
+publisher protections separately; this policy does not establish their status.
 
 PyPI publication must use the final BSD-3-Clause metadata, the Felipe Bordeu
 author/maintainer metadata, the correct project URLs, and artifact validation
 before upload.
 
-### Conda channel
+## Unsupported distribution channels
 
-The repository provides a `conda-build` recipe at
-`packaging/conda/meta.yaml`, and FlowGraph is distributed through the
-[`flowgraph` Anaconda channel](https://anaconda.org/channels/flowgraph). Users
-can install it with:
+Core release procedures do not provide publication or support through:
 
-```bash
-conda install -c flowgraph flowgraph
-```
-
-The recipe is a supported packaging input and must be validated against the
-published source distribution and a clean Conda environment before each release
-claims Conda compatibility. The `flowgraph` channel is separate from
-conda-forge; recipe inclusion does not imply that `flowgraph` is available on
-conda-forge.
-
-## Not supported for the initial release
-
-The initial public release does not promise or publish through:
-
+- Conda channels (the repository recipe was removed on November 5, 2026);
 - Docker Hub or other container registries;
 - operating-system package managers;
 - private package indexes; or
@@ -62,13 +47,14 @@ testing, ownership, security, provenance, support, and publication procedures.
 
 Users may clone the repository and build it locally with `uv`, but source
 checkout usage is not a separate supported distribution channel. The supported
-release artifacts are the GitHub source release, the PyPI package,
-and the `flowgraph` Conda channel package.
+release artifacts are the GitHub source release and the PyPI package.
+
+Optional Desktop and Web clients have separate distribution and validation
+procedures; Core wheel/sdist checks do not establish client support.
 
 ## Publication ownership
 
-Felipe Bordeu is the initial and current release manager. The project is
-maintained by one developer, so no independent backup owner is required for the
-initial alpha release. Release continuity depends on securing the maintainer's
-GitHub and PyPI accounts, configuring account recovery, enabling MFA, and
+Felipe Bordeu is the release manager. The current single-maintainer policy does
+not require an independent backup owner. Release continuity depends on securing
+the maintainer's GitHub and PyPI accounts, configuring account recovery, enabling MFA, and
 retaining private release backups and artifact records.

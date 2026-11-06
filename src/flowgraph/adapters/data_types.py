@@ -1,8 +1,9 @@
 from pathlib import Path
 
 import numpy as np
+from Muscat.ImplicitGeometry.ImplicitGeometryBase import ImplicitGeometryBase
 from Muscat.LinAlg.Transform import Transform
-from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter
+from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter, NodeFilter
 from Muscat.MeshContainers.Filters.FilterOperators import FilterOperatorBase
 from PIL.Image import Image
 
@@ -11,6 +12,9 @@ from flowgraph.domain.filepath import FilePath
 from flowgraph.domain.mesh_document import MeshDocument
 
 ANY = DataType("any", "Any", object)
+ARRAY = DataType("array", "Array", np.ndarray)
+ARRAY_1D = DataType("array-1d", "1D Array", np.ndarray)
+ARRAY_2D = DataType("array-2d", "2D Array", np.ndarray)
 STRING = DataType("string", "Text", str)
 STR_SELECT = DataType("str", "select str", str)
 BOOLEAN = DataType("boolean", "Boolean", bool)
@@ -18,6 +22,8 @@ INTEGER = DataType("integer", "Integer", int)
 FLOAT = DataType("float", "Float", float)
 LIST_STR = DataType("list[str]", "List Text", list[str])
 LIST_INT = DataType("list[int]", "List Ints", list[int])
+# JSON-friendly parameter editors and APIs explicitly requiring Python lists.
+# Numeric data ports should normally use ARRAY_1D instead.
 LIST_FLOAT = DataType("list[float]", "List Floats", list[float])
 LIST_ANY = DataType("list[any]", "List Any", list)
 FILE = DataType("filename", "FilePath", FilePath)
@@ -28,17 +34,22 @@ MESH_DOCUMENT = DataType("mesh-document", "Mesh document", MeshDocument)
 TABLE_DOCUMENT = DataType("table-document", "Table", dict)
 IMAGE = DataType("image", "Image", Image)
 IMAGEJ = DataType("imagej", "ImageJ NumPy", np.ndarray)
+MUSCAT_ZONE = DataType("muscat-zone", "Zone", ImplicitGeometryBase)
 MUSCAT_ELEMENT_FILTER = DataType(
     "filter-like",
     "Selector",
     (ElementFilter, FilterOperatorBase),
 )
+# Element filters also implement GetNodesIndices and can serve as nodal filters.
+MUSCAT_NODE_FILTER = DataType(
+    "node-filter-like", "Node Selector", (NodeFilter, ElementFilter, FilterOperatorBase)
+)
 VEC3D = DataType("VEC3D", "3D Vector", list[float])
 VEC2D = DataType("VEC2D", "2D Vector", list[float])
 VEC3DSTR = DataType("VEC3DSTR", "3D Text Vector", list[str])
 
-VEC3DI = DataType("VEC3D", "3D Vector", list[int])
-VEC2DI = DataType("VEC2D", "2D Vector", list[int])
+VEC3DI = DataType("VEC3DI", "3D Integer Vector", list[int])
+VEC2DI = DataType("VEC2DI", "2D Integer Vector", list[int])
 
 
 MULTI_SELECT = DataType("list[bool]", "List bool", list[bool])

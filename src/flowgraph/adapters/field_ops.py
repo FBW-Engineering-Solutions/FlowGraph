@@ -1,4 +1,4 @@
-"""Workflow nodes for transferring fields between meshes."""
+"""Workflow nodes for extracting and transferring mesh fields."""
 
 from collections.abc import Mapping
 from typing import Any
@@ -12,11 +12,12 @@ from Muscat.MeshContainers.Mesh import Mesh
 from Muscat.MeshTools.MeshFieldOperations import GetFieldTransferOp
 from Muscat.MeshTools.MeshTools import GetElementsCenters
 
-from flowgraph.adapters.data_types import MESH_DOCUMENT
+from flowgraph.adapters.data_types import ARRAY, MESH_DOCUMENT
 from flowgraph.application.workflow_core import (
     ExecContext,
     NodeDefinition,
     ParameterDefinition,
+    ParameterOption,
     PortDefinition,
     PortDirection,
 )
@@ -30,7 +31,7 @@ def _transfer_fields(
     _parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Transfer all nodal fields from ``source_data`` onto ``target``."""
+    """Transfer fields and tags using the selected inside/outside interpolation."""
     source_mesh: Mesh = inputs["source_data"].mesh
     target_mesh: Mesh = inputs["target"].mesh
     outpout_mesh = target_mesh.View()
@@ -39,10 +40,11 @@ def _transfer_fields(
     transfer_elements = _parameters.get("transferElementData", True)
     transfer_nodes_tags = _parameters.get("transferNodeTags", True)
     transfer_elements_tags = _parameters.get("transferElementTags", True)
+    method = _parameters.get("method", "Interp/Clamp")
 
     if transfer_nodes or transfer_nodes_tags:
         field = FEField(name="source", mesh=source_mesh)
-        operator_nodal, _, _ = GetFieldTransferOp(field, target_mesh.nodes)
+        operator_nodal, _, _ = GetFieldTransferOp(field, target_mesh.nodes, method=method)
         if transfer_nodes and source_mesh.nodeFields:
             for name, data in source_mesh.nodeFields.items():
                 if name == "flowgraph_node_id" or np.issubdtype(data.dtype, np.str_):
@@ -66,7 +68,7 @@ def _transfer_fields(
         numbering = ComputeDofNumbering(source_mesh, LagrangeSpaceP0)
         field = FEField(name="source", mesh=source_mesh, space=LagrangeSpaceP0, numbering=numbering)
         operator_elem, _, _ = GetFieldTransferOp(
-            field, GetElementsCenters(target_mesh), elementFilter=ElementFilter()
+            field, GetElementsCenters(target_mesh), method=method, elementFilter=ElementFilter()
         )
 
         if transfer_elements and source_mesh.elemFields:
@@ -94,13 +96,26 @@ TRANSFER_FIELDS_NODE = NodeDefinition(
     id="transfer-fields",
     icon="mdi-swap-horizontal-bold",
     label="Transfer Fields",
-    description="Transfers nodal fields from one mesh onto another mesh.",
+    description="Transfers node and element fields and tags between meshes with selectable interpolation.",
     ports=(
         PortDefinition("source_data", PortDirection.INPUT, MESH_DOCUMENT, "Source data"),
         PortDefinition("target", PortDirection.INPUT, MESH_DOCUMENT, "Target"),
         PortDefinition("mesh_document", PortDirection.OUTPUT, MESH_DOCUMENT, "Mesh document"),
     ),
     parameters=(
+        ParameterDefinition(
+            "method",
+            ParameterKind.STR_SELECT,
+            "Interpolation",
+            "Interp/Clamp",
+            options=(
+                ParameterOption("Interp/Clamp", "Interpolation / Clamp"),
+                ParameterOption("Interp/Nearest", "Interpolation / Nearest"),
+                ParameterOption("Interp/Extrap", "Interpolation / Extrapolation"),
+                ParameterOption("Interp/ZeroFill", "Interpolation / Zero Fill"),
+            ),
+            port=False,
+        ),
         ParameterDefinition(
             "transferNodeData", ParameterKind.BOOLEAN, "Apply on node fields", True, port=False
         ),
@@ -122,4 +137,56 @@ TRANSFER_FIELDS_NODE = NodeDefinition(
 )
 
 
-AVAILABLE_NODES = (TRANSFER_FIELDS_NODE,)
+def _extract_field(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Copy one mesh field without changing its shape, dtype, or source data."""
+    mesh = inputs["mesh"].mesh
+    entity = parameters.get("entity", "node")
+    if entity not in ("node", "element"):
+        raise ValueError("Field association must be 'node' or 'element'")
+    name = parameters.get("fieldName", "")
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("Field name must be a nonempty string")
+    fields = mesh.nodeFields if entity == "node" else mesh.elemFields
+    if name not in fields:
+        available = ", ".join(sorted(fields)) or "(none)"
+        raise ValueError(
+            f"{entity.capitalize()} field {name!r} does not exist; available: {available}"
+        )
+    return {"field": np.array(fields[name], copy=True)}
+
+
+EXTRACT_FIELD_NODE = NodeDefinition(
+    id="extract-field",
+    requirements=("py:muscat", "py:numpy"),
+    icon="mdi-table-arrow-right",
+    label="Extract Field",
+    description="Extract a nodal or element field as an independent NumPy array.",
+    ports=(
+        PortDefinition("mesh", PortDirection.INPUT, MESH_DOCUMENT, "Mesh"),
+        PortDefinition("field", PortDirection.OUTPUT, ARRAY, "Field"),
+    ),
+    parameters=(
+        ParameterDefinition(
+            "entity",
+            ParameterKind.STR_SELECT,
+            "Association",
+            "node",
+            options=(ParameterOption("node", "Node"), ParameterOption("element", "Element")),
+        ),
+        ParameterDefinition(
+            "fieldName",
+            ParameterKind.TEXT,
+            "Field name",
+            "",
+            placeholder="Enter the field name",
+        ),
+    ),
+    executor=_extract_field,
+)
+
+
+AVAILABLE_NODES = (TRANSFER_FIELDS_NODE, EXTRACT_FIELD_NODE)

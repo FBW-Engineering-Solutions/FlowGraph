@@ -14,7 +14,7 @@ must preserve the headless import boundary, workflow-format contracts, and BSD
 Set up a locked development environment from the repository root:
 
 ```bash
-uv sync --locked --extra dev
+uv sync --locked --extra dev --extra io
 ```
 
 ## Development checks
@@ -25,7 +25,7 @@ Run the complete local quality gate before opening a pull request:
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest
-uv run python -m compileall -q src tools tests
+uv run python -m compileall -q src tests
 ```
 
 Run `uvx ty check src` when changing public APIs or type-sensitive application
@@ -79,6 +79,11 @@ Signed-off-by: Jane Developer <jane@example.org>
 
 Use `git commit -s` to add the line. By signing, you certify the contribution
 under the terms in [`DCO.md`](../docs/maintainers/dco.md). Do not sign on behalf of another person.
+
+The maintainer verifies sign-offs manually before merging; no automated DCO
+check is currently required. Sign-offs are contribution certifications, not
+cryptographic commit signatures. Repository protection policy and its rollout
+status are described in the [governance guide](../docs/maintainers/governance.md).
 
 ## Release notes
 

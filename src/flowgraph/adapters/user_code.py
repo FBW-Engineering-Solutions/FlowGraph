@@ -16,9 +16,21 @@ from flowgraph.application.workflow_core import (
     PortDirection,
 )
 
-from .data_types import ANY, BOOLEAN, FLOAT, INTEGER, LIST_FLOAT, LIST_INT, LIST_STR, STRING
+from .data_types import (
+    ANY,
+    BOOLEAN,
+    FLOAT,
+    INTEGER,
+    LIST_FLOAT,
+    LIST_INT,
+    LIST_STR,
+    MESH_DOCUMENT,
+    STRING,
+)
 
 DEFAULT_CODE = """def Execute(input1, input2, input3) -> tuple[Any, Any, Any]:
+    # WARNING: Inputs are read-only and may be shared with other branches or cached.
+    # Never modify inputs or their nested data in place; create new output data.
     return (input1, input2, input3)
 """
 
@@ -30,6 +42,7 @@ _ANNOTATION_TYPES = {
     "list[float]": LIST_FLOAT,
     "list[int]": LIST_INT,
     "list[str]": LIST_STR,
+    "MeshDocument": MESH_DOCUMENT,
     "str": STRING,
 }
 
@@ -178,7 +191,11 @@ USER_FUNCTION = NodeDefinition(
     requirements=(),
     icon="mdi-code-braces",
     label="User Function",
-    description="Runs trusted local Python code defining a typed Execute function.",
+    description=(
+        "Runs trusted local Python code defining a typed Execute function. "
+        "Inputs are read-only, including nested data: never modify them in place; "
+        "create new output data when transforming values."
+    ),
     ports=(),
     executor=_execute_user_code,
     instance_port_resolver=_ports_for_instance,
