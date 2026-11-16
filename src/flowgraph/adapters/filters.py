@@ -4,7 +4,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 import Muscat.MeshContainers.ElementsDescription as ED
-import numpy as np
 from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter, NodeFilter
 from Muscat.MeshContainers.Filters.FilterOperators import (
     ComplementaryFilter,
@@ -189,16 +188,6 @@ CREATE_MUSCAT_ELEMENT_FILTER = NodeDefinition(
 )
 
 
-class _ComposedNodeFilter(NodeFilter):
-    """Honor nested nodal filters omitted by Muscat's NodeFilter implementation."""
-
-    def GetNodesIndices(self, mesh):
-        indices = super().GetNodesIndices(mesh)
-        if self.nFilter is None:
-            return indices
-        return np.intersect1d(indices, self.nFilter.GetNodesIndices(mesh))
-
-
 def _create_node_filter(
     inputs: Mapping[str, Any],
     parameters: Mapping[str, Any],
@@ -206,7 +195,7 @@ def _create_node_filter(
 ) -> Mapping[str, Any]:
     """Create a Muscat nodal selector from tags, zones, and nested selectors."""
     return {
-        "filter": _ComposedNodeFilter(
+        "filter": NodeFilter(
             nTag=_tag_list(parameters, "ntag") or None,
             eTag=_tag_list(parameters, "etag") or None,
             zone=[value for name, value in inputs.items() if name.startswith("zone_")],

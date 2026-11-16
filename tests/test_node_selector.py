@@ -140,7 +140,7 @@ def test_node_selector_multiple_zones_are_combined_with_or(mesh):
 )
 def test_node_selector_tags(mesh, parameters, expected):
     selector = CREATE_MUSCAT_NODE_FILTER.executor({}, parameters)["filter"]
-    assert isinstance(selector, NodeFilter)
+    assert type(selector) is NodeFilter
     np.testing.assert_array_equal(selector.GetNodesIndices(mesh), expected)
 
 
