@@ -34,8 +34,8 @@ DEFAULT_CODE = """#@ Dataset image
 result = image
 """
 _DECLARATION = re.compile(
-    r"^\s*#@\s*(?:(input|output)\s+)?([\w.]+)\s+"
-    r"(?:\([^\n]*\)\s*)?([A-Za-z_$][\w$]*)\s*$",
+    r"^\s*#@\s*(?:(input|output)\s+)?([\w.]+)"
+    r"(?:\s*\([^\n]*\)\s*|\s+)([A-Za-z_$][\w$]*)\s*$",
     re.IGNORECASE,
 )
 _UNTYPED_OUTPUT = re.compile(r"^\s*#@output\s+([A-Za-z_$][\w$]*)\s*$", re.IGNORECASE)
