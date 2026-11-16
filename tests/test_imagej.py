@@ -79,6 +79,27 @@ def test_script_type_annotations_support_numeric_and_untyped_outputs() -> None:
     assert [port.data_type.id for port in ports] == ["float", "integer", "any"]
 
 
+@pytest.mark.parametrize("definition", [IMAGEJ_SCRIPT, IMAGEJ_SCRIPT_FILE])
+@pytest.mark.parametrize("qualifier", ["", "input ", "output "])
+@pytest.mark.parametrize("spacing", ["", " ", "\t"])
+def test_parameter_metadata_can_immediately_follow_type(
+    definition: NodeDefinition, qualifier: str, spacing: str, tmp_path: Path
+) -> None:
+    source = f'#@ {qualifier}Integer{spacing}(label="Gaussian Sigma", min=1, max=10, value=2) sigma'
+    if definition is IMAGEJ_SCRIPT_FILE:
+        script = tmp_path / "gaussian.groovy"
+        script.write_text(source, encoding="utf-8")
+        parameters = {"filename": str(script)}
+    else:
+        parameters = {"code": source}
+    instance = definition.create_instance("script", parameters=parameters)
+    ports = [port for port in definition.ports_for_instance(instance) if not port.is_param]
+    direction = PortDirection.OUTPUT if qualifier == "output " else PortDirection.INPUT
+    assert [(port.name, port.direction, port.data_type.id) for port in ports] == [
+        ("sigma", direction, "integer"),
+    ]
+
+
 def test_invalid_script_source_and_duplicate_ports(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="empty"):
         IMAGEJ_SCRIPT.ports_for_instance(
