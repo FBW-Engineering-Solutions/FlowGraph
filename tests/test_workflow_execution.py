@@ -45,6 +45,43 @@ def _workflow_json() -> str:
     return json.dumps(workflow_to_dict(workflow))
 
 
+@pytest.mark.parametrize("incremental", [False, True])
+def test_live_node_progress_and_timings(incremental):
+    events = []
+    options = {"session_id": "progress-regression"} if incremental else None
+    response = json.loads(
+        execute_workflow_json(_workflow_json(), options, on_progress=events.append)
+    )
+    assert response["status"] == "ok"
+    assert [(event["node_id"], event["state"]) for event in events] == [
+        ("source", "running"),
+        ("source", "completed"),
+        ("output", "running"),
+        ("output", "completed"),
+    ]
+    assert response["progress"] == [events[1], events[3]]
+    assert all(event["elapsed_seconds"] >= 0 for event in response["progress"])
+    if incremental:
+        events.clear()
+        response = json.loads(
+            execute_workflow_json(_workflow_json(), options, on_progress=events.append)
+        )
+        assert any(event["state"] == "reused" for event in events)
+        assert all("elapsed_seconds" not in event for event in events if event["state"] == "reused")
+        workflow_execution.clear_execution_session(options["session_id"])
+
+
+def test_failed_node_progress_retains_elapsed_time():
+    payload = json.loads(_workflow_json())
+    payload["edges"] = []
+    events = []
+    response = json.loads(execute_workflow_json(json.dumps(payload), on_progress=events.append))
+    assert response["status"] == "error"
+    failed = [event for event in response["progress"] if event["state"] == "failed"]
+    assert failed[0]["node_id"] == "output"
+    assert failed[0]["elapsed_seconds"] >= 0
+
+
 def test_scoped_json_execution_blocks_outdated_inputs_without_upstream_execution():
     session_id = "scoped-json-regression"
     payload = _workflow_json()

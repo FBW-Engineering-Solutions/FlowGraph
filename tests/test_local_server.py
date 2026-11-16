@@ -177,6 +177,32 @@ def wait_job(api, identifier):
     pytest.fail("Execution did not finish")
 
 
+@pytest.mark.parametrize("incremental", [False, True])
+def test_job_exposes_live_progress_before_completion(tmp_path, incremental):
+    manager = JobManager(tmp_path)
+    try:
+        job = manager.submit(
+            workflow(
+                "def Execute() -> tuple[int]:\n    import time\n    time.sleep(0.5)\n    return (1,)\n"
+            ),
+            {"session_id": "progress"} if incremental else None,
+        )
+        deadline = time.monotonic() + 20
+        saw_running = False
+        while time.monotonic() < deadline:
+            job = manager.get(job["id"])
+            saw_running |= any(event["state"] == "running" for event in job["progress"])
+            if job["state"] != "running":
+                break
+            time.sleep(0.01)
+        assert saw_running
+        assert job["state"] == "completed", job
+        assert job["progress"] == job["result"]["progress"]
+        assert job["progress"][0]["elapsed_seconds"] >= 0.5
+    finally:
+        manager.close()
+
+
 def test_package_api_opt_in_metadata_and_idle_session_refresh(api, monkeypatch):
     status, runtime = request(api, "GET", "/api/v1/runtime")
     assert status == 200
@@ -342,12 +368,14 @@ def test_verbose_job_failure_cancellation_and_timeout(api, capsys):
     assert request(api, "POST", f"/api/v1/executions/{cancelled['id']}/cancel", {})[0] == 200
     api.jobs.timeout = 0.001
     _, expired = request(api, "POST", "/api/v1/executions", {"workflow": workflow()})
-    assert wait_job(api, expired["id"])["state"] == "failed"
+    completed = wait_job(api, expired["id"])
+    assert completed["state"] == "completed"
+    assert completed["timed_out"] is True
     output = capsys.readouterr().err
     assert f"Execution {failed['id']}: failed" in output
     assert output.count(f"Execution {cancelled['id']}: cancelled") == 1
     assert f"Execution {cancelled['id']}: failed" not in output
-    assert f"Execution {expired['id']}: failed (timed out)" in output
+    assert f"Execution {expired['id']}: running (timeout reached; worker retained)" in output
 
 
 @pytest.mark.parametrize("option", ["--verbose", "-v"])
@@ -492,8 +520,8 @@ def test_job_timeout_and_shutdown(tmp_path):
     job = manager.submit(workflow())
     for thread in manager.threads:
         thread.join(timeout=10)
-    assert manager.get(job["id"])["state"] == "failed"
-    assert "timeout" in manager.get(job["id"])["error"]
+    assert manager.get(job["id"])["state"] == "completed"
+    assert manager.get(job["id"])["timed_out"] is True
     manager.timeout = 30
     job = manager.submit(workflow())
     process = manager.process
@@ -503,6 +531,68 @@ def test_job_timeout_and_shutdown(tmp_path):
     assert all(not thread.is_alive() for thread in manager.threads)
     with pytest.raises(RuntimeError, match="closed"):
         manager.submit(workflow())
+
+
+@pytest.mark.parametrize("session", [False, True])
+def test_advisory_timeout_keeps_worker_alive_until_explicit_kill(api, session):
+    assert (
+        request(api, "GET", "/api/v1/runtime")[1]["capabilities"]["advisoryExecutionTimeout"] == 1
+    )
+    code = "def Execute() -> tuple[int]:\n    import time\n    time.sleep(60)\n    return (1,)\n"
+    body = {"workflow": workflow(code), "timeout_seconds": 0.01}
+    if session:
+        body["options"] = {"session_id": "timeout-session"}
+    status, job = request(api, "POST", "/api/v1/executions", body)
+    assert status == 202
+    process = api.jobs.process
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        status, running = request(api, "GET", f"/api/v1/executions/{job['id']}")
+        if running["timed_out"]:
+            break
+        time.sleep(0.01)
+    assert running["timed_out"] is True
+    assert running["state"] == "running"
+    assert running["timeout_seconds"] == 0.01
+    assert process.poll() is None
+    assert request(api, "POST", "/api/v1/executions", {"workflow": workflow()})[0] == 409
+    assert (
+        request(api, "POST", f"/api/v1/executions/{job['id']}/cancel", {})[1]["state"]
+        == "cancelled"
+    )
+    assert process.poll() is not None
+    assert request(api, "GET", "/api/v1/runtime")[0] == 200
+    _, retry = request(api, "POST", "/api/v1/executions", {"workflow": workflow()})
+    assert wait_job(api, retry["id"])["state"] == "completed"
+
+
+def test_incremental_execution_can_complete_after_timeout(api):
+    status, job = request(
+        api,
+        "POST",
+        "/api/v1/executions",
+        {
+            "workflow": workflow(),
+            "options": {"session_id": "late-result"},
+            "timeout_seconds": 0.001,
+        },
+    )
+    assert status == 202
+    completed = wait_job(api, job["id"])
+    assert completed["state"] == "completed"
+    assert completed["timed_out"] is True
+    assert api.jobs.sessions["late-result"][0].poll() is None
+
+
+@pytest.mark.parametrize("timeout", [True, "120", 0, -1, 86401, float("inf"), float("nan")])
+def test_execution_timeout_validation(api, timeout):
+    assert (
+        request(
+            api, "POST", "/api/v1/executions", {"workflow": workflow(), "timeout_seconds": timeout}
+        )[0]
+        == 400
+    )
+    assert api.jobs.active is None
 
 
 def test_worker_crash_and_result_limit_are_reported(api):

@@ -85,7 +85,12 @@ def build_parser() -> argparse.ArgumentParser:
             "repeatable; explicit values replace the default; HTTP loopback allowed for development"
         ),
     )
-    serve_parser.add_argument("--execution-timeout", type=float, default=120)
+    serve_parser.add_argument(
+        "--execution-timeout",
+        type=float,
+        default=120,
+        help="Advisory execution timeout in seconds; workers continue until completion or cancellation",
+    )
     serve_parser.add_argument(
         "--allow-package-install",
         action="store_true",
