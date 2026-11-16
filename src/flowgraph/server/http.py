@@ -210,6 +210,7 @@ class LocalServer(ThreadingHTTPServer):
                 "incrementalExecution": 1,
                 "scopedExecution": 1,
                 "liveNodeResults": 1,
+                "executionRecovery": 1,
                 "installPackages": self.packages.info()["enabled"],
             },
             "directory": str(self.workspace.root),
@@ -245,6 +246,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             "/api/v1/runtime",
             "/api/v1/catalog",
             "/api/v1/executions",
+            "/api/v1/execution-state",
             "/api/v1/execution-sessions/dispose",
             "/api/v1/files",
             "/api/v1/files/demo",
@@ -365,6 +367,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._reply(200, self.server.runtime())
             elif method == "GET" and path == "/api/v1/catalog":
                 self._reply(200, self.server.catalog)
+            elif method == "GET" and path == "/api/v1/execution-state":
+                self._reply(200, self.server.jobs.current_state())
             elif method == "POST" and path in {
                 "/api/v1/packages/check",
                 "/api/v1/packages/install",

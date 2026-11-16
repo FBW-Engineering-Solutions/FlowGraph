@@ -48,6 +48,26 @@ Core serves only the API, not editor assets: `/` and other non-API paths return
 404. The public editor, a separately served editor, or FlowGraph Desktop supplies
 the UI. Starting this server does not change standalone WASM deployments.
 
+### Recovering editor state
+
+The runtime advertises `executionRecovery: 1`. Authenticated
+`GET /api/v1/execution-state` returns `{workflow, options, previous_result, job}`
+for the active execution, or the most recently submitted job when idle. `job`
+includes current progress, all retained live node results and their cursor, and
+the final result when available. Clients resume polling the returned job ID;
+recovery never submits a new execution or stops a worker. `previous_result` is
+an optional display baseline for selected-node runs with an unchanged workflow
+and session; it is not proof that runtime objects are still cached.
+
+The web editor exposes this through **Retrieve current state from server** before
+**Use backend**. This replaces the local workflow, not merges it. State belongs
+to the server, not an individual browser: all authorized clients can retrieve
+the active/latest submission. Only submitted workflows are known to the server;
+later editor changes are not recovered. Records are bounded to 32 jobs in memory
+and lost at server shutdown. Session-worker expiration, cancellation and eviction
+may discard computation caches independently of retained serialized previews.
+An empty or restarted server returns 404 until another execution is submitted.
+
 ## Other clients
 
 ### Custom Python nodes
@@ -132,6 +152,7 @@ requests (cancel/demo) use Content-Length 0. File uploads/downloads are raw byte
 | --- | --- | --- |
 | GET | `/api/v1/runtime` | Protocol, workflow-format version, capabilities, installed packages/versions, workspace and limits |
 | GET | `/api/v1/catalog` | Metadata-only catalog from this installed core |
+| GET | `/api/v1/execution-state` | Authenticated active/latest submission: workflow, options, previous selected-run result and current job; 404 if none retained |
 | POST | `/api/v1/executions` | Submit `{"workflow": { ...workflow document... }}`; returns HTTP 202 and a job |
 | GET | `/api/v1/executions/{id}` | Get job state and result |
 | POST | `/api/v1/executions/{id}/cancel` | Cancel a running job; terminal jobs are unchanged |
