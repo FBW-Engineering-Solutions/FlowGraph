@@ -8,6 +8,7 @@ import json
 import math
 import secrets
 import sys
+from collections.abc import Sequence
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import metadata
 from pathlib import Path
@@ -40,6 +41,7 @@ class LocalServer(ThreadingHTTPServer):
         execution_timeout: float = 120,
         allowed_origins: tuple[str, ...] = (),
         verbose: bool = False,
+        plugins: Sequence[str | Path] = (),
     ):
         if (
             not 0 <= port <= 65535
@@ -99,7 +101,17 @@ class LocalServer(ThreadingHTTPServer):
         self.token = token or secrets.token_hex(32)
         self.max_request = max_request
         self.verbose = verbose
-        self.jobs = JobManager(self.workspace.root, timeout=execution_timeout, verbose=verbose)
+        from flowgraph.application.node_registry import create_node_registry
+        from flowgraph.application.plugins import load_plugin_groups, resolve_plugin_paths
+        from flowgraph.application.workflow_web_catalog import workflow_web_catalog
+
+        self.plugins = resolve_plugin_paths(plugins)
+        groups = load_plugin_groups(self.plugins)
+        create_node_registry(extra_groups=groups)
+        self.catalog = workflow_web_catalog(extra_groups=groups)
+        self.jobs = JobManager(
+            self.workspace.root, timeout=execution_timeout, verbose=verbose, plugins=self.plugins
+        )
         self.report("Server state: starting")
         super().__init__((host, port), ApiHandler)
         if public is not None:
@@ -332,9 +344,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             if method == "GET" and path == "/api/v1/runtime":
                 self._reply(200, self.server.runtime())
             elif method == "GET" and path == "/api/v1/catalog":
-                from flowgraph.application.workflow_web_catalog import workflow_web_catalog
-
-                self._reply(200, workflow_web_catalog())
+                self._reply(200, self.server.catalog)
             elif method == "POST" and path == "/api/v1/executions":
                 body = self._body(json_body=True)
                 workflow = body.get("workflow")

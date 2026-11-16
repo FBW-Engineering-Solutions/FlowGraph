@@ -119,6 +119,90 @@ caller rather than the built-in source, omit the source and edge and call
 connected to another node inside the graph. See the [Workflows guide](workflows.md)
 for running saved workflows and exporting graph interfaces.
 
+## Load Python-file plugins from the CLI or server
+
+Put reusable definitions and their executors in a Python file, then export them
+in `AVAILABLE_NODES`. The file must not run a workflow at import time. For example,
+save this as `custom_nodes.py`:
+
+```python
+from flowgraph.adapters.data_types import INTEGER, ParameterKind
+from flowgraph.application.workflow_core import (
+    NodeDefinition,
+    ParameterDefinition,
+    PortDefinition,
+    PortDirection,
+)
+
+
+def scale_integer(inputs, parameters, context):
+    return {"result": inputs["value"] * parameters["factor"]}
+
+
+SCALE_INTEGER = NodeDefinition(
+    id="scale-integer",
+    label="Scale Integer",
+    icon="mdi-multiplication",
+    ports=(
+        PortDefinition("value", PortDirection.INPUT, INTEGER),
+        PortDefinition("result", PortDirection.OUTPUT, INTEGER),
+    ),
+    parameters=(ParameterDefinition("factor", ParameterKind.INTEGER, "Factor", 2),),
+    executor=scale_integer,
+)
+
+AVAILABLE_NODES = (SCALE_INTEGER,)
+```
+
+Load these definitions before reading a saved workflow that uses `scale-integer`:
+
+```bash
+uv run flowgraph inspect /path/scaled-workflow.json --plugin /path/custom_nodes.py --full
+uv run flowgraph run /path/scaled-workflow.json --plugin /path/custom_nodes.py \
+  --override scale.factor=3
+uv run flowgraph serve --workspace /path/workspace --plugin /path/custom_nodes.py
+```
+
+Repeat `--plugin` for multiple files. Built-ins are registered first, followed by
+plugins in option order; duplicate definition IDs and repeated file paths are
+errors. Each file must export an iterable containing only `NodeDefinition`
+objects. Definitions are not discovered from arbitrary module globals.
+
+Relative plugin paths resolve from the command's working directory, **not** the
+workflow location or server workspace; `~` is expanded. Plugin directories are
+not added to `sys.path`: install helper modules and dependencies in the same
+Python environment. Plain files are supported, not package-relative imports.
+Each successfully imported file is reused within its process. Restart the CLI
+invocation or server after changing plugin code; hot reload is not supported.
+
+The server validates plugins at startup, includes their metadata in
+`GET /api/v1/catalog` under `Plugins / <filename>`, and loads the same configured
+files in both stateless and incremental execution workers. Keep those files
+unchanged while the server runs. Workers execute with the workspace as their
+working directory; use `__file__` for resources relative to the plugin itself.
+An editor must use the server's catalog, or import a matching custom catalog,
+to author these nodes. This does not install custom code into browser WASM or
+the Desktop application's built-in-only registry.
+
+Python hosts can use the same loader without the CLI:
+
+```python
+registry = create_node_registry(plugins=["/path/custom_nodes.py"])
+reloaded = execute_workflow_file("scaled-workflow.json", registry=registry)
+```
+
+`inspect_workflow(..., plugins=[...])` and `execute_cli_workflow(..., plugins=[...])`
+also accept explicit files. Native JSON hosts can pass a configured registry to
+`execute_workflow_json(document, registry=registry)`; HTTP clients cannot select
+or load plugin files through execution options.
+
+**Trust boundary:** imports execute arbitrary Python in the CLI/server process
+and workers with your OS permissions, even during inspection. Only load files
+you trust. Plugins are not sandboxed, installed automatically, embedded in
+workflow JSON, or loaded from paths named by a workflow or HTTP request. JSON
+continues to store definition IDs and parameters; supply the files again when
+running in another process. Ordinary built-in-only invocations are unaffected.
+
 ## Export extra nodes for the Web Editor
 
 The Web Editor reads catalog JSON for its menu, ports, and parameter editors.
@@ -158,8 +242,9 @@ Importing a catalog enables authoring and displaying custom nodes, **not browser
 execution**: the current WASM worker creates a built-in-only registry. Browser
 execution requires bundling the custom Python implementation into the browser
 runtime and registering it there. For local Python execution of a workflow
-exported from the website, register the custom definition before loading the
-workflow as shown above. Treat third-party workflow files and user code as
+exported from the website, supply `--plugin` to `flowgraph run` or `flowgraph serve`,
+or register the custom definition before loading the workflow as shown above.
+Treat third-party workflow files and user code as
 trusted executable content; the workflow format is not a sandbox.
 
 If contributing a node to the built-in catalog instead, add its definition to

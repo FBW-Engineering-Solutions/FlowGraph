@@ -26,6 +26,7 @@ from flowgraph.application.workflow_cli import (
 )
 from flowgraph.application.workflow_core import (
     NodeExecutionError,
+    NodeRegistry,
     WorkflowError,
     WorkflowExecutor,
     WorkflowRunResult,
@@ -56,7 +57,12 @@ def _node_ids(options: Mapping[str, Any], key: str) -> set[str] | None:
     return set(value)
 
 
-def execute_workflow_json(workflow_json: str, options: Mapping[str, Any] | None = None) -> str:
+def execute_workflow_json(
+    workflow_json: str,
+    options: Mapping[str, Any] | None = None,
+    *,
+    registry: NodeRegistry | None = None,
+) -> str:
     """Execute one workflow JSON document and return a serialized response.
 
     Native Python clients and browser-hosted Python workers share this entry
@@ -64,6 +70,8 @@ def execute_workflow_json(workflow_json: str, options: Mapping[str, Any] | None 
     bounded runtime results while graph state is reconstructed for each request.
     Process management, cancellation,
     authentication, and workspace configuration belong to the calling transport.
+    Native hosts may pass their configured registry; it is never selected by the
+    workflow document or execution options. Otherwise the built-in registry is used.
     Non-finite numbers are transported as JSON null; Python-text displays retain
     their original representations. Runtime values used by nodes are not changed.
     """
@@ -71,9 +79,10 @@ def execute_workflow_json(workflow_json: str, options: Mapping[str, Any] | None 
     session = None
     try:
         global _REGISTRY
-        if _REGISTRY is None:
-            _REGISTRY = create_node_registry()
-        registry = _REGISTRY
+        if registry is None:
+            if _REGISTRY is None:
+                _REGISTRY = create_node_registry()
+            registry = _REGISTRY
         workflow = workflow_from_json(workflow_json, registry, source_name="Workflow execution")
         injected = resolve_workflow_inputs(workflow, {}, on_warning=warnings.append)
         if options is not None:

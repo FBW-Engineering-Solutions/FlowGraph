@@ -90,6 +90,15 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument(
         "--verbose", "-v", action="store_true", help="print server state and activity to stderr"
     )
+    for command_parser in (inspect_parser, run_parser, serve_parser):
+        command_parser.add_argument(
+            "--plugin",
+            action="append",
+            default=[],
+            type=Path,
+            metavar="FILE.py",
+            help="load trusted Python node definitions from FILE.py (repeatable; executes code)",
+        )
     return parser
 
 
@@ -108,6 +117,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 execution_timeout=args.execution_timeout,
                 max_request=args.max_request_bytes,
                 verbose=args.verbose,
+                plugins=args.plugin,
                 allowed_origins=tuple(args.allow_origin)
                 if args.allow_origin is not None
                 else (DEFAULT_EDITOR_ORIGIN,),
@@ -141,6 +151,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     full=args.full,
                     inputs=parse_inputs(args.input),
                     overrides=parse_overrides(args.override),
+                    plugins=args.plugin,
                 )
             )
         else:
@@ -148,6 +159,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.workflow,
                 inputs=parse_inputs(args.input),
                 overrides=parse_overrides(args.override),
+                plugins=args.plugin,
             )
             outputs = workflow_outputs(workflow, result)
             if args.json_output:
