@@ -59,7 +59,7 @@ uses set semantics (no duplicate IDs). The existing Create Tag node is unchanged
 | **Apply Transform** (`apply-transform`) | Inputs `mesh: Mesh document`, `Transform: Transform`; output `mesh: Mesh document` | `onVectorFields=True`, `inverse=False` (UI-only). |
 | **Delaunay 3D** (`delaunay-3d`) | Input/output `meshDocument: Mesh document` | None |
 | **Remove Lonely Nodes** (`remove-lonely-nodes`) | Input/output `mesh: Mesh document` | None |
-| **Quad To Lin** (`quad-to-lin`) | Input `inputMesh: Mesh document`; output `outputMesh: Mesh document` | `divideQuadElements=True`, `linearizedMiddlePoints=False` (UI-only) |
+| **Quad To Lin** (`quad-to-lin`) | Input `inputMesh: Mesh document`; output `outputMesh: Mesh document` | `divideQuadElements=True`, `linearizeMiddlePoints=False` (UI-only) |
 | **Remesh** (`remesh`) | Input `mesh: Mesh document`; optional `levelset`, `solution`, `metric: Any`; output `mesh: Mesh document` | `backend="MmgInMemory"`, `remesherOptions="{}"`, `backendOptions="{}"` (local settings) |
 | **Rename Tag** (`rename-tag`) | Input/output `mesh: Mesh document` | `entity="element"`, `tag=""`, `newTag=""` |
 | **Merge Tags** (`merge-tags`) | Input/output `mesh: Mesh document` | `entity="element"`, `sourceTags=[]`, `targetTag="merged"` |

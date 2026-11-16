@@ -190,7 +190,7 @@ def _quad_to_lin_creation(
             mesh=QuadToLin(
                 inputs["inputMesh"].mesh,
                 divideQuadElements=parameters.get("divideQuadElements", True),
-                linearizedMiddlePoints=parameters.get("linearizedMiddlePoints", False),
+                linearizeMiddlePoints=parameters.get("linearizeMiddlePoints", False),
             )
         )
     }
@@ -413,7 +413,7 @@ QUAD_TO_LIN_CREATION_NODE = NodeDefinition(
             port=False,
         ),
         ParameterDefinition(
-            "linearizedMiddlePoints",
+            "linearizeMiddlePoints",
             ParameterKind.BOOLEAN,
             "Linearize middle points",
             False,

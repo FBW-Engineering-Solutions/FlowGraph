@@ -2,6 +2,9 @@ New in version 0.1.9:
 **********************
 **********************
 
+- Use Muscat 2.6's `linearizeMiddlePoints` parameter in both quadratic-to-linear
+  nodes without a legacy alias.
+
 - Bump the core package, runtime and lockfile version to 0.1.9; synchronize
   Desktop's core dependency without changing Desktop's own version.
 

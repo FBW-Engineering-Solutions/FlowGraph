@@ -128,7 +128,7 @@ def _quad_to_lin(
     mesh = QuadToLin(
         input_document.mesh,
         divideQuadElements=parameters.get("divideQuadElements", True),
-        linearizedMiddlePoints=parameters.get("linearizedMiddlePoints", False),
+        linearizeMiddlePoints=parameters.get("linearizeMiddlePoints", False),
     )
     return {"outputMesh": MeshDocument(mesh)}
 
@@ -423,7 +423,7 @@ QUAD_TO_LIN_NODE = NodeDefinition(
             port=False,
         ),
         ParameterDefinition(
-            "linearizedMiddlePoints",
+            "linearizeMiddlePoints",
             ParameterKind.BOOLEAN,
             "Linearize middle points",
             False,
