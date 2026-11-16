@@ -98,17 +98,27 @@ unchanged buffers rather than copying them.
 
 | Node (ID) | Contract |
 | --- | --- |
-| **Extract Skin** (`extract-skin`) | `mesh` → `mesh`. Connectable integer `dimensionality=-1` selects the highest element dimension automatically; explicit values are 1, 2, 3. |
+| **Compute Skin** (`extract-skin`) | `mesh` → full `mesh` with tagged boundary elements, plus boundary-only `skin_mesh`. Connectable integer `dimensionality=-1` selects the highest element dimension automatically; explicit values are 1, 2, 3. Connectable text `Skin_Name="Skin"` sets the boundary element tag. |
 | **Mesh Measure** (`mesh-measure`) | `mesh`, optional element `filter` → Float `measure`. Defaults to the highest element dimension. Empty selections return zero; mixed-dimensional selections are rejected. |
 | **Element Measures** (`element-measures`) | `mesh`, optional element `filter` → read-only 1D arrays `measures`, `indices`. Without a selector includes all dimensions. |
 | **Element Centers** (`element-centers`) | `mesh` → read-only 2D array `centers` in global element order: arithmetic means of element node coordinates. |
 | **Merge Duplicate Nodes** (`merge-duplicate-nodes`) | `mesh` → `mesh`, read-only integer `indices` of retained source nodes. Connectable Float `tolerance=0.0`: exact matching; positive finite values merge nearby nodes. |
 | **Remove Duplicate Elements** (`remove-duplicate-elements`) | `mesh` → `mesh`. Equal node sets within each element type are duplicates, including permutations. |
 
-Skin retains all source nodes, original node IDs, nodal fields and node tags.
-It creates a `Skin` element tag and fresh positional FlowGraph element IDs;
-source element fields/tags do not transfer. Empty or point-only meshes are
-rejected. Use **Remove Lonely Nodes** afterward to compact the boundary.
+Both skin outputs retain all source nodes, original node IDs, nodal fields and
+node tags as read-only views. The full `mesh` retains source elements and their
+tags, adding missing boundary elements and the configured skin tag. `skin_mesh`
+contains only tagged elements of dimension `dimensionality - 1`. Both outputs
+receive fresh positional FlowGraph element IDs; source element fields are
+discarded because Muscat does not transfer them during skin computation. The
+source mesh remains unchanged. Empty or point-only meshes are rejected, as are
+empty or whitespace-only skin tag names. Use **Remove Lonely Nodes** on
+`skin_mesh` afterward to compact the boundary. Connect downstream consumers to
+`skin_mesh` when they need only the boundary (previously the `mesh` output).
+Boundary extraction runs only when `skin_mesh` is consumed, as reported by
+`ExecContext.connected_output_ports`. Otherwise that output contains an empty
+read-only mesh placeholder to satisfy the engine's typed-output contract.
+Direct executor calls must explicitly request `skin_mesh` through `ExecContext`.
 
 Measures are lengths (1D), areas (2D), or volumes (3D). Element Measures pairs
 values with **global positional indices**, not stored `flowgraph_element_id`

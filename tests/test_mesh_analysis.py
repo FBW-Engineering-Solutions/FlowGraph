@@ -7,12 +7,13 @@ from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter
 from Muscat.MeshContainers.Mesh import Mesh
 from Muscat.MeshTools.MeshCreationTools import CreateCube, CreateSquare
 
-from flowgraph.adapters import ADAPTERS
+from flowgraph.adapters import ADAPTERS, mesh_analysis
 from flowgraph.adapters.filters import SELECTOR_OPERATORS
 from flowgraph.adapters.mesh_analysis import MESH_NODES, SET_MESH_FIELD
 from flowgraph.adapters.mesh_creation_tools import CREATE_CUBE_NODE
 from flowgraph.application.node_registry import create_node_registry
 from flowgraph.application.workflow_core import (
+    ExecContext,
     WorkflowEdge,
     WorkflowExecutor,
     WorkflowGraph,
@@ -25,7 +26,11 @@ from flowgraph.domain.mesh_document import MeshDocument
 def run(node_id, mesh=None, parameters=None, **inputs):
     if mesh is not None:
         inputs["mesh"] = mesh
-    return ADAPTERS.require(node_id).executor(inputs, parameters or {})
+    definition = ADAPTERS.require(node_id)
+    context = ExecContext(
+        connected_output_ports=frozenset(port.name for port in definition.outputs)
+    )
+    return definition.executor(inputs, parameters or {}, context)
 
 
 def cube():
@@ -104,7 +109,12 @@ def test_skin_and_measurements():
     source = cube()
     source.mesh.nodeFields["temperature"] = np.arange(8.0)
     source.mesh.elemFields["material"] = np.ones(source.mesh.GetNumberOfElements())
-    skin = run("extract-skin", source)["mesh"]
+    outputs = run("extract-skin", source)
+    mesh = outputs["mesh"]
+    skin = outputs["skin_mesh"]
+    assert mesh.mesh.GetNumberOfElements() == source.mesh.GetNumberOfElements()
+    assert mesh.mesh.GetElementsDimensionality() == 3
+    assert run("mesh-measure", mesh)["measure"] == pytest.approx(1.0)
     assert skin.mesh.GetNumberOfElements() == 12
     assert skin.mesh.GetElementsDimensionality() == 2
     assert set(skin.mesh.elemFields) == {"flowgraph_element_id"}
@@ -216,13 +226,77 @@ def test_structured_mesh_cleanup_and_2d_skin():
         result = run(node, source)["mesh"].mesh
         assert result.GetNumberOfNodes() == source.mesh.GetNumberOfNodes()
         assert result.GetNumberOfElements() == source.mesh.GetNumberOfElements()
-    assert run("extract-skin", source)["mesh"].mesh.GetElementsDimensionality() == 1
+    outputs = run("extract-skin", source)
+    assert outputs["mesh"].mesh.GetElementsDimensionality() == 2
+    assert outputs["skin_mesh"].mesh.GetElementsDimensionality() == 1
 
 
 @pytest.mark.parametrize("dimension", [0, 4, True, 1.5])
 def test_invalid_skin_dimension(dimension):
     with pytest.raises(ValueError, match="dimensionality"):
         run("extract-skin", cube(), {"dimensionality": dimension})
+
+
+@pytest.mark.parametrize("skin_name", ["Skin", "boundary"])
+@pytest.mark.parametrize("dimension", [-1, 3])
+def test_skin_metadata_and_input_unchanged(skin_name, dimension):
+    source = cube()
+    source.mesh.originalIDNodes = np.arange(8) + 100
+    source.mesh.nodeFields["temperature"] = np.arange(8.0)
+    source.mesh.elemFields["material"] = np.arange(source.mesh.GetNumberOfElements())
+    connectivity = {e.elementType: e.connectivity.copy() for e in source.mesh.elements}
+    tags = {
+        e.elementType: {tag.name: tag.GetIds().copy() for tag in e.tags}
+        for e in source.mesh.elements
+    }
+    outputs = run("extract-skin", source, {"Skin_Name": skin_name, "dimensionality": dimension})
+    assert set(outputs) == {"mesh", "skin_mesh"}
+    for document in outputs.values():
+        mesh = document.mesh
+        assert np.shares_memory(mesh.nodes, source.mesh.nodes)
+        assert np.shares_memory(mesh.originalIDNodes, source.mesh.originalIDNodes)
+        np.testing.assert_array_equal(mesh.originalIDNodes, source.mesh.originalIDNodes)
+        for name, data in source.mesh.nodeFields.items():
+            assert np.shares_memory(mesh.nodeFields[name], data)
+            assert not mesh.nodeFields[name].flags.writeable
+        assert not mesh.nodes.flags.writeable
+        assert not mesh.originalIDNodes.flags.writeable
+        assert set(mesh.elemFields) == {"flowgraph_element_id"}
+        ids = mesh.elemFields["flowgraph_element_id"]
+        np.testing.assert_array_equal(ids, np.arange(mesh.GetNumberOfElements()))
+        assert not ids.flags.writeable
+        for elements in mesh.elements:
+            assert not elements.connectivity.flags.writeable
+        assert sum(s.Size() for s in ElementFilter(eTag=skin_name)(mesh)) == 12
+    assert source.mesh.GetNumberOfElements() == 18
+    assert "material" in source.mesh.elemFields
+    for elements in source.mesh.elements:
+        np.testing.assert_array_equal(elements.connectivity, connectivity[elements.elementType])
+        assert {tag.name for tag in elements.tags} == set(tags[elements.elementType])
+        for tag in elements.tags:
+            np.testing.assert_array_equal(tag.GetIds(), tags[elements.elementType][tag.name])
+
+
+def test_skin_adds_missing_boundary_without_changing_input():
+    mesh = Mesh()
+    mesh.SetNodes(
+        [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        generateOriginalIDs=True,
+    )
+    mesh.GetElementsOfType(ED.Tetrahedron_4).AddNewElements(np.array([[0, 1, 2, 3]]))
+    source = MeshDocument(mesh)
+    outputs = run("extract-skin", source)
+    assert outputs["mesh"].mesh.GetNumberOfElements() == 5
+    assert outputs["skin_mesh"].mesh.GetNumberOfElements() == 4
+    assert source.mesh.GetNumberOfElements() == 1
+    assert ED.Triangle_3 not in source.mesh.elements
+    np.testing.assert_array_equal(source.mesh.elemFields["flowgraph_element_id"], [0])
+
+
+@pytest.mark.parametrize("skin_name", ["", "  ", None, 42, True])
+def test_invalid_skin_tag_name(skin_name):
+    with pytest.raises(ValueError, match="Skin tag name"):
+        run("extract-skin", cube(), {"Skin_Name": skin_name})
 
 
 @pytest.mark.parametrize(
@@ -259,7 +333,16 @@ def test_selector_expansion_limit_and_empty(node):
     assert instance is not None
 
 
-def test_saved_connected_workflow(tmp_path):
+@pytest.mark.parametrize("output,measure", [("mesh", 1.0), ("skin_mesh", 6.0)])
+def test_saved_connected_workflow(tmp_path, monkeypatch, output, measure):
+    extracted = []
+    extract = mesh_analysis.ExtractElementsByElementFilter
+
+    def track_extract(*args, **kwargs):
+        extracted.append(True)
+        return extract(*args, **kwargs)
+
+    monkeypatch.setattr(mesh_analysis, "ExtractElementsByElementFilter", track_extract)
     registry = create_node_registry()
     graph = WorkflowGraph(
         [
@@ -269,11 +352,28 @@ def test_saved_connected_workflow(tmp_path):
         ]
     )
     graph.add_edge(WorkflowEdge("cube", "mesh", "skin", "mesh"), registry)
-    graph.add_edge(WorkflowEdge("skin", "mesh", "measure", "mesh"), registry)
+    graph.add_edge(WorkflowEdge("skin", output, "measure", "mesh"), registry)
     path = tmp_path / "workflow.json"
     save_workflow(graph, path)
     result = WorkflowExecutor(registry).run(load_workflow(path, registry))
-    assert result.node_outputs["measure"]["measure"] > 0
+    assert result.node_outputs["measure"]["measure"] == pytest.approx(measure)
+    assert len(extracted) == (1 if output == "skin_mesh" else 0)
+    if output == "mesh":
+        assert result.node_outputs["skin"]["skin_mesh"].mesh.GetNumberOfElements() == 0
+
+
+@pytest.mark.parametrize("connected", [None, (), ("mesh",)])
+def test_unused_skin_skips_extraction(monkeypatch, connected):
+    def unexpected_extraction(*args, **kwargs):
+        pytest.fail("Unused skin_mesh must not be extracted")
+
+    monkeypatch.setattr(mesh_analysis, "ExtractElementsByElementFilter", unexpected_extraction)
+    context = None if connected is None else ExecContext(connected_output_ports=connected)
+    outputs = mesh_analysis.EXTRACT_SKIN.executor({"mesh": cube()}, {}, context)
+    assert outputs["mesh"].mesh.GetNumberOfElements() == 18
+    assert outputs["skin_mesh"].mesh.GetNumberOfNodes() == 0
+    assert outputs["skin_mesh"].mesh.GetNumberOfElements() == 0
+    assert not outputs["skin_mesh"].mesh.nodes.flags.writeable
 
 
 def test_field_calculator_workflow(tmp_path):
