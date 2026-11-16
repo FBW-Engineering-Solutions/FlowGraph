@@ -18,6 +18,7 @@ from uuid import uuid4
 
 from flowgraph.application.file_dependencies import declared_dependency_metadata
 from flowgraph.application.workflow_core import (
+    ExecContext,
     NodeExecutionError,
     NodeRegistry,
     WorkflowExecutor,
@@ -91,12 +92,16 @@ def run_child(
     initial_inputs: Mapping[str, Mapping[str, Any]],
     parallel_tasks: int = 1,
     gpu_available: bool = False,
+    workspace: str | Path | None = None,
 ) -> WorkflowRunResult:
     """Use an isolated child session when called during incremental execution."""
     active = _ACTIVE.get()
     if active is None:
         return WorkflowExecutor(
-            registry, parallel_tasks=parallel_tasks, gpu_available=gpu_available
+            registry,
+            parallel_tasks=parallel_tasks,
+            gpu_available=gpu_available,
+            workspace=workspace,
         ).run(graph, initial_inputs=initial_inputs)
     parent, node_id = active
     namespace = (node_id, key)
@@ -112,6 +117,7 @@ def run_child(
         from_scratch=parent._from_scratch or node_id in parent._forced,
         parallel_tasks=parallel_tasks,
         gpu_available=gpu_available,
+        workspace=workspace,
     )
 
 
@@ -167,10 +173,12 @@ class WorkflowSession:
         initial_inputs: Mapping[str, Mapping[str, Any]] | None = None,
         parallel_tasks: int = 1,
         gpu_available: bool = False,
+        workspace: str | Path | None = None,
         on_progress: Callable[[dict[str, Any]], None] | None = None,
         on_node_result: Callable[[str, Mapping[str, Any], Mapping[str, Any]], None] | None = None,
     ) -> WorkflowRunResult:
         """Execute targets and missing dependencies, preserving independent results."""
+        workspace = ExecContext(workspace=workspace).workspace
         if upstream not in {"normal", "missing", "none"}:
             raise ValueError("upstream must be normal, missing, or none")
         issues = graph.validate(self.registry, require_complete=False)
@@ -236,6 +244,7 @@ class WorkflowSession:
                 _token(injected.get(node.id, {})),
                 parallel_tasks,
                 gpu_available,
+                str(workspace) if workspace is not None else None,
                 # Child sessions do their own fine-grained reconciliation. Parent
                 # wrappers always execute so child side effects are never skipped.
                 tuple(
@@ -266,7 +275,10 @@ class WorkflowSession:
         unstable_dependencies: set[str] = set()
         first_error: NodeExecutionError | None = None
         executor = WorkflowExecutor(
-            self.registry, parallel_tasks=parallel_tasks, gpu_available=gpu_available
+            self.registry,
+            parallel_tasks=parallel_tasks,
+            gpu_available=gpu_available,
+            workspace=workspace,
         )
         for node_id in order:
             if node_id not in dependency_scope:

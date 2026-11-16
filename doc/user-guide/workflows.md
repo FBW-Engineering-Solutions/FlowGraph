@@ -217,6 +217,18 @@ paths resolve from the Python process's current working directory—not from the
 directory containing the workflow JSON file. Use absolute paths or configure
 paths with runtime overrides when running the same workflow on another machine.
 
+For portable data files, connect **Workspace File** to the reader's `path` input.
+Its relative value (for example `my/files/mesh.vtu`) is resolved against the
+explicit runtime workspace, not the working directory or workflow JSON folder:
+
+```bash
+flowgraph run workflow.json --workspace ./project
+```
+
+Python execution APIs accept `workspace=...`; server execution uses its configured
+workspace and browser execution uses uploaded/mounted files. See the
+[file node reference](../reference/adapters/file.md#workspace-file).
+
 ## Execute a workflow from a Python script
 
 The UI is optional: saved workflows can be executed headlessly from a script.

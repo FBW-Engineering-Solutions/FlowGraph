@@ -62,6 +62,7 @@ def execute_workflow_json(
     options: Mapping[str, Any] | None = None,
     *,
     registry: NodeRegistry | None = None,
+    workspace: str | Path | None = None,
     on_progress: Callable[[dict[str, Any]], None] | None = None,
     on_node_result: Callable[[dict[str, Any]], None] | None = None,
 ) -> str:
@@ -137,11 +138,12 @@ def execute_workflow_json(
                 upstream=options.get("upstream", "normal"),
                 missing_only=options.get("missing_only", False),
                 initial_inputs=injected,
+                workspace=workspace,
                 on_progress=report,
                 on_node_result=report_result if on_node_result is not None else None,
             )
         else:
-            result = WorkflowExecutor(registry).run(
+            result = WorkflowExecutor(registry, workspace=workspace).run(
                 workflow,
                 initial_inputs=injected,
                 on_progress=report,

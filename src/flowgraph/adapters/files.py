@@ -13,7 +13,7 @@ from flowgraph.application.workflow_core import (
     PortDirection,
 )
 
-from .data_types import LIST_STR, STRING, ParameterKind
+from .data_types import DIRECTORY, LIST_STR, STRING, ParameterKind
 
 
 def _select_file(
@@ -57,27 +57,39 @@ def _select_server_file(
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Output the configured uploaded-file path."""
+    """Resolve a portable workspace file, preserving legacy absolute paths."""
     path = parameters.get("file name", "")
     if not isinstance(path, str):
         raise TypeError("The selected file path parameter must be text")
     if len(path) == 0:
         raise ValueError("Path can't be empty")
-    return {"path": path}
+    source = Path(path).expanduser()
+    # Absolute paths from existing workflows remain external references.
+    if source.is_absolute():
+        return {"path": str(source)}
+    root = _exec_context.workspace if _exec_context is not None else None
+    if root is None:
+        raise ValueError("Workspace File requires a configured workspace directory")
+    source = (root / source).resolve()
+    if not source.is_relative_to(root):
+        raise ValueError("Workspace File path escapes the workspace directory")
+    if not source.is_file():
+        raise ValueError(f"Workspace file does not exist or is not a file: {path}")
+    return {"path": str(source)}
 
 
 SELECT_SERVER_FILE = NodeDefinition(
     cache_policy="pure",
-    id="select-server-file",
+    id="workspace-file",
     requirements=(),
     icon="mdi-cloud-upload-outline",
-    label="Select uploaded file",
-    description="Outputs a selected server file path as text without reading the file.",
+    label="Workspace File",
+    description="Resolves a workspace-relative file path at runtime without reading the file. Legacy absolute paths remain external references.",
     ports=(PortDefinition("path", PortDirection.OUTPUT, STRING, "File path"),),
     executor=_select_server_file,
     parameters=(
         ParameterDefinition(
-            "file name", ParameterKind.SELECT_SERVER_FILENAME, "File Name", "", port=False
+            "file name", ParameterKind.SELECT_SERVER_FILENAME, "Workspace file", "", port=False
         ),
     ),
 )
@@ -85,6 +97,44 @@ SELECT_SERVER_FILE = NodeDefinition(
 
 class DirectoryReadError(ValueError):
     """Raised when a directory-file listing node receives an invalid directory path."""
+
+
+def _workspace_directory(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Resolve the selected relative folder within the host-configured workspace."""
+    root = _exec_context.workspace if _exec_context is not None else None
+    if root is None:
+        raise ValueError("Workspace Folder requires a configured workspace directory")
+    selected = parameters.get("folder", ".")
+    if not isinstance(selected, str):
+        raise TypeError("Workspace Folder selection must be text")
+    relative = Path(selected)
+    if relative.is_absolute():
+        raise ValueError("Workspace Folder requires a workspace-relative folder path")
+    folder = (root / relative).resolve()
+    if not folder.is_relative_to(root):
+        raise ValueError("Workspace Folder path escapes the workspace directory")
+    if not folder.is_dir():
+        raise ValueError(f"Workspace folder does not exist or is not a directory: {selected}")
+    return {"path": folder}
+
+
+WORKSPACE = NodeDefinition(
+    cache_policy="pure",
+    id="workspace-folder",
+    requirements=(),
+    icon="mdi-folder-outline",
+    label="Workspace Folder",
+    description="Resolves a selected workspace-relative folder as an absolute directory path. Defaults to the workspace root.",
+    ports=(PortDefinition("path", PortDirection.OUTPUT, DIRECTORY, "Directory path"),),
+    executor=_workspace_directory,
+    parameters=(
+        ParameterDefinition("folder", ParameterKind.TEXT, "Workspace folder", ".", port=False),
+    ),
+)
 
 
 def _compile_filename_patterns(
@@ -171,7 +221,7 @@ READ_DIRECTORY_FILES = NodeDefinition(
     parameters=(
         ParameterDefinition(
             "path",
-            ParameterKind.FILE,
+            ParameterKind.DIRECTORY,
             "Directory path",
             "",
             "/path/to/directory",
@@ -201,5 +251,6 @@ __all__ = [
     "READ_DIRECTORY_FILES",
     "SELECT_FILE",
     "SELECT_SERVER_FILE",
+    "WORKSPACE",
     "DirectoryReadError",
 ]

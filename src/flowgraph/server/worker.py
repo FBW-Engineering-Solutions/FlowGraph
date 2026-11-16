@@ -39,6 +39,7 @@ def main() -> None:
     parser.add_argument("files", nargs="*", type=Path)
     args = parser.parse_args()
     registry = create_node_registry(plugins=args.plugin)
+    workspace = Path.cwd()
     if args.session is not None:
         command = args.session / "command.json"
         while True:
@@ -54,6 +55,7 @@ def main() -> None:
                     json.dumps(envelope["workflow"]),
                     envelope["options"],
                     registry=registry,
+                    workspace=workspace,
                     on_progress=report,
                     on_node_result=lambda result: report({"node_result": result}),
                 )
@@ -67,6 +69,7 @@ def main() -> None:
                 execute_workflow_json(
                     request.read_text(encoding="utf-8"),
                     registry=registry,
+                    workspace=workspace,
                     on_progress=report,
                     on_node_result=lambda result: report({"node_result": result}),
                 ),

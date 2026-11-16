@@ -39,6 +39,9 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = commands.add_parser("run", help="execute a workflow without opening the UI")
     run_parser.add_argument("workflow", type=str, help="workflow JSON file")
     run_parser.add_argument(
+        "--workspace", type=Path, help="workspace directory for Workspace File nodes"
+    )
+    run_parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -181,6 +184,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 overrides=parse_overrides(args.override),
                 plugins=args.plugin,
                 verbose=args.verbose,
+                workspace=args.workspace,
             )
             outputs = workflow_outputs(workflow, result)
             if args.json_output:
