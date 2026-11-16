@@ -29,7 +29,7 @@ columns must exist and have compatible lengths.
 | **Create Mesh From Cells Dict** (`create-mesh-from-cells-dict`) | Inputs `points`, `cellsDict`, `pointFields`, `cellFields`, `originalIds`, `cellsOriginalIds`; output `mesh` | `cellFieldInDictOrder=True` |
 | **Mesh To Simplex** (`mesh-to-simplex`) | Input/output `mesh: Mesh document` | `inPlace=True` |
 | **To Quadratic Mesh** (`to-quadratic-mesh`) | Input `inputMesh`; output `outputMesh` | None |
-| **Quad To Lin (Creation Tools)** (`quad-to-lin-creation`) | Input `inputMesh`; output `outputMesh` | `divideQuadElements=True`, `linearizedMiddlePoints=False` |
+| **Quad To Lin (Creation Tools)** (`quad-to-lin-creation`) | Input `inputMesh`; output `outputMesh` | `divideQuadElements=True`, `linearizeMiddlePoints=False` |
 | **Mirror Mesh** (`mirror-mesh`) | Input/output `inmesh: Mesh document` | `x=None`, `y=None`, `z=None`, `propagateToNodeFields=False` |
 | **Create 0D Elements For Every Point** (`create-0d-elements-for-every-point`) | Input `mesh`; output `elements: Elements container` | None |
 | **Subdivide Mesh** (`subdivide-mesh`) | Input/output `mesh: Mesh document` | `level=1` |

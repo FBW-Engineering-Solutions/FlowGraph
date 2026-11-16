@@ -186,8 +186,13 @@ def test_third_party_notice_inventory_matches_declared_dependencies() -> None:
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     lock = tomllib.loads((root / "uv.lock").read_text(encoding="utf-8"))
     versions = {}
+    editable = set()
     for package in lock["package"]:
-        versions.setdefault(package["name"], set()).add(package["version"])
+        if "version" not in package:
+            assert "editable" in package["source"], package
+            editable.add(package["name"])
+        else:
+            versions.setdefault(package["name"], set()).add(package["version"])
     groups = {"required": project["dependencies"], **project["optional-dependencies"]}
     expected = set()
     for group, dependencies in groups.items():
@@ -202,6 +207,9 @@ def test_third_party_notice_inventory_matches_declared_dependencies() -> None:
     assert len(rows) == len(actual), "Duplicate dependency/group rows"
     assert actual == expected
     for name, _, version in rows:
+        if name in editable:
+            # Dynamic editable versions are not pinned; retain the reviewed snapshot.
+            continue
         assert version in versions[name], f"Stale locked version for {name}: {version}"
 
 
@@ -376,13 +384,26 @@ def test_packaging_rehearsal_commands_use_consistent_relative_output() -> None:
 
 def test_reviewed_dependency_advisories_remain_remediated() -> None:
     """Prevent the reviewed lock/build versions regressing below patched floors."""
+    from packaging.requirements import Requirement
     from packaging.version import Version
 
     root = Path(__file__).parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    setuptools = next(
+        Requirement(requirement)
+        for requirement in project["build-system"]["requires"]
+        if Requirement(requirement).name == "setuptools"
+    )
+    assert any(
+        specifier.operator == ">=" and Version(specifier.version) >= Version("84.1.0")
+        for specifier in setuptools.specifier
+    ), "Isolated builds must require patched setuptools"
     lock = tomllib.loads((root / "uv.lock").read_text(encoding="utf-8"))
-    versions = {package["name"]: Version(package["version"]) for package in lock["package"]}
-    assert versions["setuptools"] >= Version("84.1.0")
-    assert versions["urllib3"] >= Version("2.8.0")
+    for name, minimum in (("setuptools", "84.1.0"), ("urllib3", "2.8.0")):
+        packages = [package for package in lock["package"] if package["name"] == name]
+        if name == "urllib3":
+            assert packages, f"Missing audited dependency: {name}"
+        assert all(Version(package["version"]) >= Version(minimum) for package in packages)
 
 
 def test_conda_recipe_is_absent() -> None:

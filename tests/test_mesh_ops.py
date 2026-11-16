@@ -133,14 +133,15 @@ def test_quad_to_lin_node_exposes_mesh_ports_and_parameters() -> None:
         for parameter in QUAD_TO_LIN_NODE.parameters
     ] == [
         ("divideQuadElements", True, False),
-        ("linearizedMiddlePoints", False, False),
+        ("linearizeMiddlePoints", False, False),
     ]
 
 
-def test_quad_to_lin_node_converts_quadratic_elements_without_mutating_input() -> None:
+@pytest.mark.parametrize("node_id", ["quad-to-lin", "quad-to-lin-creation"])
+def test_quad_to_lin_node_converts_quadratic_elements_without_mutating_input(node_id: str) -> None:
     source_mesh = Mesh()
     source_mesh.SetNodes(
-        [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0.5, 0, 0], [0.5, 0.5, 0], [0, 0.5, 0]],
+        [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0.6, 0, 0], [0.6, 0.6, 0], [0, 0.6, 0]],
         generateOriginalIDs=True,
     )
     elements = ElementsContainer(ED.ElementType.Triangle_6)
@@ -148,8 +149,10 @@ def test_quad_to_lin_node_converts_quadratic_elements_without_mutating_input() -
     source_mesh.elements.AddContainer(elements)
     source = MeshDocument(source_mesh)
 
-    result = QUAD_TO_LIN_NODE.executor(
-        {"inputMesh": source}, {"divideQuadElements": True, "linearizedMiddlePoints": True}
+    node = ADAPTERS.require(node_id)
+    assert "linearizeMiddlePoints" in node.default_parameters
+    result = node.executor(
+        {"inputMesh": source}, {"divideQuadElements": True, "linearizeMiddlePoints": True}
     )["outputMesh"]
 
     assert isinstance(result, MeshDocument)
@@ -159,6 +162,7 @@ def test_quad_to_lin_node_converts_quadratic_elements_without_mutating_input() -
     np.testing.assert_array_equal(
         source.mesh.elements[ED.ElementType.Triangle_6].connectivity, [[0, 1, 2, 3, 4, 5]]
     )
+    np.testing.assert_array_equal(source.mesh.nodes[3:6], [[0.6, 0, 0], [0.6, 0.6, 0], [0, 0.6, 0]])
     np.testing.assert_array_equal(result.mesh.nodes[3:6], [[0.5, 0, 0], [0.5, 0.5, 0], [0, 0.5, 0]])
 
 
