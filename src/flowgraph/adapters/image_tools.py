@@ -45,7 +45,7 @@ class ImageOperationError(RuntimeError):
 
 
 class ImageJConversionError(RuntimeError):
-    """Raised when a Pillow image cannot be converted to an ImageJ NumPy array."""
+    """Raised when conversion between Pillow and ImageJ image values fails."""
 
 
 class ImageFluencyError(RuntimeError):
@@ -70,6 +70,34 @@ def _pillow_to_imagej(
     if not isinstance(image, Image):
         raise ImageJConversionError("Image input must be a PIL.Image.Image instance")
     return {"image": np.array(image, copy=True)}
+
+
+def _imagej_to_pillow(
+    inputs: Mapping[str, Any],
+    _parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Convert a single ImageJ NumPy image using Pillow's native array modes."""
+    array = inputs["image"]
+    if not isinstance(array, np.ndarray):
+        raise ImageJConversionError("ImageJ input must be a NumPy array")
+    if array.ndim not in (2, 3) or (array.ndim == 3 and array.shape[2] not in (2, 3, 4)):
+        raise ImageJConversionError(
+            "ImageJ input must have shape (height, width) or (height, width, channels) "
+            "with 2, 3, or 4 channels; select a single plane from stacks or volumes"
+        )
+    if array.shape[0] == 0 or array.shape[1] == 0:
+        raise ImageJConversionError("Image dimensions must both be at least one pixel")
+    try:
+        image = PillowImage.fromarray(array)
+    except (TypeError, ValueError) as error:
+        raise ImageJConversionError(
+            f"Cannot convert ImageJ array with shape {array.shape} and dtype {array.dtype} "
+            "to Pillow; use a Pillow-supported grayscale dtype or uint8 color channels"
+        ) from error
+    # Reuse Pillow's buffer sharing where supported; Pillow writes detach the buffer.
+    image.readonly = 1
+    return {"image": image}
 
 
 def _metric_channels(image: Image) -> tuple[np.ndarray, ...]:
@@ -556,6 +584,20 @@ PILLOW_TO_IMAGEJ = NodeDefinition(
 )
 
 
+IMAGEJ_TO_PILLOW = NodeDefinition(
+    id="imagej-to-pillow",
+    requirements=("py:pillow", "py:numpy"),
+    icon="mdi-image-sync-outline",
+    label="ImageJ To Pillow",
+    description="Converts a single ImageJ NumPy image to a Pillow image without intensity scaling.",
+    ports=(
+        PortDefinition("image", PortDirection.INPUT, IMAGEJ, "ImageJ NumPy array"),
+        PortDefinition("image", PortDirection.OUTPUT, IMAGE, "Pillow image"),
+    ),
+    executor=_imagej_to_pillow,
+)
+
+
 WRITE_IMAGE = NodeDefinition(
     cache_policy="pure",
     id="write-image",
@@ -731,6 +773,7 @@ IMAGE_FLUENCY_METRICS = NodeDefinition(
 AVAILABLE_NODES = (
     READ_IMAGE,
     PILLOW_TO_IMAGEJ,
+    IMAGEJ_TO_PILLOW,
     WRITE_IMAGE,
     RESIZE_IMAGE,
     CROP_IMAGE,

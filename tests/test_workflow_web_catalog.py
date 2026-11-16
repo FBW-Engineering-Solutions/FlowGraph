@@ -107,7 +107,7 @@ def test_workflow_web_catalog_exports_plaid_dataset_sample_and_list_types() -> N
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 
-    assert len(nodes) == len(ADAPTERS.node_definitions) == 135
+    assert len(nodes) == len(ADAPTERS.node_definitions) == 136
     assert all(isinstance(node["requirements"], list) for node in nodes.values())
     assert all(
         isinstance(requirement, str)
@@ -123,6 +123,11 @@ def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> Non
     assert nodes["load-meshio"]["requirements"] == ["py:muscat", "py:meshio"]
     assert nodes["read-table"]["requirements"] == ["py:pandas", "py:openpyxl"]
     assert nodes["image-fluency-metrics"]["requirements"] == ["py:pillow", "py:numpy"]
+    assert nodes["imagej-to-pillow"]["requirements"] == ["py:pillow", "py:numpy"]
+    assert [
+        (port["name"], port["direction"], port["data_type_id"])
+        for port in nodes["imagej-to-pillow"]["ports"]
+    ] == [("image", "input", "imagej"), ("image", "output", "image")]
     assert nodes["extract-vector-value"]["requirements"] == ["py:numpy"]
     assert nodes["scalars-to-array-1d"]["requirements"] == ["py:numpy"]
     assert nodes["calculator"]["requirements"] == ["py:numpy"]

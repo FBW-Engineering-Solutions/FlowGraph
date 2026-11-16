@@ -16,12 +16,14 @@ from flowgraph.adapters.image_tools import (
     CROP_IMAGE,
     IMAGE_FLUENCY_METRICS,
     IMAGE_TO_MESH,
+    IMAGEJ_TO_PILLOW,
     PILLOW_TO_IMAGEJ,
     READ_IMAGE,
     RESIZE_IMAGE,
     ROTATE_IMAGE,
     WRITE_IMAGE,
     ImageFluencyError,
+    ImageJConversionError,
     ImageLoadError,
     ImageOperationError,
     ImageWriteError,
@@ -76,6 +78,72 @@ def test_pillow_to_imagej_returns_a_detached_numpy_array() -> None:
     assert not np.shares_memory(result, np.asarray(image))
 
 
+@pytest.mark.parametrize(
+    ("shape", "dtype", "mode"),
+    [
+        ((2, 3), np.uint8, "L"),
+        ((2, 3), np.uint16, "I;16"),
+        ((2, 3), np.int32, "I"),
+        ((2, 3), np.float32, "F"),
+        ((2, 3), np.bool_, "1"),
+        ((2, 3, 2), np.uint8, "LA"),
+        ((2, 3, 3), np.uint8, "RGB"),
+        ((2, 3, 4), np.uint8, "RGBA"),
+    ],
+)
+def test_imagej_to_pillow_preserves_supported_pixels(shape, dtype, mode) -> None:
+    array = np.arange(np.prod(shape)).reshape(shape).astype(dtype)
+    original = array.copy()
+
+    image = IMAGEJ_TO_PILLOW.executor({"image": array}, {})["image"]
+
+    assert isinstance(image, PillowImage.Image)
+    assert image.mode == mode
+    assert image.size == (3, 2)
+    assert image.readonly
+    assert not np.asarray(image).flags.writeable
+    np.testing.assert_array_equal(np.asarray(image), original)
+    image.putpixel((0, 0), (0,) * shape[2] if len(shape) == 3 else 0)
+    np.testing.assert_array_equal(array, original)
+
+
+def test_imagej_to_pillow_accepts_noncontiguous_readonly_arrays() -> None:
+    array = np.arange(60, dtype=np.uint8).reshape(4, 5, 3)[::-1, ::2]
+    array.setflags(write=False)
+
+    image = IMAGEJ_TO_PILLOW.executor({"image": array}, {})["image"]
+
+    np.testing.assert_array_equal(np.asarray(image), array)
+    assert not array.flags.writeable
+
+
+def test_imagej_to_pillow_reuses_supported_buffers() -> None:
+    array = np.arange(6, dtype=np.uint8).reshape(2, 3)
+    image = IMAGEJ_TO_PILLOW.executor({"image": array}, {})["image"]
+
+    array[0, 0] = 99
+
+    assert image.getpixel((0, 0)) == 99
+
+
+@pytest.mark.parametrize(
+    ("array", "message"),
+    [
+        ("not an array", "must be a NumPy array"),
+        (np.zeros(3), "must have shape"),
+        (np.zeros((2, 3, 5)), "must have shape"),
+        (np.zeros((2, 3, 4, 5)), "must have shape"),
+        (np.zeros((0, 3), dtype=np.uint8), "at least one pixel"),
+        (np.zeros((2, 0), dtype=np.uint8), "at least one pixel"),
+        (np.zeros((2, 3, 3), dtype=np.float32), "Pillow-supported"),
+        (np.zeros((2, 3), dtype=object), "Pillow-supported"),
+    ],
+)
+def test_imagej_to_pillow_reports_unsupported_inputs(array, message) -> None:
+    with pytest.raises(ImageJConversionError, match=message):
+        IMAGEJ_TO_PILLOW.executor({"image": array}, {})
+
+
 def test_image_tools_are_registered_in_a_top_level_group() -> None:
     group = next(group for group in ADAPTERS.groups if group.label == "Image Tools")
 
@@ -83,6 +151,7 @@ def test_image_tools_are_registered_in_a_top_level_group() -> None:
     assert [definition.id for definition in group.node_definitions] == [
         "read-image",
         "pillow-to-imagej",
+        "imagej-to-pillow",
         "write-image",
         "resize-image",
         "crop-image",
@@ -563,6 +632,33 @@ def test_read_image_connects_to_pillow_to_imagej_with_registered_conversion(
         conversion.convert(PillowImage.fromarray(np.array([[5]], dtype=np.uint8), mode="L")),
         [[5]],
     )
+
+
+def test_pillow_imagej_round_trip_workflow_can_write_image(tmp_path: Path) -> None:
+    source = tmp_path / "source.png"
+    destination = tmp_path / "result.png"
+    pixels = np.arange(18, dtype=np.uint8).reshape(2, 3, 3)
+    PillowImage.fromarray(pixels).save(source)
+    registry = create_node_registry()
+    graph = WorkflowGraph(
+        [
+            READ_IMAGE.create_instance("read", parameters={"path": str(source)}),
+            PILLOW_TO_IMAGEJ.create_instance("to-imagej"),
+            IMAGEJ_TO_PILLOW.create_instance("to-pillow"),
+            WRITE_IMAGE.create_instance("write", parameters={"filename": str(destination)}),
+        ]
+    )
+    for source_id, target_id in (
+        ("read", "to-imagej"),
+        ("to-imagej", "to-pillow"),
+        ("to-pillow", "write"),
+    ):
+        graph.add_edge(WorkflowEdge(source_id, "image", target_id, "image"), registry)
+
+    WorkflowExecutor(registry).run(graph)
+
+    with PillowImage.open(destination) as image:
+        np.testing.assert_array_equal(np.asarray(image), pixels)
 
 
 def test_image_file_parameter_ports_override_configured_paths(tmp_path: Path) -> None:
