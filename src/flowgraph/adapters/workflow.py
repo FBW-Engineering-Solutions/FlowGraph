@@ -82,6 +82,7 @@ def _execute_workflow(
         key=session_key,
         parallel_tasks=context.parallel_tasks,
         gpu_available=context.gpu_available,
+        workspace=context.workspace,
         initial_inputs=injected,
     )
     outputs = {
@@ -178,6 +179,7 @@ def _execute_batch_workflow(
             initial_inputs=injected,
             parallel_tasks=context.parallel_tasks,
             gpu_available=context.gpu_available,
+            workspace=context.workspace,
         )
         results.append(result)
         for port in graph.outputs:

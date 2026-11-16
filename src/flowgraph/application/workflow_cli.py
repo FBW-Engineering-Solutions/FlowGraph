@@ -438,6 +438,7 @@ def execute_cli_workflow(
     overrides: Mapping[str, Mapping[str, Any]] | None = None,
     plugins: Sequence[str | Path] = (),
     verbose: bool = False,
+    workspace: str | Path | None = None,
 ) -> tuple[WorkflowGraph, WorkflowRunResult]:
     """Execute a workflow, optionally reporting live console diagnostics."""
     from flowgraph.application.node_registry import create_node_registry
@@ -451,7 +452,7 @@ def execute_cli_workflow(
         report_node_outputs("run", node_id, outputs)
 
     with _execution_console(verbose):
-        result = WorkflowExecutor(registry).run(
+        result = WorkflowExecutor(registry, workspace=workspace).run(
             workflow, initial_inputs=injected, on_node_result=report if verbose else None
         )
     return workflow, result

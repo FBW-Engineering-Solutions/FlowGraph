@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -6,7 +7,7 @@ import meshio
 import pytest
 
 from flowgraph.adapters import ADAPTERS
-from flowgraph.adapters.data_types import FILE, LIST_STR, TABLE_DOCUMENT
+from flowgraph.adapters.data_types import DIRECTORY, LIST_STR, TABLE_DOCUMENT
 from flowgraph.adapters.files import READ_DIRECTORY_FILES, DirectoryReadError
 from flowgraph.adapters.readers import (
     LOAD_MESHIO,
@@ -14,6 +15,8 @@ from flowgraph.adapters.readers import (
     READ_TABLE,
     TableReadError,
 )
+from flowgraph.application.workflow_core import WorkflowGraph
+from flowgraph.application.workflow_io import workflow_from_json, workflow_to_dict
 from flowgraph.domain.mesh_document import MeshDocument
 
 
@@ -168,9 +171,12 @@ def test_read_directory_files_rejects_a_missing_directory(tmp_path: Path) -> Non
         READ_DIRECTORY_FILES.executor({"path": tmp_path / "missing"}, {})
 
 
-def test_read_directory_files_is_registered_with_text_path_and_list_text_output() -> None:
+def test_read_directory_files_is_registered_with_path_and_list_text_output() -> None:
     assert ADAPTERS.require("read-directory-files") is READ_DIRECTORY_FILES
-    assert [(port.name, port.data_type) for port in READ_DIRECTORY_FILES.inputs] == [("path", FILE)]
+    assert [(port.name, port.data_type) for port in READ_DIRECTORY_FILES.inputs] == [
+        ("path", DIRECTORY)
+    ]
+    assert READ_DIRECTORY_FILES.parameters[0].kind is DIRECTORY
     assert [(port.name, port.data_type) for port in READ_DIRECTORY_FILES.outputs] == [
         ("files", LIST_STR),
         ("files_full_paths", LIST_STR),
@@ -183,3 +189,18 @@ def test_read_directory_files_is_registered_with_text_path_and_list_text_output(
     assert READ_DIRECTORY_FILES.parameters[0].port is True
     assert READ_DIRECTORY_FILES.parameters[1].port is False
     assert READ_DIRECTORY_FILES.parameters[2].port is False
+
+
+def test_read_directory_path_parameter_round_trips(tmp_path: Path) -> None:
+    from flowgraph.application.node_registry import create_node_registry
+
+    registry = create_node_registry()
+    node = READ_DIRECTORY_FILES.create_instance("listing", parameters={"path": str(tmp_path)})
+    assert isinstance(node.parameters["path"], Path)
+    serialized = json.dumps(workflow_to_dict(WorkflowGraph([node])))
+    restored = workflow_from_json(serialized, registry)
+    assert restored.require_node("listing").parameters["path"] == str(tmp_path)
+    from flowgraph.application.workflow_core import WorkflowExecutor
+
+    result = WorkflowExecutor(registry).run(restored)
+    assert result.node_outputs["listing"] == {"files": [], "files_full_paths": []}

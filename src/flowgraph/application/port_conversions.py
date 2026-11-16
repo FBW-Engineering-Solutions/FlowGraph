@@ -77,6 +77,7 @@ STR_TO_FILE = PortConversion("string", "filename", "Text → FilePath", FilePath
 
 PATH_TO_STR = PortConversion("dirname", "string", "dirname → Text", str)
 STR_TO_PATH = PortConversion("string", "dirname", "Text → dirname", Path)
+PATH_TO_FILE = PortConversion("dirname", "filename", "Path → FilePath", FilePath)
 
 VEC3D_TO_LIST = PortConversion(
     "VEC3D", "list[float]", "Tex3D Vector → list[float]", lambda x: list(x)
@@ -182,6 +183,7 @@ PORT_CONVERSIONS = (
     FLOAT_TO_LIST_FLOAT,
     PATH_TO_STR,
     STR_TO_PATH,
+    PATH_TO_FILE,
     VEC3D_TO_LIST,
     PILLOW_TO_IMAGEJ,
     FILE_TO_STR,

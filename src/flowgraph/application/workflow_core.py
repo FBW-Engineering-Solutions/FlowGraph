@@ -8,6 +8,7 @@ from collections.abc import Callable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from enum import Enum
+from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, get_args, get_origin
 
@@ -51,8 +52,14 @@ class ExecContext:
     parallel_tasks: int = 1
     gpu_available: bool = False
     connected_output_ports: frozenset[str] = frozenset()
+    workspace: Path | None = None
 
     def __post_init__(self) -> None:
+        if self.workspace is not None:
+            root = Path(self.workspace).expanduser().resolve()
+            if not root.is_dir():
+                raise ValueError(f"Workspace directory does not exist: {root}")
+            object.__setattr__(self, "workspace", root)
         if isinstance(self.parallel_tasks, bool) or not isinstance(self.parallel_tasks, int):
             raise TypeError("parallel_tasks must be an integer")
         if self.parallel_tasks < 1:
@@ -1255,11 +1262,13 @@ class WorkflowExecutor:
         *,
         parallel_tasks: int = 1,
         gpu_available: bool = False,
+        workspace: str | Path | None = None,
     ) -> None:
         self._registry = registry
         self._exec_context = ExecContext(
             parallel_tasks=parallel_tasks,
             gpu_available=gpu_available,
+            workspace=workspace,
         )
 
     def run(

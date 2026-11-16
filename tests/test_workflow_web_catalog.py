@@ -57,6 +57,22 @@ def test_workflow_web_catalog_groups_table_to_mesh_under_mesh_creation() -> None
     assert sum(node["id"] == "csv-to-mesh" for node in _nodes([mesh])) == 1
 
 
+def test_workspace_folder_catalog_exports_path_output() -> None:
+    catalog = workflow_web_catalog()
+    node = next(node for node in _nodes(catalog["groups"]) if node["id"] == "workspace-folder")
+    output = next(port for port in node["ports"] if port["name"] == "path")
+    assert output["data_type_id"] == "dirname"
+    assert output["data_type_label"] == "Path"
+    assert node["parameters"][0]["kind_id"] == "string"
+    assert node["parameters"][0]["default"] == "."
+    reader = next(
+        node for node in _nodes(catalog["groups"]) if node["id"] == "read-directory-files"
+    )
+    directory = next(port for port in reader["ports"] if port["name"] == "path")
+    assert directory["data_type_id"] == "dirname"
+    assert directory["data_type_label"] == "Path"
+
+
 def test_workflow_web_catalog_groups_sliders_under_input_scalars() -> None:
     groups = workflow_web_catalog()["groups"]
     inputs = next(group for group in groups if group["label"] == "Inputs")
@@ -107,7 +123,7 @@ def test_workflow_web_catalog_exports_plaid_dataset_sample_and_list_types() -> N
 def test_workflow_web_catalog_exports_direct_requirements_for_all_nodes() -> None:
     nodes = {node["id"]: node for node in _nodes(workflow_web_catalog()["groups"])}
 
-    assert len(nodes) == len(ADAPTERS.node_definitions) == 136
+    assert len(nodes) == len(ADAPTERS.node_definitions) == 137
     assert all(isinstance(node["requirements"], list) for node in nodes.values())
     assert all(
         isinstance(requirement, str)

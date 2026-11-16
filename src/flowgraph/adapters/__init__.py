@@ -12,6 +12,7 @@ from flowgraph.adapters.files import (
     READ_DIRECTORY_FILES,
     SELECT_FILE,
     SELECT_SERVER_FILE,
+    WORKSPACE,
 )
 from flowgraph.adapters.filters import (
     CREATE_MUSCAT_ELEMENT_FILTER,
@@ -117,7 +118,13 @@ ADAPTERS = AdapterCatalog(
                 ),
                 AdapterGroup(
                     "Files",
-                    (SELECT_FILE, SELECT_SERVER_FILE, DOWNLOAD_URL, READ_DIRECTORY_FILES),
+                    (
+                        SELECT_FILE,
+                        SELECT_SERVER_FILE,
+                        WORKSPACE,
+                        DOWNLOAD_URL,
+                        READ_DIRECTORY_FILES,
+                    ),
                 ),
             ),
         ),

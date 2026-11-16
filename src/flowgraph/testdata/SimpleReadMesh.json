@@ -13,7 +13,7 @@
       "target_port": "mesh"
     },
     {
-      "source_node": "select-server-file_1",
+      "source_node": "workspace-file_1",
       "source_port": "path",
       "target_node": "file-path",
       "target_port": "path"
@@ -42,8 +42,8 @@
       }
     },
     {
-      "definition_id": "select-server-file",
-      "id": "select-server-file_1",
+      "definition_id": "workspace-file",
+      "id": "workspace-file_1",
       "parameters": {
         "file name": "{testdata}/FlowGraph.stl"
       },

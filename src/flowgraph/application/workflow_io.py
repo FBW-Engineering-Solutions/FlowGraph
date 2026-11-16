@@ -220,6 +220,7 @@ def execute_workflow_file(
     parameter_overrides: Mapping[str, Mapping[str, Any]] | None = None,
     *,
     registry: NodeRegistry | None = None,
+    workspace: str | Path | None = None,
 ) -> WorkflowRunResult:
     """Load and execute a workflow, optionally overriding parameters by node ID."""
     if registry is None:
@@ -228,17 +229,19 @@ def execute_workflow_file(
         registry = create_node_registry()
     workflow = load_workflow(path, registry)
     _apply_parameter_overrides(workflow, parameter_overrides or {})
-    return WorkflowExecutor(registry).run(workflow)
+    return WorkflowExecutor(registry, workspace=workspace).run(workflow)
 
 
 def execute_workflow(
     workflow: WorkflowGraph,
     registry: NodeRegistry,
     parameter_overrides: Mapping[str, Mapping[str, Any]] | None = None,
+    *,
+    workspace: str | Path | None = None,
 ) -> WorkflowRunResult:
     """execute a workflow, optionally overriding parameters by node ID."""
     _apply_parameter_overrides(workflow, parameter_overrides or {})
-    return WorkflowExecutor(registry).run(workflow)
+    return WorkflowExecutor(registry, workspace=workspace).run(workflow)
 
 
 def _parse_node(
@@ -373,7 +376,7 @@ def _resolve_testdata_value(value: Any, testdata_root: Path) -> Any:
 
 def _serialize_testdata_value(value: Any, testdata_root: Path) -> Any:
     """Return a JSON-compatible value, replacing packaged paths with a token."""
-    if isinstance(value, FilePath):
+    if isinstance(value, (FilePath, Path)):
         return _serialize_testdata_value(str(value), testdata_root)
     if isinstance(value, str):
         path = Path(value).expanduser()

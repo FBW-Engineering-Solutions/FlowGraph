@@ -15,7 +15,8 @@ and returns the path of the downloaded temporary file.
 | Node (ID) | Inputs and outputs | Parameters and behavior |
 | --- | --- | --- |
 | **Select file** (`select-file`) | Output `path: Text` | `path`: `""`; accepts local file patterns such as `*.*`. The desktop UI opens a local file chooser. |
-| **Select uploaded file** (`select-server-file`) | Output `path: Text` | `file name`: `""` (UI-only, not a port). The server-side upload selector displays uploaded files and returns the selected server path. |
+| **Workspace File** (`workspace-file`) | Output `path: Text` | `file name`: `""` (UI-only, not a port). Stores a workspace-relative path and outputs its absolute runtime path. |
+| **Workspace Folder** (`workspace-folder`) | Output `path: Path` | `folder`: `"."`. Dropdown includes the workspace root and all nested subfolders, including empty folders. Outputs the selected directory as an absolute `pathlib.Path`. |
 | **Download URL** (`download-url`) | Output `path: Text` | `url`: `""`; accepts only HTTP(S) URLs and downloads the response to a persistent system temporary file. |
 | **Read Directory Files** (`read-directory-files`) | Parameter/input `path: Path`; outputs `files: List Text`, `files_full_paths: List Text` | Local `include_pattern` and `exclude_pattern` regular expressions filter immediate regular files by filename. |
 
@@ -25,12 +26,46 @@ and returns the path of the downloaded temporary file.
 is invalid at execution time. The path can be connected to a reader such as **Read
 Mesh (Muscat)** or **Read Image (Pillow)**.
 
-## Select uploaded file
+## Workspace File
 
-**Select uploaded file** is intended for files uploaded to the FlowGraph server. The
-`file name` parameter is a UI-only selector and is not exported as a workflow input
-port. The node outputs the selected server-side path as text and does not read the
-file.
+**Workspace File** (formerly **Select uploaded file**) selects a file within the
+active workspace. It stores a relative path such as `my/files/mesh.vtu`, resolves
+that path at execution time, and outputs absolute `path` text without reading or
+copying file contents. Connect it to the `path` input of **Read Mesh** or another
+reader. Moving the workspace does not require editing the saved workflow.
+
+The node ID is `workspace-file` and its parameter is `file name`.
+Existing absolute paths remain external references. In the web
+editor, exact matches to current workspace files are normalized to relative paths;
+ambiguous basenames and unmatched external paths are not rewritten.
+
+Configure the root with `flowgraph run workflow.json --workspace ./project`,
+`flowgraph serve --workspace ./project`, or the Python execution APIs' `workspace`
+keyword. Browser execution uses its uploaded/mounted files directory. Desktop
+launchers accept `--workspace ./project`; without it, Desktop uses its temporary
+session upload folder. Persistent workspace files are not removed on exit.
+
+Relative references require an explicit workspace and an existing regular file.
+Traversal or symlinks escaping that workspace are rejected. Legacy absolute paths
+are intentionally not confined to it. No `{workspace}` substitution is performed
+in arbitrary text parameters; use the node's output instead.
+
+## Workspace Folder
+
+Use **Workspace Folder** when you need a directory rather than a selected file.
+Choose **Workspace root** (`.`) or any nested subdirectory in its dropdown,
+including empty directories. The saved `folder` value is an ordinary
+workspace-relative Text parameter, not a separate data type;
+the node outputs its absolute runtime directory as `path: Path` (`pathlib.Path`), without reading
+files or creating directories. For example, connect
+`Workspace Folder.path → Read Directory Files.path` to enumerate selected files.
+The root comes from the same runtime configuration as **Workspace File** and is
+inherited by nested workflows. An unconfigured workspace produces a clear error;
+there is no implicit fallback to the process working directory. Moving the
+workspace updates the output on the next run, including incremental execution.
+Missing folders, file selections, absolute paths and paths escaping the workspace
+are rejected. The node ID is `workspace-folder`; nodes without a
+`folder` parameter continue to select the workspace root.
 
 ## Download URL
 
@@ -47,7 +82,10 @@ and the target server must allow the request through its CORS policy.
 **Read Directory Files** returns sorted basenames in `files` and their resolved
 full paths in `files_full_paths` for immediate regular files in the configured
 directory. It does not include nested files or directory names. The optional
-`path` parameter port must identify an existing directory.
+`path` parameter/input has type **Path** (`pathlib.Path`), not **FilePath**, and
+must identify an existing directory. **Workspace Folder** connects directly without
+conversion. Saved directory parameters remain JSON strings and are converted to
+paths for execution.
 
 The local `include_pattern` and `exclude_pattern` parameters each accept a
 regular expression. For example, to include CSV and text files except generated
