@@ -12,6 +12,7 @@ import threading
 import time
 import uuid
 from collections.abc import Sequence
+from copy import deepcopy
 from pathlib import Path
 
 from flowgraph.application.plugins import resolve_plugin_paths
@@ -36,6 +37,7 @@ class JobManager:
         self.plugins = resolve_plugin_paths(plugins)
         self.lock = threading.RLock()
         self.jobs: dict[str, dict] = {}
+        self.recovery: dict[str, dict] = {}
         self.process: subprocess.Popen | None = None
         self.active: str | None = None
         self.closed = False
@@ -76,7 +78,9 @@ class JobManager:
                     directory.cleanup()
                     del self.sessions[key]
             while len(self.jobs) >= 32:
-                self.jobs.pop(next(iter(self.jobs)))
+                oldest = next(iter(self.jobs))
+                self.jobs.pop(oldest)
+                self.recovery.pop(oldest, None)
             identifier = uuid.uuid4().hex
             job = {
                 "id": identifier,
@@ -154,6 +158,19 @@ class JobManager:
                 temporary.cleanup()
                 raise
             self.jobs[identifier] = job
+            previous_result = None
+            if options and options.get("targets") and not options.get("from_scratch"):
+                for previous_id in reversed(self.recovery):
+                    previous = self.recovery[previous_id]
+                    if previous["options"].get("session_id") == session_id:
+                        if previous["workflow"] == workflow:
+                            previous_result = self.jobs[previous_id]["result"]
+                        break
+            self.recovery[identifier] = {
+                "workflow": deepcopy(workflow),
+                "options": deepcopy(options or {}),
+                "previous_result": previous_result,
+            }
             self.process = process
             self.active = identifier
             self._report_state(identifier, "running")
@@ -255,6 +272,14 @@ class JobManager:
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait()
+
+    def current_state(self) -> dict:
+        """Snapshot the active or latest submission without running or stopping it."""
+        with self.lock:
+            identifier = self.active or next(reversed(self.jobs), None)
+            if identifier is None:
+                raise KeyError("No execution state is retained by this server")
+            return {**self.recovery[identifier], "job": self.get(identifier)}
 
     def get(self, identifier: str, after: int = 0) -> dict:
         with self.lock:
