@@ -52,6 +52,7 @@ _TYPES = {
     "Float": FLOAT,
     "float": FLOAT,
     "Dataset": IMAGEJ,
+    "ImagePlus": IMAGEJ,
     "Img": IMAGEJ,
     "RandomAccessibleInterval": IMAGEJ,
 }
@@ -129,6 +130,64 @@ def _file_ports_for_instance(instance: NodeInstance) -> tuple[PortDefinition, ..
     return (filename_port, *script_ports)
 
 
+def _to_imageplus(array: np.ndarray) -> Any:
+    """Build an owned ImageJ1 processor, preserving spatial and RGB semantics."""
+    import jpype
+    import scyjava
+
+    if not isinstance(array, np.ndarray) or array.ndim not in (2, 3):
+        raise ValueError("ImagePlus input requires a single grayscale or RGB NumPy image")
+    height, width = array.shape[:2]
+    if not height or not width:
+        raise ValueError("ImagePlus input dimensions must be positive")
+    if array.ndim == 3:
+        if array.shape[2] != 3 or array.dtype != np.uint8:
+            raise ValueError(
+                "ImagePlus color input requires uint8 RGB; convert alpha images to RGB explicitly"
+            )
+        packed = (
+            (array[:, :, 0].astype(np.int32) << 16)
+            | (array[:, :, 1].astype(np.int32) << 8)
+            | array[:, :, 2]
+        )
+        processor = scyjava.jimport("ij.process.ColorProcessor")(
+            width, height, jpype.JArray(jpype.JInt)(packed.ravel())
+        )
+    else:
+        types = {
+            np.dtype("uint8"): ("ByteProcessor", jpype.JByte, np.int8),
+            np.dtype("uint16"): ("ShortProcessor", jpype.JShort, np.int16),
+            np.dtype("float32"): ("FloatProcessor", jpype.JFloat, np.float32),
+        }
+        if array.dtype not in types:
+            raise ValueError("ImagePlus grayscale input requires uint8, uint16, or float32 pixels")
+        name, java_type, storage_type = types[array.dtype]
+        pixels = np.ascontiguousarray(array).view(storage_type).ravel()
+        processor = scyjava.jimport(f"ij.process.{name}")(
+            width, height, jpype.JArray(java_type)(pixels), None
+        )
+    return scyjava.jimport("ij.ImagePlus")("FlowGraph image", processor)
+
+
+def _from_imageplus(image: Any) -> np.ndarray:
+    """Read current processor pixels, not a potentially stale Dataset conversion."""
+    if image.getStackSize() != 1:
+        raise ValueError(
+            "ImagePlus output is a stack; select a single image plane before returning"
+        )
+    shape = (image.getHeight(), image.getWidth())
+    pixels = np.asarray(image.getProcessor().getPixels()).reshape(shape)
+    if image.getType() == 4:  # ImagePlus.COLOR_RGB: packed 0xRRGGBB integers.
+        rgb = np.empty((*shape, 3), dtype=np.uint8)
+        for channel, shift in enumerate((16, 8, 0)):
+            rgb[:, :, channel] = (pixels >> shift) & 255
+        return rgb
+    dtypes = {0: np.uint8, 1: np.uint16, 2: np.float32}
+    if image.getType() not in dtypes:
+        raise ValueError("ImagePlus output must be grayscale or RGB, not indexed color")
+    return pixels.view(dtypes[image.getType()]).copy()
+
+
 def _execute_script(
     inputs: Mapping[str, Any],
     source: str,
@@ -153,7 +212,9 @@ def _execute_script(
         if port.direction is not PortDirection.INPUT or port.name not in inputs:
             continue
         value = inputs[port.name]
-        if declared_type == "Dataset":
+        if declared_type == "ImagePlus":
+            value = _to_imageplus(value)
+        elif declared_type == "Dataset":
             value = ij.py.to_dataset(value)
         elif declared_type in {"Img", "RandomAccessibleInterval"}:
             value = ij.py.to_img(value)
@@ -161,15 +222,35 @@ def _execute_script(
             value = ij.py.to_java(value)
         args[port.name] = value
 
+    # ImagePlus is not always present in SciJava's short-name type aliases.
+    source = re.sub(
+        r"(^\s*#@\s*(?:(?:input|output)\s+)?)ImagePlus(?=\s|\()",
+        r"\1ij.ImagePlus",
+        source,
+        flags=re.MULTILINE,
+    )
     result = ij.py.run_script("Groovy", source, args)
     outputs: dict[str, Any] = {}
-    for port, _ in declarations:
+    for port, declared_type in declarations:
         if port.direction is not PortDirection.OUTPUT:
             continue
         if port.name not in result:
             raise ValueError(f"ImageJ script did not produce output {port.name!r}")
-        value = ij.py.from_java(result[port.name])
-        outputs[port.name] = np.asarray(value).copy() if port.data_type == IMAGEJ else value
+        raw_value = result[port.name]
+        value = (
+            _from_imageplus(raw_value)
+            if declared_type == "ImagePlus" and raw_value is not None
+            else ij.py.from_java(raw_value)
+        )
+        if port.data_type == IMAGEJ and value is None:
+            raise ValueError(
+                f"ImageJ script output {port.name!r} is null; check the Fiji/Groovy error log "
+                "and assign a valid image to the declared output. "
+                "IJ.run(image, command, options) requires an ImagePlus, not a Dataset."
+            )
+        if port.data_type == IMAGEJ and declared_type != "ImagePlus":
+            value = np.asarray(value).copy()
+        outputs[port.name] = value
     return outputs
 
 
