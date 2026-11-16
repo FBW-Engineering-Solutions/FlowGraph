@@ -27,11 +27,13 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
+  "packaging>=24",
   "vtk>=9.2",
   "muscat>=2.5.2",
 ]
 
 [project.optional-dependencies]
+server = ["uv>=0.6"]
 io = [
   "meshio>=5.3",
   "meshlane>=5.5.0",

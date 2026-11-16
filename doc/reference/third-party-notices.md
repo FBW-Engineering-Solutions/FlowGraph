@@ -39,12 +39,16 @@ component's terms.
 
 ## Required runtime dependencies
 
+Package-management dependencies added November 13, 2026: packaging metadata
+identifies BSD-2-Clause OR Apache-2.0; uv metadata identifies MIT OR Apache-2.0.
+
 `required` means a direct dependency of the base Core installation.
 
 | Distribution | Group | Locked version | Main project license | Role and evidence |
 | --- | --- | --- | --- | --- |
 | `vtk` | `required` | `9.6.2` | BSD-3-Clause | VTK data representations and algorithms. Installed `LICENSE` contains the three-clause BSD terms; see [VTK copyright](https://github.com/Kitware/VTK/blob/master/Copyright.txt). Native and third-party components require separate review. |
 | `muscat` | `required` | `2.5.2` | BSD-3-Clause | Mesh data structures and processing. Installed `LICENSE` identifies Muscat Packages and BSD-3-Clause; see [Muscat source](https://gitlab.com/drti/muscat). |
+| `packaging` | `required` | `26.3` | BSD-2-Clause OR Apache-2.0 | Wheel tags, versions, requirements and environment markers; installed distribution metadata. |
 
 ## Optional runtime dependencies
 
@@ -54,6 +58,7 @@ that the integration or its external tools are supported on every platform.
 | Distribution | Group | Locked version | Main project license | Role and evidence |
 | --- | --- | --- | --- | --- |
 | `meshio` | `io` | `5.3.5` | MIT | Mesh format I/O. Installed `LICENSE.txt` credits Nico Schlömer and contributors; see [meshio source](https://github.com/nschloe/meshio). |
+| `uv` | `server` | `0.13.8` | MIT OR Apache-2.0 | Optional wheel-only workspace installer; installed distribution metadata. Bundled components require separate review. |
 | `meshlane` | `io` | `5.5.0` | MIT | Mesh format I/O. Installed `LICENSE.txt` credits Nico Schlömer, Simvia, and Meshlane contributors; see [Meshlane source](https://github.com/simvia-tech/meshlane). |
 | `pandas` | `io` | `3.0.5` | BSD-3-Clause | Tabular data operations and I/O. Installed `LICENSE` includes project and additional notices; see [pandas source](https://github.com/pandas-dev/pandas). |
 | `h5py` | `io` | `3.16.0` | BSD-3-Clause | HDF5 I/O. Installed metadata and `LICENSE` identify the project license; the distribution also carries HDF5, LZF, and other notices. See [h5py source](https://github.com/h5py/h5py). |

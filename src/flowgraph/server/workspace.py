@@ -30,6 +30,10 @@ class Workspace:
         if not isinstance(name, str) or not name or "\\" in name or "\x00" in name:
             raise ValueError("A workspace-relative file path is required")
         relative = PurePosixPath(name)
+        if relative.parts and relative.parts[0] == ".flowgraph-packages":
+            raise ValueError(
+                "The package directory is managed by the package API, not the file API"
+            )
         if relative.is_absolute() or any(part in {"", ".", ".."} for part in name.split("/")):
             raise ValueError("Invalid workspace-relative file path")
         target = self.root
@@ -50,7 +54,9 @@ class Workspace:
             # Do not follow symlink directories, including on Python 3.11.
             for parent, children, names in os.walk(self.root, followlinks=False):
                 children[:] = sorted(
-                    name for name in children if not (Path(parent) / name).is_symlink()
+                    name
+                    for name in children
+                    if name != ".flowgraph-packages" and not (Path(parent) / name).is_symlink()
                 )
                 directories.extend(
                     (Path(parent) / name).relative_to(self.root).as_posix() for name in children

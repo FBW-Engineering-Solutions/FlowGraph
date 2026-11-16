@@ -97,6 +97,20 @@ together; the workflow file and execution response formats are unchanged.
 
 ## Experimental local server
 
+### Optional workspace packages
+
+Install the `server` extra (`uv sync --extra server`, or install `flowgraph[server]`)
+and pass `--allow-package-install` to `flowgraph serve` to enable the web editor's
+confirmed wheel-only installation API. It is disabled by default. Compatible
+prebuilt Python/native wheels are installed with uv into
+`<workspace>/.flowgraph-packages/<python-and-platform-id>/site-packages`, not the
+base environment. Extras persist across server restarts. Stop the backend and
+delete `.flowgraph-packages` to remove them. Read-only workspace destinations,
+source builds, conflicting distributions and base-module shadowing are rejected.
+Installation requires idle execution and restarts session workers, clearing caches.
+The managed directory is excluded from the file API. Only install trusted code;
+this is not a sandbox or a multi-user package service.
+
 The prototype branch includes an authenticated execution API (loopback by default):
 
 For LAN or internet browser clients, put an HTTPS reverse proxy in front of the

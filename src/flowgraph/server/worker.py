@@ -9,6 +9,14 @@ from pathlib import Path
 
 
 def main() -> None:
+    import sys
+
+    from flowgraph.server.packages import checked_directory
+
+    extra_packages = checked_directory(Path.cwd())
+    if extra_packages.is_dir():
+        # No site.addsitedir: do not execute arbitrary .pth startup hooks.
+        sys.path.append(str(extra_packages))
     from flowgraph.application.node_registry import create_node_registry
     from flowgraph.application.workflow_execution import execute_workflow_json
 

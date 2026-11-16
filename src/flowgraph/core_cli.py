@@ -86,6 +86,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     serve_parser.add_argument("--execution-timeout", type=float, default=120)
+    serve_parser.add_argument(
+        "--allow-package-install",
+        action="store_true",
+        help="allow confirmed wheel installation into workspace/.flowgraph-packages (requires server extra)",
+    )
     serve_parser.add_argument("--max-request-bytes", type=int, default=16 << 20)
     serve_parser.add_argument(
         "--verbose", "-v", action="store_true", help="print server state and activity to stderr"
@@ -118,6 +123,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 max_request=args.max_request_bytes,
                 verbose=args.verbose,
                 plugins=args.plugin,
+                allow_package_install=args.allow_package_install,
                 allowed_origins=tuple(args.allow_origin)
                 if args.allow_origin is not None
                 else (DEFAULT_EDITOR_ORIGIN,),

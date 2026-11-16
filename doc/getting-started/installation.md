@@ -73,6 +73,7 @@ Other runtime extras are:
 | `imagej` | PyImageJ and scyjava; a suitable Java runtime and the selected ImageJ/Fiji components are needed. Initialization may download Java artifacts. |
 | `ml` | PyPlaid integration; its own dependencies and platform constraints apply. |
 | `cosapp` | CoSApp model integration; user models can require other libraries or external tools. |
+| `server` | uv wheel installer for optional workspace-local packages. Requires explicit `flowgraph serve --allow-package-install`; the base environment is unchanged. |
 
 For example, request the ImageJ integration with:
 

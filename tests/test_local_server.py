@@ -177,6 +177,30 @@ def wait_job(api, identifier):
     pytest.fail("Execution did not finish")
 
 
+def test_package_api_opt_in_metadata_and_idle_session_refresh(api, monkeypatch):
+    status, runtime = request(api, "GET", "/api/v1/runtime")
+    assert status == 200
+    assert runtime["capabilities"]["installPackages"] is False
+    assert runtime["packageInstallation"]["persistent"] is True
+    assert request(api, "POST", "/api/v1/packages/check", {"name": "example"})[0] == 403
+    api.packages.enabled = True
+    plan = {"token": "confirmed", "packages": [], "persistent": True}
+    monkeypatch.setattr(api.packages, "check", lambda name: plan)
+    monkeypatch.setattr(api.packages, "install", lambda token: plan)
+    assert request(api, "POST", "/api/v1/packages/check", {"name": "example"}) == (200, plan)
+    disposed = []
+    api.jobs.sessions["idle"] = None
+    monkeypatch.setattr(api.jobs, "dispose_session", lambda session: disposed.append(session))
+    assert request(api, "POST", "/api/v1/packages/install", {"token": "confirmed"}) == (200, plan)
+    assert disposed == ["idle"]
+    api.jobs.sessions.clear()
+    api.jobs.active = "running"
+    try:
+        assert request(api, "POST", "/api/v1/packages/install", {"token": "confirmed"})[0] == 409
+    finally:
+        api.jobs.active = None
+
+
 def test_incremental_session_retains_objects_and_disposal_starts_cold(api):
     options = {"session_id": "test-session"}
     status, job = request(
