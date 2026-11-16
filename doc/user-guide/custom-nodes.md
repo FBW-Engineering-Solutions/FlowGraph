@@ -203,6 +203,40 @@ workflow JSON, or loaded from paths named by a workflow or HTTP request. JSON
 continues to store definition IDs and parameters; supply the files again when
 running in another process. Ordinary built-in-only invocations are unaffected.
 
+## Workspace Muscat solver
+
+The source checkout includes `workspace/MuscatSolver.py`, exporting
+`muscat-initial-strain-solver` (**Muscat Initial Strain Solver**). Load the trusted
+file using `--plugin` with `serve`, `run`, or `inspect`. It is not built in,
+automatically discovered by Desktop, or installed in browser WASM.
+
+Connect a mesh reader to `mesh` and the solved `mesh` output to a viewer or
+**Write Mesh** for VTK export. Outputs contain nodal `Displacement`, initial
+strain components, and element-center `sigma_*` fields. The input is unchanged;
+unchanged storage is shared read-only.
+
+- `axisymmetric=true` requires a 2D `(r,z)` mesh with strictly positive radius;
+  `false` requires 3D. Axis-touching meshes are not supported.
+- Set `young` and `poisson` in consistent units. Defaults (1.0, 0.3) are
+  illustrative, not calibrated material properties.
+- `strain_strategy`: `analytical` uses the supplied height profile;
+  `from_WK1_points` / `from_WK1_cells_center` read `strain_field` (default `strain`).
+  Imported tensors must be finite row-major `(N,9)` or `(N,3,3)`, over all nodes
+  or elements (including boundary elements). Only diagonal entries are retained.
+  Axisymmetry maps xx to rr, yy to zz, zz to tt.
+- Default supports use the example's geometry-specific zones. Optional
+  `boundary_A/B/C` selectors replace them. Axisymmetric A fixes axial motion
+  near `(20,0.5)`; `bridage=hyperstatique` adds B near `(10,0.5)`. In 3D A/B
+  must select linear surface elements and block their local normal, while C
+  fixes global displacement component 1. Empty selections fail explicitly.
+- Stress order: rr,zz,tt,rz (axisymmetric), xx,yy,zz,yz,xz,xy (3D).
+  Lower-dimensional boundary cells receive zero stress. The formulation uses
+  P1 displacement and initial-strain loading with no external forces.
+
+The plugin includes installed-Muscat compatibility forms and P1 constraints;
+reciprocal radius is evaluated at quadrature points to avoid unsupported native
+negative powers. See the file's module documentation for the complete contract.
+
 ## Export extra nodes for the Web Editor
 
 The Web Editor reads catalog JSON for its menu, ports, and parameter editors.

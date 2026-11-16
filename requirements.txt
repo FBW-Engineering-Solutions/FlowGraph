@@ -2,3 +2,4 @@
 # Use `uv sync` for development; pyproject.toml is the canonical dependency file.
 vtk>=9.2
 muscat>=2.5.2
+packaging>=24

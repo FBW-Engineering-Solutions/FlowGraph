@@ -42,6 +42,7 @@ class LocalServer(ThreadingHTTPServer):
         allowed_origins: tuple[str, ...] = (),
         verbose: bool = False,
         plugins: Sequence[str | Path] = (),
+        allow_package_install: bool = False,
     ):
         if (
             not 0 <= port <= 65535
@@ -98,6 +99,14 @@ class LocalServer(ThreadingHTTPServer):
                 )
         self.allowed_origins = frozenset(allowed_origins)
         self.workspace = Workspace(workspace)
+        from flowgraph.server.packages import PackageManager
+
+        self.packages = PackageManager(self.workspace.root, enabled=allow_package_install)
+        if allow_package_install:
+            try:
+                import uv  # noqa: F401 - validate explicit optional installer dependency
+            except ImportError as error:
+                raise ValueError("Package installation requires flowgraph[server] (uv).") from error
         self.token = token or secrets.token_hex(32)
         self.max_request = max_request
         self.verbose = verbose
@@ -179,6 +188,13 @@ class LocalServer(ThreadingHTTPServer):
                 if item.metadata["Name"]
             }
         )
+        extras = self.packages.distributions()
+        packages = sorted(
+            set(packages)
+            | {canonical.metadata["Name"].lower().replace("_", "-") for canonical in extras}
+        )
+        for item in extras:
+            versions[item.metadata["Name"]] = item.version
         return {
             "protocol": "flowgraph-local-server",
             "version": 1,
@@ -192,10 +208,12 @@ class LocalServer(ThreadingHTTPServer):
                 "cancelExecution": True,
                 "incrementalExecution": 1,
                 "scopedExecution": 1,
+                "installPackages": self.packages.info()["enabled"],
             },
             "directory": str(self.workspace.root),
             "packages": packages,
             "versions": versions,
+            "packageInstallation": self.packages.info(),
             "limits": {
                 "request_bytes": self.max_request,
                 "result_bytes": self.jobs.max_result,
@@ -345,6 +363,25 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._reply(200, self.server.runtime())
             elif method == "GET" and path == "/api/v1/catalog":
                 self._reply(200, self.server.catalog)
+            elif method == "POST" and path in {
+                "/api/v1/packages/check",
+                "/api/v1/packages/install",
+            }:
+                body = self._body(json_body=True)
+                # Share the execution admission lock: never install into running workers.
+                with self.server.jobs.lock:
+                    if self.server.jobs.active is not None:
+                        raise ApiError(
+                            409, "Wait for workflow execution to finish before managing packages."
+                        )
+                    self.server.packages.require_enabled()
+                    if path.endswith("/check"):
+                        result = self.server.packages.check(body.get("name"))
+                    else:
+                        result = self.server.packages.install(body.get("token"))
+                        for session_id in list(self.server.jobs.sessions):
+                            self.server.jobs.dispose_session(session_id)
+                self._reply(200, result)
             elif method == "POST" and path == "/api/v1/executions":
                 body = self._body(json_body=True)
                 workflow = body.get("workflow")
