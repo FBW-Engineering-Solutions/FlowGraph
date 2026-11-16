@@ -22,7 +22,8 @@ An application or environment that redistributes those files needs its own revie
 
 ## Inventory scope and evidence
 
-**Review date: November 5, 2026.** Versions below are a snapshot of `uv.lock`, not
+**Review date: November 5, 2026; Muscat version updated November 16, 2026.**
+Versions below are a snapshot of `uv.lock`, not
 installation requirements or a promise that every user receives those versions.
 The version constraints and extras in
 [pyproject.toml](https://github.com/FBW-Engineering-Solutions/FlowGraph/blob/master/pyproject.toml)
@@ -47,7 +48,7 @@ identifies BSD-2-Clause OR Apache-2.0; uv metadata identifies MIT OR Apache-2.0.
 | Distribution | Group | Locked version | Main project license | Role and evidence |
 | --- | --- | --- | --- | --- |
 | `vtk` | `required` | `9.6.2` | BSD-3-Clause | VTK data representations and algorithms. Installed `LICENSE` contains the three-clause BSD terms; see [VTK copyright](https://github.com/Kitware/VTK/blob/master/Copyright.txt). Native and third-party components require separate review. |
-| `muscat` | `required` | `2.5.2` | BSD-3-Clause | Mesh data structures and processing. Installed `LICENSE` identifies Muscat Packages and BSD-3-Clause; see [Muscat source](https://gitlab.com/drti/muscat). |
+| `muscat` | `required` | `2.6.0` | BSD-3-Clause | Mesh data structures and processing. Installed `LICENSE` identifies Muscat Packages and BSD-3-Clause; see [Muscat source](https://gitlab.com/drti/muscat). |
 | `packaging` | `required` | `26.3` | BSD-2-Clause OR Apache-2.0 | Wheel tags, versions, requirements and environment markers; installed distribution metadata. |
 
 ## Optional runtime dependencies

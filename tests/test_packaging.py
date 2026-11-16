@@ -315,6 +315,26 @@ def test_io_dependencies_are_optional() -> None:
     assert names.isdisjoint(dependency["name"] for dependency in package["dependencies"])
 
 
+def test_release_muscat_dependency_uses_registry_source() -> None:
+    """Keep release installs independent of a sibling Muscat checkout."""
+    from packaging.requirements import Requirement
+
+    root = Path(__file__).parents[1]
+    metadata = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert "muscat" not in metadata.get("tool", {}).get("uv", {}).get("sources", {})
+    requirement = next(
+        Requirement(dependency)
+        for dependency in metadata["project"]["dependencies"]
+        if Requirement(dependency).name == "muscat"
+    )
+    lock = tomllib.loads((root / "uv.lock").read_text(encoding="utf-8"))
+    packages = [package for package in lock["package"] if package["name"] == "muscat"]
+    assert packages
+    for package in packages:
+        assert package["source"] == {"registry": "https://pypi.org/simple"}
+        assert package["version"] in requirement.specifier
+
+
 def test_core_package_uses_standard_pure_python_build_configuration() -> None:
     """Require setuptools packaging without a Cython build dependency."""
     root = Path(__file__).parents[1]
