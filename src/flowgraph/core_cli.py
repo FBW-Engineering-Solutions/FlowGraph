@@ -80,6 +80,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     serve_parser.add_argument("--execution-timeout", type=float, default=120)
     serve_parser.add_argument("--max-request-bytes", type=int, default=16 << 20)
+    serve_parser.add_argument(
+        "--verbose", "-v", action="store_true", help="print server state and activity to stderr"
+    )
     return parser
 
 
@@ -95,6 +98,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 port=args.port,
                 execution_timeout=args.execution_timeout,
                 max_request=args.max_request_bytes,
+                verbose=args.verbose,
                 allowed_origins=tuple(args.allow_origin)
                 if args.allow_origin is not None
                 else (DEFAULT_EDITOR_ORIGIN,),

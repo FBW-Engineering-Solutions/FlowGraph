@@ -30,6 +30,20 @@ the editor or restarting the server, use the current launch link again.
 
 Stop the server with **Ctrl+C**; shutdown terminates active execution.
 
+Add `--verbose` (or `-v`) to print startup/shutdown state, the resolved workspace,
+allowed editor origins, execution/request/result limits, sanitized HTTP endpoints
+and response codes, and execution state transitions to stderr. For example:
+
+```bash
+uvx --with imagej flowgraph serve --workspace . --verbose
+```
+
+Execution transitions include running, completed, failed, cancelled, and timeout
+failures; polling does not repeat transition messages. HTTP polling requests are
+still logged. Diagnostics omit credentials, query values, file/workflow contents,
+and arbitrary request paths. The usual token and launch link remain on stdout;
+keep them private. Without the flag, additional diagnostics are disabled.
+
 Core serves only the API, not editor assets: `/` and other non-API paths return
 404. The public editor, a separately served editor, or FlowGraph Desktop supplies
 the UI. Starting this server does not change standalone WASM deployments.
@@ -71,6 +85,7 @@ the public editor default.
 | `--allow-origin` | Public editor origin | Allowed client origin; repeatable as described above |
 | `--execution-timeout` | `120` | Execution timeout in seconds |
 | `--max-request-bytes` | `16777216` (16 MiB) | Maximum request body size |
+| `--verbose`, `-v` | Off | Print server state and sanitized activity to stderr |
 
 ## API version 1
 

@@ -95,6 +95,13 @@ The prototype branch includes an authenticated, loopback-only execution API:
 uv run flowgraph serve --workspace /absolute/path/to/existing/workspace
 ```
 
+Add `--verbose` (or `-v`) for server lifecycle, configuration, sanitized HTTP
+activity, and execution state changes on stderr. For an isolated tool launch:
+
+```bash
+uvx --with imagej flowgraph serve --workspace . --verbose
+```
+
 Port 8765 and the allowed editor origin `https://flowgraph-web.fbw-es.com` are
 defaults; explicit `--allow-origin` values replace that origin. The editor still
 requires bearer authentication and browser local-network permission. Click the

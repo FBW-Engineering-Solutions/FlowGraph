@@ -16,10 +16,18 @@ from pathlib import Path
 class JobManager:
     """Bounded jobs, stateless workers, and supervised incremental session workers."""
 
-    def __init__(self, workspace: Path, *, timeout: float = 120, max_result: int = 64 << 20):
+    def __init__(
+        self,
+        workspace: Path,
+        *,
+        timeout: float = 120,
+        max_result: int = 64 << 20,
+        verbose: bool = False,
+    ):
         self.workspace = workspace
         self.timeout = timeout
         self.max_result = max_result
+        self.verbose = verbose
         self.lock = threading.RLock()
         self.jobs: dict[str, dict] = {}
         self.process: subprocess.Popen | None = None
@@ -27,6 +35,10 @@ class JobManager:
         self.closed = False
         self.threads: list[threading.Thread] = []
         self.sessions: dict[str, tuple[subprocess.Popen, tempfile.TemporaryDirectory, float]] = {}
+
+    def _report_state(self, identifier: str, state: str) -> None:
+        if self.verbose:
+            print(f"[flowgraph] Execution {identifier}: {state}", file=sys.stderr, flush=True)
 
     def submit(self, workflow: dict, options: dict | None = None) -> dict:
         with self.lock:
@@ -113,6 +125,7 @@ class JobManager:
             self.jobs[identifier] = job
             self.process = process
             self.active = identifier
+            self._report_state(identifier, "running")
             thread = threading.Thread(
                 target=self._watch,
                 args=(identifier, process, temporary, session_id),
@@ -126,6 +139,7 @@ class JobManager:
     def _watch(self, identifier, process, temporary, session_id=None) -> None:
         result = None
         error = None
+        timed_out = False
         try:
             response = Path(temporary.name) / "response.json"
             if session_id is not None:
@@ -152,6 +166,7 @@ class JobManager:
                 raise TypeError("Invalid execution response")
         except Exception as exception:  # noqa: BLE001 - convert process failures to job state
             error = str(exception)
+            timed_out = isinstance(exception, TimeoutError)
         finally:
             temporary.cleanup()
         with self.lock:
@@ -164,6 +179,7 @@ class JobManager:
                     result=result,
                     error=error,
                 )
+                self._report_state(identifier, "failed (timed out)" if timed_out else job["state"])
             if self.active == identifier:
                 self.active = None
                 self.process = None
@@ -193,6 +209,7 @@ class JobManager:
             if job["state"] == "running":
                 self._stop(self.process)
                 job["state"] = "cancelled"
+                self._report_state(identifier, "cancelled")
                 self.active = None
                 self.process = None
             return dict(job)

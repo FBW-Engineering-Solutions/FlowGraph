@@ -6,6 +6,7 @@ import hmac
 import json
 import math
 import secrets
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import metadata
 from pathlib import Path
@@ -35,6 +36,7 @@ class LocalServer(ThreadingHTTPServer):
         max_request: int = 16 << 20,
         execution_timeout: float = 120,
         allowed_origins: tuple[str, ...] = (),
+        verbose: bool = False,
     ):
         if (
             not 0 <= port <= 65535
@@ -72,14 +74,35 @@ class LocalServer(ThreadingHTTPServer):
         self.workspace = Workspace(workspace)
         self.token = token or secrets.token_hex(32)
         self.max_request = max_request
-        self.jobs = JobManager(self.workspace.root, timeout=execution_timeout)
+        self.verbose = verbose
+        self.jobs = JobManager(self.workspace.root, timeout=execution_timeout, verbose=verbose)
+        self.report("Server state: starting")
         super().__init__(("127.0.0.1", port), ApiHandler)
         self.authority = f"127.0.0.1:{self.server_port}"
         self.origin = f"http://{self.authority}"
+        self.report(f"Workspace: {str(self.workspace.root)!r}")
+        self.report(f"Allowed editor origins: {sorted(self.allowed_origins)!r}")
+        self.report(
+            f"Limits: execution={execution_timeout:g}s, request={max_request} bytes, "
+            f"result={self.jobs.max_result} bytes"
+        )
+
+    def report(self, message: str) -> None:
+        """Emit opt-in diagnostics without request credentials or payloads."""
+        if self.verbose:
+            print(f"[flowgraph] {message}", file=sys.stderr, flush=True)
+
+    def serve_forever(self, poll_interval: float = 0.5) -> None:
+        self.report(f"Server state: ready/listening at {self.origin}")
+        try:
+            super().serve_forever(poll_interval)
+        finally:
+            self.report("Server state: shutting down")
 
     def server_close(self) -> None:
         self.jobs.close()
         super().server_close()
+        self.report("Server state: stopped")
 
     def runtime(self) -> dict:
         import platform
@@ -138,6 +161,24 @@ class ApiHandler(BaseHTTPRequestHandler):
         """Do not log request URLs, tokens, workspace names, or workflow data."""
 
     def _reply(self, status: int, value, *, binary: bool = False) -> None:
+        # Only fixed route labels are logged; paths and query values are untrusted
+        # and can contain credentials, filenames, or control characters.
+        path = self.path.split("?", 1)[0]
+        routes = {
+            "/api/v1/runtime",
+            "/api/v1/catalog",
+            "/api/v1/executions",
+            "/api/v1/execution-sessions/dispose",
+            "/api/v1/files",
+            "/api/v1/files/demo",
+            "/api/v1/files/content",
+        }
+        endpoint = path if path in routes else "<unknown endpoint>"
+        if path.startswith("/api/v1/executions/"):
+            endpoint = "/api/v1/executions/<id>"
+            if path.endswith("/cancel"):
+                endpoint += "/cancel"
+        self.server.report(f"HTTP {self.command} {endpoint} -> {status}")
         body = value if binary else json.dumps(value, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header(
