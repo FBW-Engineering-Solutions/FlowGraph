@@ -8,7 +8,12 @@ from Muscat.LinAlg.MatVecOperations import ImmutableView
 from Muscat.MeshContainers import ElementsDescription as ED
 from Muscat.MeshContainers.ElementsContainers import AllElements, ElementsContainer
 from Muscat.MeshContainers.Filters.FilterObjects import ElementFilter
-from Muscat.MeshTools.MeshInspectionTools import GetMeasure, GetVolumePerElement
+from Muscat.MeshContainers.Mesh import Mesh
+from Muscat.MeshTools.MeshInspectionTools import (
+    ExtractElementsByElementFilter,
+    GetMeasure,
+    GetVolumePerElement,
+)
 from Muscat.MeshTools.MeshModificationTools import (
     CleanDoubleElements,
     CleanDoubleNodes,
@@ -88,7 +93,7 @@ def _skin(
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Extract boundary elements, retaining nodal metadata and generating boundary IDs."""
+    """Add tagged boundary elements, extracting the skin only when consumed."""
     source = inputs["mesh"].mesh
     dim = parameters.get("dimensionality", -1)
     if isinstance(dim, bool) or not isinstance(dim, int) or dim not in (-1, 1, 2, 3):
@@ -98,10 +103,24 @@ def _skin(
     dim = source.GetElementsDimensionality() if dim == -1 else dim
     if dim < 1:
         raise ValueError("Skin extraction requires elements of dimension at least 1")
-    mesh = ComputeSkin(source.View(), md=dim, inPlace=False)
-    mesh.nodeFields = source.View().nodeFields
-    mesh.elemFields = {}
-    return _result(mesh)
+    skin_name = parameters.get("Skin_Name", "Skin")
+    if not isinstance(skin_name, str) or not skin_name.strip():
+        raise ValueError("Skin tag name must be a nonempty string")
+    mesh = ComputeSkin(source.View(), md=dim, inPlace=True, skinTagName=skin_name)
+    outputs = _result(mesh)
+    if _exec_context is None or "skin_mesh" not in _exec_context.connected_output_ports:
+        outputs["skin_mesh"] = _result(Mesh())["mesh"]
+        return outputs
+    skin_mesh = ExtractElementsByElementFilter(
+        mesh,
+        ElementFilter(eTag=skin_name, dimensionality=dim - 1),
+        copy=False,
+    )
+    # Muscat's extraction helper does not transfer nodal fields or original IDs.
+    skin_mesh.nodeFields = mesh.nodeFields.copy()
+    skin_mesh.originalIDNodes = mesh.originalIDNodes
+    outputs["skin_mesh"] = _result(skin_mesh)["mesh"]
+    return outputs
 
 
 def _measure(
@@ -222,13 +241,18 @@ SET_MESH_FIELD = _node(
 )
 EXTRACT_SKIN = _node(
     "extract-skin",
-    "Extract Skin",
+    "Compute Skin",
     _skin,
-    (_input("mesh", MESH_DOCUMENT), _output("mesh", MESH_DOCUMENT)),
+    (
+        _input("mesh", MESH_DOCUMENT),
+        _output("mesh", MESH_DOCUMENT),
+        _output("skin_mesh", MESH_DOCUMENT),
+    ),
     (
         ParameterDefinition(
             "dimensionality", ParameterKind.INTEGER, "Source dimension (-1: automatic)", -1
         ),
+        ParameterDefinition("Skin_Name", ParameterKind.TEXT, "Skin element tag name", "Skin"),
     ),
 )
 MESH_MEASURE = _node(
