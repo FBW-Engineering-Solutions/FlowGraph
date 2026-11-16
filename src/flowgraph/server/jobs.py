@@ -1,8 +1,9 @@
-"""Bounded, single-active-job execution with cancellable native subprocesses."""
+"""Single-active-job execution with advisory timeouts and cancellable subprocesses."""
 
 from __future__ import annotations
 
 import json
+import math
 import os
 import subprocess
 import sys
@@ -45,7 +46,18 @@ class JobManager:
         if self.verbose:
             print(f"[flowgraph] Execution {identifier}: {state}", file=sys.stderr, flush=True)
 
-    def submit(self, workflow: dict, options: dict | None = None) -> dict:
+    def submit(
+        self, workflow: dict, options: dict | None = None, timeout_seconds: float | None = None
+    ) -> dict:
+        timeout = self.timeout if timeout_seconds is None else timeout_seconds
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout)
+            or timeout <= 0
+            or (timeout_seconds is not None and timeout > 86400)
+        ):
+            raise ValueError("timeout_seconds must be a finite number between 0 and 86400")
         with self.lock:
             if self.closed:
                 raise RuntimeError("Execution service is closed")
@@ -66,7 +78,15 @@ class JobManager:
             while len(self.jobs) >= 32:
                 self.jobs.pop(next(iter(self.jobs)))
             identifier = uuid.uuid4().hex
-            job = {"id": identifier, "state": "running", "result": None, "error": None}
+            job = {
+                "id": identifier,
+                "state": "running",
+                "result": None,
+                "error": None,
+                "timed_out": False,
+                "timeout_seconds": timeout,
+                "progress": [],
+            }
             temporary = tempfile.TemporaryDirectory(prefix="flowgraph-job-")
             root = Path(temporary.name)
             try:
@@ -138,7 +158,7 @@ class JobManager:
             self._report_state(identifier, "running")
             thread = threading.Thread(
                 target=self._watch,
-                args=(identifier, process, temporary, session_id),
+                args=(identifier, process, temporary, session_id, timeout),
                 daemon=True,
             )
             self.threads = [item for item in self.threads if item.is_alive()]
@@ -146,25 +166,43 @@ class JobManager:
             thread.start()
             return dict(job)
 
-    def _watch(self, identifier, process, temporary, session_id=None) -> None:
+    def _watch(self, identifier, process, temporary, session_id=None, timeout=None) -> None:
         result = None
         error = None
-        timed_out = False
         try:
             response = Path(temporary.name) / "response.json"
-            if session_id is not None:
-                deadline = time.monotonic() + self.timeout
-                while not response.is_file() and process.poll() is None:
-                    if time.monotonic() >= deadline:
-                        self._stop(process)
-                        raise TimeoutError("Execution exceeded the server timeout")
-                    time.sleep(0.02)
-            else:
-                try:
-                    process.wait(timeout=self.timeout)
-                except subprocess.TimeoutExpired:
-                    self._stop(process)
-                    raise TimeoutError("Execution exceeded the server timeout") from None
+            progress_file = response.with_name("progress.jsonl")
+            progress_offset = 0
+            progress = {}
+
+            def read_progress():
+                nonlocal progress_offset
+                if not progress_file.exists():
+                    return
+                with progress_file.open("rb") as stream:
+                    stream.seek(progress_offset)
+                    for line in stream:
+                        if not line.endswith(b"\n"):
+                            break
+                        progress_offset += len(line)
+                        event = json.loads(line)
+                        progress[event["node_id"]] = event
+                with self.lock:
+                    self.jobs[identifier]["progress"] = list(progress.values())
+
+            deadline = time.monotonic() + (self.timeout if timeout is None else timeout)
+            while process.poll() is None and (session_id is None or not response.is_file()):
+                read_progress()
+                if time.monotonic() >= deadline:
+                    with self.lock:
+                        job = self.jobs.get(identifier)
+                        if job and job["state"] == "running" and not job["timed_out"]:
+                            job["timed_out"] = True
+                            self._report_state(
+                                identifier, "running (timeout reached; worker retained)"
+                            )
+                time.sleep(0.02)
+            read_progress()
             if (session_id is None and process.returncode != 0) or not response.is_file():
                 raise RuntimeError(
                     f"Execution process exited without a result ({process.returncode})"
@@ -176,7 +214,6 @@ class JobManager:
                 raise TypeError("Invalid execution response")
         except Exception as exception:  # noqa: BLE001 - convert process failures to job state
             error = str(exception)
-            timed_out = isinstance(exception, TimeoutError)
         finally:
             temporary.cleanup()
         with self.lock:
@@ -189,7 +226,7 @@ class JobManager:
                     result=result,
                     error=error,
                 )
-                self._report_state(identifier, "failed (timed out)" if timed_out else job["state"])
+                self._report_state(identifier, job["state"])
             if self.active == identifier:
                 self.active = None
                 self.process = None

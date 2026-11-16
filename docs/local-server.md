@@ -38,8 +38,8 @@ and response codes, and execution state transitions to stderr. For example:
 uvx --with imagej flowgraph serve --workspace . --verbose
 ```
 
-Execution transitions include running, completed, failed, cancelled, and timeout
-failures; polling does not repeat transition messages. HTTP polling requests are
+Execution transitions include running, completed, failed, cancelled, and advisory
+timeout warnings; polling does not repeat transition messages. HTTP polling requests are
 still logged. Diagnostics omit credentials, query values, file/workflow contents,
 and arbitrary request paths. The usual token and launch link remain on stdout;
 keep them private. Without the flag, additional diagnostics are disabled.
@@ -107,7 +107,7 @@ the public editor default.
 | `--plugin FILE.py` | None | Trusted Python node definitions; repeatable, loaded at startup and in workers |
 | `--port` | `8765` | Loopback API port; `0` selects an available port |
 | `--allow-origin` | Public editor origin | Allowed client origin; repeatable as described above |
-| `--execution-timeout` | `120` | Execution timeout in seconds |
+| `--execution-timeout` | `120` | Default advisory execution timeout in seconds; does not kill the worker |
 | `--max-request-bytes` | `16777216` (16 MiB) | Maximum request body size |
 | `--verbose`, `-v` | Off | Print server state and sanitized activity to stderr |
 
@@ -143,10 +143,17 @@ requests (cancel/demo) use Content-Length 0. File uploads/downloads are raw byte
 
 ### Execution lifecycle
 
-A job has `id`, `state`, `result`, and `error`. States are `running`, `completed`,
+A job has `id`, `state`, `result`, `error`, `timed_out`, and `timeout_seconds`. States are `running`, `completed`,
 `failed`, and `cancelled`. The unchanged `execute_workflow_json()` response is
 nested under `result`; workflow validation/node errors make a job `failed` and
-remain available there. Process failures/timeouts have an `error` message.
+remain available there. Process failures have an `error` message.
+Submission accepts an optional top-level `timeout_seconds` (finite positive number,
+at most 86400), independent of incremental execution `options`. If omitted, the
+server's `--execution-timeout` is used. Runtime metadata advertises
+`advisoryExecutionTimeout: 1`. At the threshold, `timed_out` becomes true but the
+job stays `running`, retains its worker/cache and admission slot, and can still
+complete successfully. Use the cancellation endpoint to explicitly terminate the
+worker; the HTTP server remains available. HTTP request timeouts are separate.
 Cancelled jobs have no execution result. Unknown/expired jobs return HTTP 404.
 Concurrent submission returns HTTP 409. Only the 32 most recent jobs are retained,
 in memory; restarting the server discards all jobs. Results are limited to 64 MiB
@@ -176,9 +183,10 @@ this polling and uses the installed core's catalog.
   files. Directory mounting is not supported. These checks do not protect against
   a trusted workflow or another local process concurrently replacing directories
   (filesystem check/use races). Hard-linked files are not isolated either.
-- Cancellation/timeout terminates the direct workflow process, escalating to kill
+- Explicit cancellation or service shutdown terminates the direct workflow process, escalating to kill
   after two seconds. Processes deliberately spawned by workflow code are not
   managed or guaranteed to stop. Already-written files are not rolled back.
+  Execution timeout alone does not terminate the process or limit resource usage.
 - Runtime packages are reported from installed distribution metadata, not a promise
   that external tools, licenses, or optional native integrations are usable.
 - Request/download limits and retained-job bounds are guardrails, not resource

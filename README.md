@@ -144,7 +144,11 @@ printed **Open editor** link to pass the token and port automatically; keep the
 link private.
 
 It runs one workflow at a time in a cancellable native subprocess and provides
-runtime metadata, catalog, and workspace file endpoints. Core is API-only and never
+runtime metadata, catalog, and workspace file endpoints. Execution timeouts are
+advisory: the worker remains alive until completion or explicit cancellation,
+and the HTTP server is not stopped. GUI clients can supply a per-job timeout;
+`--execution-timeout` sets the default warning threshold (120 seconds).
+Core is API-only and never
 serves editor assets. Web and desktop clients own their GUI hosting and explicitly
 allow their origin with `--allow-origin`. Native workflow code is **not sandboxed**.
 See [Local server API and limitations](docs/local-server.md) for authentication,

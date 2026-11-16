@@ -5,7 +5,20 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from contextlib import contextmanager
 from pathlib import Path
+
+
+@contextmanager
+def progress_writer(response: Path):
+    """Append complete events to a private job file, independent of node stdout."""
+    with response.with_name("progress.jsonl").open("w", encoding="utf-8") as stream:
+
+        def report(event):
+            stream.write(json.dumps(event) + "\n")
+            stream.flush()
+
+        yield report
 
 
 def main() -> None:
@@ -36,18 +49,25 @@ def main() -> None:
             command.unlink()
             request, response = Path(payload["request"]), Path(payload["response"])
             envelope = json.loads(request.read_text(encoding="utf-8"))
-            result = execute_workflow_json(
-                json.dumps(envelope["workflow"]), envelope["options"], registry=registry
-            )
+            with progress_writer(response) as report:
+                result = execute_workflow_json(
+                    json.dumps(envelope["workflow"]),
+                    envelope["options"],
+                    registry=registry,
+                    on_progress=report,
+                )
             temporary = response.with_suffix(".tmp")
             temporary.write_text(result, encoding="utf-8")
             temporary.replace(response)
     else:
         request, response = args.files
-        response.write_text(
-            execute_workflow_json(request.read_text(encoding="utf-8"), registry=registry),
-            encoding="utf-8",
-        )
+        with progress_writer(response) as report:
+            response.write_text(
+                execute_workflow_json(
+                    request.read_text(encoding="utf-8"), registry=registry, on_progress=report
+                ),
+                encoding="utf-8",
+            )
 
 
 if __name__ == "__main__":
