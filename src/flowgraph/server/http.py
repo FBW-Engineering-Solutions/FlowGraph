@@ -206,6 +206,7 @@ class LocalServer(ThreadingHTTPServer):
             "capabilities": {
                 "mountDirectory": False,
                 "cancelExecution": True,
+                "advisoryExecutionTimeout": 1,
                 "incrementalExecution": 1,
                 "scopedExecution": 1,
                 "installPackages": self.packages.info()["enabled"],
@@ -387,7 +388,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                 workflow = body.get("workflow")
                 if not isinstance(workflow, dict):
                     raise ApiError(400, "workflow must be a workflow JSON object")
-                self._reply(202, self.server.jobs.submit(workflow, body.get("options")))
+                self._reply(
+                    202,
+                    self.server.jobs.submit(
+                        workflow, body.get("options"), body.get("timeout_seconds")
+                    ),
+                )
             elif method == "POST" and path == "/api/v1/execution-sessions/dispose":
                 body = self._body(json_body=True)
                 session_id = body.get("session_id")

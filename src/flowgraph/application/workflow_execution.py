@@ -7,7 +7,7 @@ import math
 import traceback
 from base64 import b64encode
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -62,6 +62,7 @@ def execute_workflow_json(
     options: Mapping[str, Any] | None = None,
     *,
     registry: NodeRegistry | None = None,
+    on_progress: Callable[[dict[str, Any]], None] | None = None,
 ) -> str:
     """Execute one workflow JSON document and return a serialized response.
 
@@ -77,6 +78,13 @@ def execute_workflow_json(
     """
     warnings: list[str] = []
     session = None
+    progress: dict[str, dict[str, Any]] = {}
+
+    def report(event: dict[str, Any]) -> None:
+        progress[event["node_id"]] = event
+        if on_progress is not None:
+            on_progress(event)
+
     try:
         global _REGISTRY
         if registry is None:
@@ -111,9 +119,12 @@ def execute_workflow_json(
                 upstream=options.get("upstream", "normal"),
                 missing_only=options.get("missing_only", False),
                 initial_inputs=injected,
+                on_progress=report,
             )
         else:
-            result = WorkflowExecutor(registry).run(workflow, initial_inputs=injected)
+            result = WorkflowExecutor(registry).run(
+                workflow, initial_inputs=injected, on_progress=report
+            )
         response = {
             "status": "ok",
             "execution_order": list(result.execution_order),
@@ -142,6 +153,7 @@ def execute_workflow_json(
         response["cache"]["session_id"] = options["session_id"]
         response["cache"]["version"] = INCREMENTAL_EXECUTION_VERSION
     response["warnings"] = warnings
+    response["progress"] = list(progress.values())
     return json.dumps(
         _json_safe(response), ensure_ascii=False, separators=(",", ":"), allow_nan=False
     )

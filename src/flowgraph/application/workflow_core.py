@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import time
 from collections.abc import Callable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
@@ -1268,6 +1269,7 @@ class WorkflowExecutor:
         node_ids: set[str] | None = None,
         initial_outputs: Mapping[str, Mapping[str, Any]] | None = None,
         initial_inputs: Mapping[str, Mapping[str, Any]] | None = None,
+        on_progress: Callable[[dict[str, Any]], None] | None = None,
     ) -> WorkflowRunResult:
         """Execute all nodes, or only *node_ids* using previously resolved outputs."""
         # Missing required connections are execution-time node failures, not
@@ -1294,113 +1296,130 @@ class WorkflowExecutor:
             outgoing[output_port.node_id].add(output_port.node_port)
 
         for node_id in order:
-            node = graph.require_node(node_id)
-            definition = self._registry.require(node.definition_id)
-            injected_inputs = dict((initial_inputs or {}).get(node_id, {}))
-            input_edges: dict[str, WorkflowEdge] = {}
-            connected_ports = {edge.target_port for edge in incoming[node_id]} | set(
-                injected_inputs
-            )
-            missing_required = [
-                port.name
-                for port in definition._inputs(definition.ports_for_instance(node))
-                if port.required and port.name not in connected_ports
-            ]
-            if missing_required:
-                if first_error is None:
-                    first_error = NodeExecutionError(
-                        node.id,
-                        node.definition_id,
-                        "required inputs are not connected: " + ", ".join(missing_required),
-                    )
-                continue
-            missing_sources = [
-                edge for edge in incoming[node_id] if edge.source_node not in outputs
-            ]
-            if missing_sources:
-                missing = ", ".join(edge.source_node for edge in missing_sources)
-                if first_error is None:
-                    first_error = NodeExecutionError(
-                        node.id,
-                        node.definition_id,
-                        f"upstream outputs are unavailable from: {missing}",
-                    )
-                continue
-            node_inputs: dict[str, Any] = dict(injected_inputs)
-            input_error = False
-            for edge in incoming[node_id]:
-                value = outputs[edge.source_node][edge.source_port]
-                conversion = graph.edge_conversion(edge, self._registry)
-                if conversion is not None:
-                    try:
-                        value = conversion.convert(value)
-                    except Exception as error:  # noqa: BLE001
-                        if first_error is None:
-                            first_error = NodeExecutionError(
-                                node.id,
-                                node.definition_id,
-                                f"conversion {conversion.label} failed for {edge.id}: {error}",
-                            )
-                            first_error.__cause__ = error
-                        input_error = True
-                        continue
-                target_port = definition.input_for_instance(edge.target_port, node)
-                if target_port is None or not target_port.accepts(value):
+            started = time.perf_counter()
+            if on_progress is not None:
+                on_progress({"node_id": node_id, "state": "running"})
+            completed = False
+            try:
+                node = graph.require_node(node_id)
+                definition = self._registry.require(node.definition_id)
+                injected_inputs = dict((initial_inputs or {}).get(node_id, {}))
+                input_edges: dict[str, WorkflowEdge] = {}
+                connected_ports = {edge.target_port for edge in incoming[node_id]} | set(
+                    injected_inputs
+                )
+                missing_required = [
+                    port.name
+                    for port in definition._inputs(definition.ports_for_instance(node))
+                    if port.required and port.name not in connected_ports
+                ]
+                if missing_required:
                     if first_error is None:
-                        expected = "unknown" if target_port is None else target_port.data_type.label
                         first_error = NodeExecutionError(
                             node.id,
                             node.definition_id,
-                            f"input {edge.target_port!r} expected {expected}, "
-                            f"got {type(value).__name__}",
+                            "required inputs are not connected: " + ", ".join(missing_required),
                         )
-                    input_error = True
                     continue
-                node_inputs[edge.target_port] = value
-                input_edges[edge.target_port] = edge
-            if input_error:
-                continue
-            resolved_inputs[node_id] = MappingProxyType(node_inputs)
-            parameter_inputs = {
-                port.name: node_inputs[port.name]
-                for port in definition._inputs(definition.ports_for_instance(node))
-                if port.is_param and port.name in node_inputs
-            }
-            # A connected parameter port is the authoritative source for that
-            # parameter. Persist its resolved value so the UI and saved
-            # workflow reflect the value used for this execution.
-            node.parameters.update(parameter_inputs)
-            try:
-                exec_context = replace(
-                    self._exec_context,
-                    connected_output_ports=frozenset(outgoing[node_id]),
-                )
-                raw_outputs = definition.execute_instance(
-                    node,
-                    MappingProxyType(node_inputs),
-                    self._registry,
-                    MappingProxyType(input_edges),
-                    exec_context,
-                )
-                node_outputs = {} if raw_outputs is None else dict(raw_outputs)
-            except WorkflowError as error:
-                if isinstance(error, NodeExecutionError):
+                missing_sources = [
+                    edge for edge in incoming[node_id] if edge.source_node not in outputs
+                ]
+                if missing_sources:
+                    missing = ", ".join(edge.source_node for edge in missing_sources)
+                    if first_error is None:
+                        first_error = NodeExecutionError(
+                            node.id,
+                            node.definition_id,
+                            f"upstream outputs are unavailable from: {missing}",
+                        )
+                    continue
+                node_inputs: dict[str, Any] = dict(injected_inputs)
+                input_error = False
+                for edge in incoming[node_id]:
+                    value = outputs[edge.source_node][edge.source_port]
+                    conversion = graph.edge_conversion(edge, self._registry)
+                    if conversion is not None:
+                        try:
+                            value = conversion.convert(value)
+                        except Exception as error:  # noqa: BLE001
+                            if first_error is None:
+                                first_error = NodeExecutionError(
+                                    node.id,
+                                    node.definition_id,
+                                    f"conversion {conversion.label} failed for {edge.id}: {error}",
+                                )
+                                first_error.__cause__ = error
+                            input_error = True
+                            continue
+                    target_port = definition.input_for_instance(edge.target_port, node)
+                    if target_port is None or not target_port.accepts(value):
+                        if first_error is None:
+                            expected = (
+                                "unknown" if target_port is None else target_port.data_type.label
+                            )
+                            first_error = NodeExecutionError(
+                                node.id,
+                                node.definition_id,
+                                f"input {edge.target_port!r} expected {expected}, "
+                                f"got {type(value).__name__}",
+                            )
+                        input_error = True
+                        continue
+                    node_inputs[edge.target_port] = value
+                    input_edges[edge.target_port] = edge
+                if input_error:
+                    continue
+                resolved_inputs[node_id] = MappingProxyType(node_inputs)
+                parameter_inputs = {
+                    port.name: node_inputs[port.name]
+                    for port in definition._inputs(definition.ports_for_instance(node))
+                    if port.is_param and port.name in node_inputs
+                }
+                # A connected parameter port is the authoritative source for that
+                # parameter. Persist its resolved value so the UI and saved
+                # workflow reflect the value used for this execution.
+                node.parameters.update(parameter_inputs)
+                try:
+                    exec_context = replace(
+                        self._exec_context,
+                        connected_output_ports=frozenset(outgoing[node_id]),
+                    )
+                    raw_outputs = definition.execute_instance(
+                        node,
+                        MappingProxyType(node_inputs),
+                        self._registry,
+                        MappingProxyType(input_edges),
+                        exec_context,
+                    )
+                    node_outputs = {} if raw_outputs is None else dict(raw_outputs)
+                except WorkflowError as error:
+                    if isinstance(error, NodeExecutionError):
+                        if first_error is None:
+                            first_error = error
+                        continue
+                    raise
+                except Exception as error:  # noqa: BLE001
+                    if first_error is None:
+                        first_error = NodeExecutionError(node.id, node.definition_id, str(error))
+                        first_error.__cause__ = error
+                    continue
+                try:
+                    self._validate_outputs(node, definition, node_outputs)
+                except NodeExecutionError as error:
                     if first_error is None:
                         first_error = error
                     continue
-                raise
-            except Exception as error:  # noqa: BLE001
-                if first_error is None:
-                    first_error = NodeExecutionError(node.id, node.definition_id, str(error))
-                    first_error.__cause__ = error
-                continue
-            try:
-                self._validate_outputs(node, definition, node_outputs)
-            except NodeExecutionError as error:
-                if first_error is None:
-                    first_error = error
-                continue
-            outputs[node_id] = MappingProxyType(node_outputs)
+                outputs[node_id] = MappingProxyType(node_outputs)
+                completed = True
+            finally:
+                if on_progress is not None:
+                    on_progress(
+                        {
+                            "node_id": node_id,
+                            "state": "completed" if completed else "failed",
+                            "elapsed_seconds": time.perf_counter() - started,
+                        }
+                    )
 
         if first_error is not None:
             first_error.partial_result = self._partial_result(order, outputs, resolved_inputs)

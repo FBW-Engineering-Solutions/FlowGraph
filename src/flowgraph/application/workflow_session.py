@@ -8,7 +8,7 @@ Configuration is compared structurally; opaque runtime inputs are cache misses.
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
@@ -167,6 +167,7 @@ class WorkflowSession:
         initial_inputs: Mapping[str, Mapping[str, Any]] | None = None,
         parallel_tasks: int = 1,
         gpu_available: bool = False,
+        on_progress: Callable[[dict[str, Any]], None] | None = None,
     ) -> WorkflowRunResult:
         """Execute targets and missing dependencies, preserving independent results."""
         if upstream not in {"normal", "missing", "none"}:
@@ -331,6 +332,8 @@ class WorkflowSession:
                 and entry.signature == signature
             ):
                 reused.append(node_id)
+                if on_progress is not None:
+                    on_progress({"node_id": node_id, "state": "reused"})
                 self.entries.move_to_end(node_id)
                 continue
             if node_id not in scope:
@@ -350,7 +353,11 @@ class WorkflowSession:
             authored_parameters = dict(instance.parameters)
             try:
                 result = executor.run(
-                    graph, node_ids={node_id}, initial_outputs=outputs, initial_inputs=injected
+                    graph,
+                    node_ids={node_id},
+                    initial_outputs=outputs,
+                    initial_inputs=injected,
+                    on_progress=on_progress,
                 )
             except NodeExecutionError as error:
                 failed.append(node_id)
