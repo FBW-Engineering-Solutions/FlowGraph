@@ -274,6 +274,75 @@ def test_runtime_catalog_and_authentication(api):
     assert request(api, "GET", "/unknown")[0] == 404
 
 
+@pytest.mark.parametrize("verbose", [False, True])
+def test_server_activity_diagnostics_are_opt_in_and_redacted(api, capsys, verbose):
+    api.verbose = verbose
+    api.jobs.verbose = verbose
+    route = "/api/v1/files/content?" + urlencode({"path": "private-name.txt", "token": api.token})
+    assert request(api, "PUT", route, b"private-file-content")[0] == 200
+    assert request(api, "GET", "/private-unknown-path")[0] == 404
+    assert request(api, "GET", "/api/v1/runtime", headers={"Authorization": "secret"})[0] == 401
+    _, job = request(api, "POST", "/api/v1/executions", {"workflow": workflow()})
+    assert wait_job(api, job["id"])["state"] == "completed"
+    for _ in range(2):
+        request(api, "GET", f"/api/v1/executions/{job['id']}")
+    output = capsys.readouterr()
+    assert output.out == ""
+    if not verbose:
+        assert output.err == ""
+        return
+    assert "HTTP PUT /api/v1/files/content -> 200" in output.err
+    assert "HTTP GET <unknown endpoint> -> 404" in output.err
+    assert "HTTP GET /api/v1/runtime -> 401" in output.err
+    assert output.err.count(f"Execution {job['id']}: running") == 1
+    assert output.err.count(f"Execution {job['id']}: completed") == 1
+    for private in (
+        api.token,
+        "secret",
+        "private-name",
+        "private-unknown",
+        "private-file",
+        "hello",
+    ):
+        assert private not in output.err
+
+
+def test_verbose_job_failure_cancellation_and_timeout(api, capsys):
+    api.jobs.verbose = True
+    _, failed = request(api, "POST", "/api/v1/executions", {"workflow": {}})
+    assert wait_job(api, failed["id"])["state"] == "failed"
+    _, cancelled = request(api, "POST", "/api/v1/executions", {"workflow": workflow()})
+    assert request(api, "POST", f"/api/v1/executions/{cancelled['id']}/cancel", {})[0] == 200
+    api.jobs.timeout = 0.001
+    _, expired = request(api, "POST", "/api/v1/executions", {"workflow": workflow()})
+    assert wait_job(api, expired["id"])["state"] == "failed"
+    output = capsys.readouterr().err
+    assert f"Execution {failed['id']}: failed" in output
+    assert output.count(f"Execution {cancelled['id']}: cancelled") == 1
+    assert f"Execution {cancelled['id']}: failed" not in output
+    assert f"Execution {expired['id']}: failed (timed out)" in output
+
+
+@pytest.mark.parametrize("option", ["--verbose", "-v"])
+def test_cli_verbose_lifecycle(tmp_path, monkeypatch, capsys, option):
+    from http.server import ThreadingHTTPServer
+
+    def interrupt(self, poll_interval):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(ThreadingHTTPServer, "serve_forever", interrupt)
+    assert main(["serve", "--workspace", str(tmp_path), "--port", "0", option]) == 0
+    output = capsys.readouterr()
+    assert "Bearer token:" in output.out
+    assert "Bearer token:" not in output.err
+    states = ["starting", "ready/listening", "shutting down", "stopped"]
+    positions = [output.err.index(f"Server state: {state}") for state in states]
+    assert positions == sorted(positions)
+    assert f"Workspace: {str(tmp_path.resolve())!r}" in output.err
+    assert "Allowed editor origins: ['https://flowgraph-web.fbw-es.com']" in output.err
+    assert "Limits: execution=120s, request=16777216 bytes" in output.err
+
+
 def test_execution_and_invalid_workflow_recovery(api):
     status, job = request(api, "POST", "/api/v1/executions", {"workflow": workflow()})
     assert status == 202
@@ -477,7 +546,10 @@ def test_cli_server_defaults_and_overrides(
     assert configuration["workspace"] == tmp_path
     assert configuration["port"] == expected_port
     assert configuration["allowed_origins"] == expected_origins
-    output = capsys.readouterr().out
+    assert configuration["verbose"] is False
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    output = captured.out
     assert "Experimental FlowGraph API" in output
     assert (
         f"Open editor: {expected_origins[0]}/#token=test-token&port={expected_port or 45678}\n"
