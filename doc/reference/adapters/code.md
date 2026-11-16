@@ -60,10 +60,47 @@ refresh the node's ports before connecting its script inputs and outputs.
 
 Both ImageJ script nodes use the same Groovy execution and conversion rules:
 
-Image ports (`Dataset`, `Img`, `RandomAccessibleInterval`) carry NumPy
+Image ports (`ImagePlus`, `Dataset`, `Img`, `RandomAccessibleInterval`) carry NumPy
 arrays. Common scalar declarations are typed; other types use `Any`. SciJava
 service parameters are injected by Fiji and do not appear as graph inputs.
 Install the optional extra with `pip install 'flowgraph[imagej]'` and provide a
 Java runtime before execution;
 Fiji is initialized in headless mode. The first execution may download Fiji
 dependencies. These nodes run trusted user code, not a sandbox.
+
+### Gaussian blur of a Pillow-derived image
+
+`IJ.run(image, command, options)` requires an `ImagePlus`, not an ImageJ2
+`Dataset`. Declare `ImagePlus` ports to use standard ImageJ1 commands without
+manual array-axis handling. Use `Double` for a sigma connected to a Float Slider
+(an `Integer` input rounds the slider value):
+
+```groovy
+#@ ImagePlus imp
+#@ Double sigma
+#@output ImagePlus result
+
+import ij.IJ
+
+IJ.run(imp, "Gaussian Blur...", "sigma=" + sigma)
+IJ.log("Successfully applied Gaussian Blur with a sigma of: " + sigma)
+result = imp
+```
+
+Connect `result` to **ImageJ To Pillow**, then connect its `image` output to
+**Show Image**. A null image output is reported at the script node; inspect the
+Fiji/Groovy error log for script errors rather than changing downstream shapes.
+
+**Read Image (Pillow)** can connect directly to `imp` using the automatic
+Pillow-to-NumPy conversion, or through **Pillow To ImageJ**. The bridge constructs
+an owned ImageJ1 processor with correct width/height and packed RGB pixels; script
+changes do not mutate upstream images. Grayscale uint8, uint16, float32 and uint8
+RGB are supported. Returned ImagePlus pixels are read back from the current
+processor into height/width or height/width/channel arrays.
+
+ImagePlus input does not silently discard alpha or reduce precision: convert
+LA/RGBA to RGB with **Convert Image Mode**, and normalize unsupported dtypes
+explicitly. For palette images, convert to RGB first to preserve palette colors.
+Stacks and indexed-color ImagePlus outputs are rejected; return a single grayscale
+or RGB image. Both `ImagePlus` and fully qualified `ij.ImagePlus` declarations
+are supported. Java initialization remains lazy and requires the ImageJ extra.

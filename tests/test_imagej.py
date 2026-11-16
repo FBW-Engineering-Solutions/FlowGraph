@@ -11,7 +11,12 @@ import pytest
 
 from flowgraph.adapters import ADAPTERS
 from flowgraph.adapters.data_types import FILE, IMAGEJ, STRING
-from flowgraph.adapters.imagej import IMAGEJ_SCRIPT, IMAGEJ_SCRIPT_FILE
+from flowgraph.adapters.imagej import (
+    IMAGEJ_SCRIPT,
+    IMAGEJ_SCRIPT_FILE,
+    _from_imageplus,
+    _to_imageplus,
+)
 from flowgraph.application.workflow_core import (
     NodeDefinition,
     NodeRegistry,
@@ -22,6 +27,114 @@ from flowgraph.application.workflow_core import (
     WorkflowGraph,
 )
 from flowgraph.domain.filepath import FilePath
+
+
+@pytest.mark.parametrize("definition", [IMAGEJ_SCRIPT, IMAGEJ_SCRIPT_FILE])
+@pytest.mark.parametrize("typename", ["ImagePlus", "ij.ImagePlus"])
+def test_imageplus_ports_are_typed(definition, typename, tmp_path) -> None:
+    code = f"#@ {typename} imp\n#@output {typename} result\nresult = imp"
+    script = tmp_path / "imageplus.groovy"
+    script.write_text(code, encoding="utf-8")
+    instance = definition.create_instance(
+        "script", parameters={"code": code, "filename": str(script)}
+    )
+    assert [
+        (port.name, port.data_type)
+        for port in definition.ports_for_instance(instance)
+        if not port.is_param
+    ] == [("imp", IMAGEJ), ("result", IMAGEJ)]
+
+
+@pytest.mark.parametrize(
+    ("dtype", "shape", "processor_type", "image_type"),
+    [
+        (np.uint8, (3, 5), "ByteProcessor", 0),
+        (np.uint16, (3, 5), "ShortProcessor", 1),
+        (np.float32, (3, 5), "FloatProcessor", 2),
+        (np.uint8, (3, 5, 3), "ColorProcessor", 4),
+    ],
+)
+def test_imageplus_processor_round_trip(monkeypatch, dtype, shape, processor_type, image_type):
+    array = (np.arange(np.prod(shape)).reshape(shape) * 500).astype(dtype)
+    calls = []
+
+    def processor(width, height, pixels, *_args):
+        calls.append((width, height))
+        return SimpleNamespace(getPixels=lambda: pixels)
+
+    def imageplus(_title, proc):
+        return SimpleNamespace(
+            getStackSize=lambda: 1,
+            getHeight=lambda: shape[0],
+            getWidth=lambda: shape[1],
+            getType=lambda: image_type,
+            getProcessor=lambda: proc,
+        )
+
+    monkeypatch.setitem(
+        sys.modules,
+        "jpype",
+        SimpleNamespace(
+            JByte=np.int8,
+            JShort=np.int16,
+            JFloat=np.float32,
+            JInt=np.int32,
+            JArray=lambda dtype: lambda pixels: np.array(pixels, dtype=dtype, copy=True),
+        ),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "scyjava",
+        SimpleNamespace(
+            jimport=lambda name: (
+                imageplus
+                if name == "ij.ImagePlus"
+                else processor
+                if name == f"ij.process.{processor_type}"
+                else pytest.fail(name)
+            )
+        ),
+    )
+    original = array.copy()
+    image = _to_imageplus(array[:, ::-1])
+    output = _from_imageplus(image)
+    assert calls == [(shape[1], shape[0])]
+    assert output.dtype == dtype
+    np.testing.assert_array_equal(output, array[:, ::-1])
+    image.getProcessor().getPixels()[0] = 0
+    np.testing.assert_array_equal(array, original)
+    assert not np.shares_memory(output, image.getProcessor().getPixels())
+
+
+@pytest.mark.parametrize(
+    "array",
+    [
+        np.zeros((2, 3, 4), dtype=np.uint8),
+        np.zeros((2, 3, 2), dtype=np.uint8),
+        np.zeros((2, 3), dtype=np.float64),
+        np.zeros((0, 3), dtype=np.uint8),
+        np.zeros((2, 3, 3), dtype=np.uint16),
+        np.zeros((2, 3, 4, 5), dtype=np.uint8),
+    ],
+)
+def test_imageplus_rejects_unsupported_inputs(array):
+    with pytest.raises(ValueError, match="ImagePlus"):
+        _to_imageplus(array)
+
+
+def test_imageplus_outputs_reject_stacks_and_indexed_color():
+    with pytest.raises(ValueError, match="stack"):
+        _from_imageplus(SimpleNamespace(getStackSize=lambda: 2))
+    with pytest.raises(ValueError, match="indexed color"):
+        _from_imageplus(
+            SimpleNamespace(
+                getStackSize=lambda: 1,
+                getHeight=lambda: 2,
+                getWidth=lambda: 3,
+                getType=lambda: 3,
+                getProcessor=lambda: SimpleNamespace(getPixels=lambda: np.zeros(6, dtype=np.int8)),
+            )
+        )
 
 
 def test_script_declarations_create_named_typed_ports_without_loading_imagej() -> None:
@@ -41,6 +154,66 @@ def test_script_declarations_create_named_typed_ports_without_loading_imagej() -
         ("title", PortDirection.OUTPUT, STRING),
     ]
     assert ADAPTERS.require("imagej-script") is IMAGEJ_SCRIPT
+
+
+@pytest.mark.parametrize("explicit_conversion", [False, True])
+@pytest.mark.parametrize("definition", [IMAGEJ_SCRIPT, IMAGEJ_SCRIPT_FILE])
+def test_pillow_to_imageplus_script_to_pillow_workflow(
+    monkeypatch, tmp_path, explicit_conversion, definition
+):
+    from PIL import Image
+
+    from flowgraph.adapters import imagej as adapter
+    from flowgraph.adapters.image_tools import IMAGEJ_TO_PILLOW, PILLOW_TO_IMAGEJ, READ_IMAGE
+    from flowgraph.application.node_registry import create_node_registry
+
+    pixels = np.arange(45, dtype=np.uint8).reshape(3, 5, 3)
+    path = tmp_path / "image.png"
+    Image.fromarray(pixels).save(path)
+    code = "#@ ImagePlus imp\n#@output ImagePlus result\nresult = imp"
+    script = tmp_path / "script.groovy"
+    script.write_text(code, encoding="utf-8")
+    monkeypatch.setattr(adapter, "_to_imageplus", lambda value: ("imageplus", value.copy()))
+    monkeypatch.setattr(adapter, "_from_imageplus", lambda value: value[1].copy())
+
+    def run_script(_language, _source, args):
+        assert "#@ ij.ImagePlus imp" in _source
+        assert "#@output ij.ImagePlus result" in _source
+        assert args["imp"][0] == "imageplus"
+        args["imp"][1][0, 0] = 0
+        return {"result": args["imp"]}
+
+    monkeypatch.setitem(
+        sys.modules,
+        "imagej",
+        SimpleNamespace(
+            init=lambda *_a, **_kw: SimpleNamespace(py=SimpleNamespace(run_script=run_script))
+        ),
+    )
+    registry = create_node_registry()
+    graph = WorkflowGraph(
+        [
+            READ_IMAGE.create_instance("read", parameters={"path": str(path)}),
+            definition.create_instance(
+                "script", parameters={"code": code, "filename": str(script)}
+            ),
+            IMAGEJ_TO_PILLOW.create_instance("pillow"),
+        ]
+    )
+    source = "read"
+    if explicit_conversion:
+        graph.add_node(PILLOW_TO_IMAGEJ.create_instance("numpy"))
+        graph.add_edge(WorkflowEdge("read", "image", "numpy", "image"), registry)
+        source = "numpy"
+    graph.add_edge(WorkflowEdge(source, "image", "script", "imp"), registry)
+    graph.add_edge(WorkflowEdge("script", "result", "pillow", "image"), registry)
+
+    result = WorkflowExecutor(registry).run(graph)
+
+    expected = pixels.copy()
+    expected[0, 0] = 0
+    np.testing.assert_array_equal(np.asarray(result.node_outputs["pillow"]["image"]), expected)
+    np.testing.assert_array_equal(np.asarray(result.node_outputs["read"]["image"]), pixels)
 
 
 def test_file_node_infers_ports_from_selected_script(tmp_path: Path) -> None:
@@ -224,6 +397,28 @@ def test_imagej_selects_java_21_before_initialization(
             "headless",
         )
     ]
+
+
+@pytest.mark.parametrize("definition", [IMAGEJ_SCRIPT, IMAGEJ_SCRIPT_FILE])
+@pytest.mark.parametrize("image_type", ["Dataset", "ImagePlus"])
+def test_null_image_output_is_reported_at_script_node(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, definition: NodeDefinition, image_type: str
+) -> None:
+    bridge = SimpleNamespace(
+        run_script=lambda *_args: {"result": None}, from_java=lambda value: value
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "imagej",
+        SimpleNamespace(init=lambda *_args, **_kw: SimpleNamespace(py=bridge)),
+    )
+    source = f"#@output {image_type} result"
+    script = tmp_path / "null.groovy"
+    script.write_text(source, encoding="utf-8")
+    parameters = {"code": source, "filename": str(script)}
+
+    with pytest.raises(ValueError, match="output 'result' is null.*ImagePlus, not a Dataset"):
+        definition.executor({}, parameters)
 
 
 def test_missing_declared_output_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
