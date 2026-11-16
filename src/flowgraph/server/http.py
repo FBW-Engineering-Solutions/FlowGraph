@@ -1,8 +1,9 @@
-"""Prototype authenticated HTTP API, restricted to IPv4 loopback."""
+"""Authenticated HTTP API; remote access requires an HTTPS reverse proxy."""
 
 from __future__ import annotations
 
 import hmac
+import ipaddress
 import json
 import math
 import secrets
@@ -32,6 +33,8 @@ class LocalServer(ThreadingHTTPServer):
         workspace: Path,
         *,
         port: int = 8765,
+        host: str = "127.0.0.1",
+        public_url: str | None = None,
         token: str | None = None,
         max_request: int = 16 << 20,
         execution_timeout: float = 120,
@@ -47,6 +50,27 @@ class LocalServer(ThreadingHTTPServer):
             raise ValueError("Invalid port, request limit, or execution timeout")
         if token is not None and (len(token) < 32 or not token.isascii() or not token.isalnum()):
             raise ValueError("Token must contain at least 32 ASCII letters/digits")
+        address = ipaddress.IPv4Address(host)
+        public = urlsplit(public_url) if public_url is not None else None
+        if public is not None:
+            if (
+                public.scheme != "https"
+                or not public.hostname
+                or public.username is not None
+                or public.password is not None
+                or public.path not in ("", "/")
+                or public.query
+                or public.fragment
+                or "\\" in public_url
+                or any(char.isspace() for char in public_url)
+            ):
+                raise ValueError("Public URL must be an HTTPS origin without credentials or a path")
+            # Validate the port before opening the listening socket.
+            _ = public.port
+        if not address.is_loopback and public is None:
+            raise ValueError(
+                "Non-loopback binding requires --public-url and an HTTPS reverse proxy"
+            )
         for origin in allowed_origins:
             parsed = urlsplit(origin)
             if (
@@ -77,9 +101,19 @@ class LocalServer(ThreadingHTTPServer):
         self.verbose = verbose
         self.jobs = JobManager(self.workspace.root, timeout=execution_timeout, verbose=verbose)
         self.report("Server state: starting")
-        super().__init__(("127.0.0.1", port), ApiHandler)
-        self.authority = f"127.0.0.1:{self.server_port}"
-        self.origin = f"http://{self.authority}"
+        super().__init__((host, port), ApiHandler)
+        if public is not None:
+            public_host = public.hostname
+            if ":" in public_host:
+                public_host = f"[{public_host}]"
+            self.authority = (
+                f"{public_host}:{public.port}" if public.port not in (None, 443) else public_host
+            )
+        else:
+            self.authority = f"{host}:{self.server_port}"
+        self.origin = (
+            f"https://{self.authority}" if public is not None else f"http://{self.authority}"
+        )
         self.report(f"Workspace: {str(self.workspace.root)!r}")
         self.report(f"Allowed editor origins: {sorted(self.allowed_origins)!r}")
         self.report(

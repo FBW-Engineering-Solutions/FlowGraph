@@ -89,7 +89,20 @@ together; the workflow file and execution response formats are unchanged.
 
 ## Experimental local server
 
-The prototype branch includes an authenticated, loopback-only execution API:
+The prototype branch includes an authenticated execution API (loopback by default):
+
+For LAN or internet browser clients, put an HTTPS reverse proxy in front of the
+API and pass `--public-url https://python.example.com` to `flowgraph serve`.
+The proxy must preserve the public Host header, Authorization, Origin, and CORS
+preflight headers. Leave Python on `127.0.0.1:8765` when the proxy runs on the
+same machine. An explicit IPv4 `--host` (including `0.0.0.0`) is supported but
+non-loopback binding requires `--public-url`; restrict the HTTP port to a trusted
+proxy network. This option advertises HTTPS; it does not enable TLS in Python.
+Certificates must be trusted by browser clients, including for private LAN IPs.
+Use `--allow-origin` to allow your exact editor origin (the hosted editor is the
+default). The launch link includes the remote backend address in its fragment.
+This is a trusted single-user service, not a sandbox or a public multi-user API;
+use an unprivileged account, firewall/VPN restrictions, and proxy request limits.
 
 ```bash
 uv run flowgraph serve --workspace /absolute/path/to/existing/workspace
