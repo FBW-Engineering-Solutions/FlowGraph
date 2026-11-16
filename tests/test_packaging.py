@@ -134,6 +134,7 @@ def test_core_metadata_excludes_desktop_dependencies_and_entry_points() -> None:
         for dependency in dependencies
     )
     assert "vtk>=9.2" in dependencies
+    assert "muscat>=2.6.0" in dependencies
 
 
 def test_public_metadata_links_to_documentation() -> None:

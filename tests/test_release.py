@@ -41,6 +41,32 @@ def test_release_docs_use_planned_mvp_baseline_without_missing_audit() -> None:
     assert "New in version 0.1.5:" in changelog
 
 
+def test_release_notes_document_019_workflow_migration() -> None:
+    """Keep breaking workflow changes in the next release, not published history."""
+    changelog = (ROOT / "docs/changelog.md").read_text(encoding="utf-8")
+    current, previous = changelog.split("New in version 0.1.8:", 1)
+    current = " ".join(current.split())
+    assert current.startswith("New in version 0.1.9:")
+    for text in (
+        "Muscat 2.6.0 or newer",
+        "`definition_id`",
+        "`select-server-file`",
+        "`workspace-file`",
+        "`workspace-folder`",
+        "`workspace`",
+        "No legacy aliases",
+        "nested workflows",
+        "node instance IDs or edge endpoints",
+        "`linearizedMiddlePoints` to `linearizeMiddlePoints`",
+        "preserving its value",
+        "`skin_mesh`",
+        "Desktop/Web",
+    ):
+        assert text in current
+    assert "`workspace-file`" not in previous
+    assert "`workspace-folder`" not in previous
+
+
 def test_security_reporting_docs_keep_unverified_delivery_explicit() -> None:
     security = " ".join((ROOT / "SECURITY.md").read_text(encoding="utf-8").split())
     assert "GitHub private vulnerability reporting" in security
