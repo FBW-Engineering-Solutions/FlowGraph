@@ -1,0 +1,249 @@
+{
+  "format": "flowgraph-workflow",
+  "version": 3,
+  "nodes": [
+    {
+      "id": "example-title",
+      "definition_id": "title-doc",
+      "parameters": {
+        "title": "ImageJ Gaussian Blur — a first image workflow"
+      },
+      "position": {
+        "x": 40,
+        "y": 20
+      },
+      "size": {
+        "width": 1650,
+        "height": 80
+      }
+    },
+    {
+      "id": "start-here",
+      "definition_id": "paragraph-doc",
+      "parameters": {
+        "text": "START HERE\nLearn: read a Pillow image → run a standard ImageJ Groovy command → compare before/after.\n\nNative prerequisites: FlowGraph 0.1.8 with ImagePlus support and the io + imagej extras. From a source checkout: uv sync --extra io --extra imagej. Fiji runs headlessly; the first run can download Java/Fiji dependencies and take longer. Internet access may be needed.\n\nThis example requires native Python/Java execution, not browser-only WASM. In a browser editor, use a compatible local-server runtime and a path visible to that runtime. Only run Groovy scripts you trust."
+      },
+      "position": {
+        "x": 40,
+        "y": 140
+      },
+      "size": {
+        "width": 1700,
+        "height": 300
+      }
+    },
+    {
+      "id": "read-help",
+      "definition_id": "paragraph-doc",
+      "parameters": {
+        "text": "1 · CHOOSE AN IMAGE\nRead Image uses the bundled ColorCardboard.jpg via the portable {testdata} token. No personal file path is saved. To try your own file, change path to a file the executing runtime can read. Browser upload/server paths may differ from desktop paths.\n\nThe image output feeds both the script and the BEFORE viewer. The original pixels are not modified."
+      },
+      "position": {
+        "x": 40,
+        "y": 850
+      },
+      "size": {
+        "width": 420,
+        "height": 480
+      }
+    },
+    {
+      "id": "script-help",
+      "definition_id": "paragraph-doc",
+      "parameters": {
+        "text": "2 · READ THE SCRIPT PORTS\n#@ ImagePlus imp creates the image input; #@ Double sigma creates a decimal-number input; #@output ImagePlus result creates the processed image output. The SciJava label/min/max/value metadata describe sigma; the connected slider supplies its actual value.\n\nRead Image connects directly to imp: FlowGraph automatically converts Pillow → NumPy → an owned ImagePlus. An explicit Pillow To ImageJ node is optional. IJ.run needs ImagePlus, not Dataset.\n\nresult = imp publishes the processed image. No active Fiji window, display update, or manual channel-axis loop is required."
+      },
+      "position": {
+        "x": 520,
+        "y": 1120
+      },
+      "size": {
+        "width": 850,
+        "height": 390
+      }
+    },
+    {
+      "id": "conversion-help",
+      "definition_id": "paragraph-doc",
+      "parameters": {
+        "text": "3 · RETURN TO PILLOW\nThe script result carries ImageJ pixels as a NumPy array. ImageJ To Pillow converts them back to a Pillow Image for Show Image. It does not normalize intensities.\n\nFollow the wire from image to the AFTER viewer. Show Image is a viewer, not a file writer; add Write Image (Pillow) if you want to save a result."
+      },
+      "position": {
+        "x": 1420,
+        "y": 850
+      },
+      "size": {
+        "width": 420,
+        "height": 440
+      }
+    },
+    {
+      "id": "sigma-help",
+      "definition_id": "paragraph-doc",
+      "parameters": {
+        "text": "4 · EXPERIMENT WITH SIGMA\nStart at 2. Try 1, 5, then 10 and run the workflow again after each change. Higher sigma gives stronger spatial smoothing. Double preserves fractional slider values; Integer would round them.\n\nThe slider is limited to 1–10, matching the script metadata. The connected value overrides the metadata default. The script only blurs the connected image, not all open images."
+      },
+      "position": {
+        "x": 520,
+        "y": 1770
+      },
+      "size": {
+        "width": 850,
+        "height": 240
+      }
+    },
+    {
+      "id": "before-label",
+      "definition_id": "paragraph-doc",
+      "parameters": {
+        "text": "BEFORE · original Pillow image\nUse this as the reference. Rerunning blur does not change these source pixels."
+      },
+      "position": {
+        "x": 40,
+        "y": 2070
+      },
+      "size": {
+        "width": 650,
+        "height": 110
+      }
+    },
+    {
+      "id": "after-label",
+      "definition_id": "paragraph-doc",
+      "parameters": {
+        "text": "AFTER · Gaussian-blurred image\nCompare edges and fine texture at the same zoom. At sigma 2 the difference may be subtle; try 10."
+      },
+      "position": {
+        "x": 1130,
+        "y": 2070
+      },
+      "size": {
+        "width": 650,
+        "height": 110
+      }
+    },
+    {
+      "id": "troubleshooting",
+      "definition_id": "paragraph-doc",
+      "parameters": {
+        "text": "RUN & TROUBLESHOOT\n1. Open this workflow in an editor backed by native FlowGraph. Fit the graph to see all notes.\n2. Confirm Read Image points to an existing image. Run the whole workflow; the two Show Image nodes display before and after.\n3. Change sigma and run again. Show Image does not save files.\n\nMissing pyimagej/Java: install the imagej extra; allow the first initialization/download to finish. Unknown ImagePlus ports: update/restart the runtime with ImagePlus support. A null script result: inspect the Fiji/Groovy error log and assign result.\n\nSupported ImagePlus inputs: uint8, uint16 or float32 grayscale; uint8 RGB. For RGBA/LA or palette files, add Convert Image Mode → RGB before the script (alpha is discarded only by this explicit choice). Stacks, indexed-color outputs and unsupported dtypes need explicit conversion.\n\nThis is trusted local code execution, not a sandbox. The example has no file-writing node."
+      },
+      "position": {
+        "x": 40,
+        "y": 2800
+      },
+      "size": {
+        "width": 1700,
+        "height": 430
+      }
+    },
+    {
+      "id": "gaussian-blur",
+      "definition_id": "imagej-script",
+      "parameters": {
+        "code": "#@ ImagePlus imp\n#@ Double(label=\"Gaussian Sigma\", min=1, max=10, value=2) sigma\n#@output ImagePlus result\n\nimport ij.IJ\n\n// imp is the connected image, not an active Fiji window.\n// FlowGraph converts Pillow pixels to an owned ImagePlus.\n// RGB channels are handled by ImageJ; no axis loop is needed.\nIJ.run(imp, \"Gaussian Blur...\", \"sigma=\" + sigma)\n\n// This writes to the ImageJ log; it does not create a viewer.\nIJ.log(\"Successfully applied Gaussian Blur with a sigma of: \" + sigma)\n\n// Publish the processed image on the result output port.\nresult = imp\n"
+      },
+      "position": {
+        "x": 520,
+        "y": 550
+      },
+      "size": {
+        "width": 850,
+        "height": 540
+      }
+    },
+    {
+      "id": "read-image",
+      "definition_id": "read-image",
+      "parameters": {
+        "path": "{testdata}/ColorCardboard.jpg"
+      },
+      "position": {
+        "x": 40,
+        "y": 580
+      }
+    },
+    {
+      "id": "original-image",
+      "definition_id": "local-view",
+      "parameters": {},
+      "position": {
+        "x": 40,
+        "y": 2200
+      },
+      "size": {
+        "width": 650,
+        "height": 520
+      }
+    },
+    {
+      "id": "sigma",
+      "definition_id": "float-slider",
+      "parameters": {
+        "min": 1,
+        "max": 10,
+        "value": 2
+      },
+      "position": {
+        "x": 520,
+        "y": 1570
+      }
+    },
+    {
+      "id": "blurred-image",
+      "definition_id": "local-view",
+      "parameters": {},
+      "position": {
+        "x": 1130,
+        "y": 2200
+      },
+      "size": {
+        "width": 650,
+        "height": 520
+      }
+    },
+    {
+      "id": "to-pillow",
+      "definition_id": "imagej-to-pillow",
+      "parameters": {},
+      "position": {
+        "x": 1480,
+        "y": 580
+      }
+    }
+  ],
+  "inputs": [],
+  "outputs": [],
+  "edges": [
+    {
+      "source_node": "read-image",
+      "source_port": "image",
+      "target_node": "original-image",
+      "target_port": "input"
+    },
+    {
+      "source_node": "to-pillow",
+      "source_port": "image",
+      "target_node": "blurred-image",
+      "target_port": "input"
+    },
+    {
+      "source_node": "gaussian-blur",
+      "source_port": "result",
+      "target_node": "to-pillow",
+      "target_port": "image"
+    },
+    {
+      "source_node": "sigma",
+      "source_port": "value",
+      "target_node": "gaussian-blur",
+      "target_port": "sigma"
+    },
+    {
+      "source_node": "read-image",
+      "source_port": "image",
+      "target_node": "gaussian-blur",
+      "target_port": "imp"
+    }
+  ]
+}

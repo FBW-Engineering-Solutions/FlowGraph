@@ -144,7 +144,18 @@ class LocalServer(ThreadingHTTPServer):
         from flowgraph.application.workflow_io import WORKFLOW_FORMAT, WORKFLOW_FORMAT_VERSION
 
         versions = {"Python": platform.python_version()}
-        for name in ("FlowGraph", "Muscat", "NumPy", "SciPy", "h5py", "meshio", "MeshLane"):
+        for name in (
+            "FlowGraph",
+            "Muscat",
+            "NumPy",
+            "SciPy",
+            "h5py",
+            "meshio",
+            "MeshLane",
+            "pyimagej",
+            "cosapp",
+            "pyplaid",
+        ):
             try:
                 versions[name] = metadata.version(name)
             except metadata.PackageNotFoundError:

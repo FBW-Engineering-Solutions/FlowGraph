@@ -113,12 +113,54 @@ def test_user_function_rejects_invalid_code_lines(code: object) -> None:
         workflow_from_dict(payload, create_node_registry())
 
 
-@pytest.mark.parametrize("filename", ("SimpleReadMesh.json", "AllFilters.json"))
+@pytest.mark.parametrize("filename", ("SimpleReadMesh.json", "AllFilters.json", "ImageJBlur.json"))
 def test_packaged_demo_workflows_load(filename: str) -> None:
     workflow = load_workflow(package_resource_path("testdata", filename), create_node_registry())
 
     assert workflow.nodes
     assert workflow.edges
+
+
+def test_imagej_blur_example_is_portable_annotated_and_connected() -> None:
+    registry = create_node_registry()
+    path = package_resource_path("testdata", "ImageJBlur.json")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    workflow = load_workflow(path, registry)
+    nodes = {node["id"]: node for node in payload["nodes"]}
+
+    assert nodes["read-image"]["parameters"]["path"] == "{testdata}/ColorCardboard.jpg"
+    assert Path(workflow.require_node("read-image").parameters["path"]).is_file()
+    assert nodes["sigma"]["parameters"] == {"min": 1, "max": 10, "value": 2}
+    assert "#@ ImagePlus imp" in nodes["gaussian-blur"]["parameters"]["code"]
+    assert "#@ Double(" in nodes["gaussian-blur"]["parameters"]["code"]
+    assert "#@output ImagePlus result" in nodes["gaussian-blur"]["parameters"]["code"]
+    assert {node["definition_id"] for node in payload["nodes"]} == {
+        "title-doc",
+        "paragraph-doc",
+        "read-image",
+        "imagej-script",
+        "float-slider",
+        "imagej-to-pillow",
+        "local-view",
+    }
+    notes = "\n".join(node["parameters"].get("text", "") for node in payload["nodes"])
+    for topic in ("START HERE", "BEFORE", "AFTER", "TROUBLESHOOT", "headlessly", "RGBA"):
+        assert topic in notes
+    assert {
+        (edge.source_node, edge.source_port, edge.target_node, edge.target_port)
+        for edge in workflow.edges
+    } == {
+        ("read-image", "image", "original-image", "input"),
+        ("read-image", "image", "gaussian-blur", "imp"),
+        ("sigma", "value", "gaussian-blur", "sigma"),
+        ("gaussian-blur", "result", "to-pillow", "image"),
+        ("to-pillow", "image", "blurred-image", "input"),
+    }
+    restored = workflow_from_dict(workflow_to_dict(workflow), registry)
+    assert (
+        restored.require_node("script-help").parameters
+        == workflow.require_node("script-help").parameters
+    )
 
 
 def test_documentation_title_is_portless_and_persists_its_text() -> None:

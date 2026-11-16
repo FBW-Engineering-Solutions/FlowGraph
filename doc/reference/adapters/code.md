@@ -70,6 +70,14 @@ dependencies. These nodes run trusted user code, not a sandbox.
 
 ### Gaussian blur of a Pillow-derived image
 
+An annotated, ready-to-open workflow is included as
+`flowgraph/testdata/ImageJBlur.json`. Locate it in an installed environment with
+`uv run python -c 'from flowgraph.resources import package_resource_path; print(package_resource_path("testdata", "ImageJBlur.json"))'`.
+It uses the bundled image through `{testdata}/ColorCardboard.jpg`, includes
+numbered setup/port/conversion notes, a sigma slider and before/after viewers.
+It requires native execution with the `io` and `imagej` extras, not browser-only
+WASM. Open the JSON in an editor, run it, change sigma and run again.
+
 `IJ.run(image, command, options)` requires an `ImagePlus`, not an ImageJ2
 `Dataset`. Declare `ImagePlus` ports to use standard ImageJ1 commands without
 manual array-axis handling. Use `Double` for a sigma connected to a Float Slider
