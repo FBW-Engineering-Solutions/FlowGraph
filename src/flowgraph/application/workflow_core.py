@@ -1270,6 +1270,7 @@ class WorkflowExecutor:
         initial_outputs: Mapping[str, Mapping[str, Any]] | None = None,
         initial_inputs: Mapping[str, Mapping[str, Any]] | None = None,
         on_progress: Callable[[dict[str, Any]], None] | None = None,
+        on_node_result: Callable[[str, Mapping[str, Any], Mapping[str, Any]], None] | None = None,
     ) -> WorkflowRunResult:
         """Execute all nodes, or only *node_ids* using previously resolved outputs."""
         # Missing required connections are execution-time node failures, not
@@ -1411,6 +1412,8 @@ class WorkflowExecutor:
                     continue
                 outputs[node_id] = MappingProxyType(node_outputs)
                 completed = True
+                if on_node_result is not None:
+                    on_node_result(node_id, resolved_inputs[node_id], outputs[node_id])
             finally:
                 if on_progress is not None:
                     on_progress(
