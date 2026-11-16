@@ -377,6 +377,12 @@ def test_display_meshes_projects_surface_without_changing_the_input() -> None:
     mesh.nodeFields["velocity"] = np.tile([3.0, 4.0, 0.0], (mesh.GetNumberOfNodes(), 1))
     original_count = mesh.GetNumberOfElements()
     document = MeshDocument(mesh)
+    original_points = mesh.nodes.copy()
+    original_connectivity = {
+        name: elements.connectivity.copy() for name, elements in mesh.elements.items()
+    }
+    original_node_fields = {name: data.copy() for name, data in mesh.nodeFields.items()}
+    original_cell_fields = {name: data.copy() for name, data in mesh.elemFields.items()}
     registry = create_node_registry()
     workflow = WorkflowGraph([registry.create_instance("mesh-sink", "view")])
 
@@ -387,13 +393,31 @@ def test_display_meshes_projects_surface_without_changing_the_input() -> None:
     assert all(
         0 <= index < len(preview["x"]) for index in preview["i"] + preview["j"] + preview["k"]
     )
-    assert sorted(preview["fields"]["temperature"]) == list(range(mesh.GetNumberOfNodes()))
+    assert len(preview["x"]) == 26
+    assert set(preview["i"] + preview["j"] + preview["k"]) == set(range(26))
+    boundary = np.any(
+        (original_points == original_points.min(axis=0))
+        | (original_points == original_points.max(axis=0)),
+        axis=1,
+    )
+    np.testing.assert_array_equal(
+        np.column_stack((preview["x"], preview["y"], preview["z"])), original_points[boundary]
+    )
+    np.testing.assert_array_equal(
+        preview["fields"]["temperature"], original_node_fields["temperature"][boundary]
+    )
     assert preview["fields"]["velocity"] == [5.0] * len(preview["x"])
     assert preview["field_components"]["velocity"] == [[3.0, 4.0, 0.0]] * len(preview["x"])
     assert "temperature" not in preview["field_components"]
     assert "flowgraph_node_id" not in preview["fields"]
     assert mesh.GetNumberOfElements() == original_count
-    assert "temperature" in mesh.nodeFields
+    np.testing.assert_array_equal(mesh.nodes, original_points)
+    for name, connectivity in original_connectivity.items():
+        np.testing.assert_array_equal(mesh.elements[name].connectivity, connectivity)
+    for name, data in original_node_fields.items():
+        np.testing.assert_array_equal(mesh.nodeFields[name], data)
+    for name, data in original_cell_fields.items():
+        np.testing.assert_array_equal(mesh.elemFields[name], data)
 
 
 def test_display_meshes_handles_planar_mesh_and_skips_other_nodes() -> None:
