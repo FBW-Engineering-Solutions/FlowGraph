@@ -1,3 +1,10 @@
+New in version 0.1.9:
+**********************
+**********************
+
+- Bump the core package, runtime and lockfile version to 0.1.9; synchronize
+  Desktop's core dependency without changing Desktop's own version.
+
 New in version 0.1.8:
 **********************
 **********************
