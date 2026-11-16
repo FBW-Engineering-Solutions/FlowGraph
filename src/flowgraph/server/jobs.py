@@ -10,7 +10,10 @@ import tempfile
 import threading
 import time
 import uuid
+from collections.abc import Sequence
 from pathlib import Path
+
+from flowgraph.application.plugins import resolve_plugin_paths
 
 
 class JobManager:
@@ -23,11 +26,13 @@ class JobManager:
         timeout: float = 120,
         max_result: int = 64 << 20,
         verbose: bool = False,
+        plugins: Sequence[str | Path] = (),
     ):
         self.workspace = workspace
         self.timeout = timeout
         self.max_result = max_result
         self.verbose = verbose
+        self.plugins = resolve_plugin_paths(plugins)
         self.lock = threading.RLock()
         self.jobs: dict[str, dict] = {}
         self.process: subprocess.Popen | None = None
@@ -93,6 +98,11 @@ class JobManager:
                             sys.executable,
                             "-m",
                             "flowgraph.server.worker",
+                            *(
+                                argument
+                                for path in self.plugins
+                                for argument in ("--plugin", str(path))
+                            ),
                             *(
                                 ["--session", session_root.name]
                                 if session_root

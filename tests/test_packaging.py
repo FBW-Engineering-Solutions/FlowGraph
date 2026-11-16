@@ -78,7 +78,11 @@ def test_custom_node_guide_example_executes(tmp_path: Path) -> None:
     """Keep the public Python node recipe executable, including its JSON round trip."""
     root = Path(__file__).parents[1]
     guide = (root / "doc" / "user-guide" / "custom-nodes.md").read_text(encoding="utf-8")
-    examples = [part.split("\n```", 1)[0] for part in guide.split("```python\n")[1:]]
+    recipe, plugin_section = guide.split("## Load Python-file plugins from the CLI or server", 1)
+    catalog_section = plugin_section.split("## Export extra nodes for the Web Editor", 1)[1]
+    examples = [
+        part.split("\n```", 1)[0] for part in (recipe + catalog_section).split("```python\n")[1:]
+    ]
     script = "\n".join(examples)
     completed = subprocess.run(
         [sys.executable, "-c", script], cwd=tmp_path, capture_output=True, text=True, check=True

@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import argparse
 import json
-import sys
 import time
 from pathlib import Path
 
 
 def main() -> None:
+    from flowgraph.application.node_registry import create_node_registry
     from flowgraph.application.workflow_execution import execute_workflow_json
 
-    if sys.argv[1] == "--session":
-        command = Path(sys.argv[2]) / "command.json"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--plugin", action="append", default=[], type=Path)
+    parser.add_argument("--session", type=Path)
+    parser.add_argument("files", nargs="*", type=Path)
+    args = parser.parse_args()
+    registry = create_node_registry(plugins=args.plugin)
+    if args.session is not None:
+        command = args.session / "command.json"
         while True:
             if not command.exists():
                 time.sleep(0.02)
@@ -21,14 +28,17 @@ def main() -> None:
             command.unlink()
             request, response = Path(payload["request"]), Path(payload["response"])
             envelope = json.loads(request.read_text(encoding="utf-8"))
-            result = execute_workflow_json(json.dumps(envelope["workflow"]), envelope["options"])
+            result = execute_workflow_json(
+                json.dumps(envelope["workflow"]), envelope["options"], registry=registry
+            )
             temporary = response.with_suffix(".tmp")
             temporary.write_text(result, encoding="utf-8")
             temporary.replace(response)
     else:
-        request, response = map(Path, sys.argv[1:])
+        request, response = args.files
         response.write_text(
-            execute_workflow_json(request.read_text(encoding="utf-8")), encoding="utf-8"
+            execute_workflow_json(request.read_text(encoding="utf-8"), registry=registry),
+            encoding="utf-8",
         )
 
 

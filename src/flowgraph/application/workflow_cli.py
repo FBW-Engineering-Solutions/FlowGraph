@@ -79,6 +79,7 @@ def inspect_workflow(
     full: bool = False,
     inputs: Mapping[str, Any] | None = None,
     overrides: Mapping[str, Mapping[str, Any]] | None = None,
+    plugins: Sequence[str | Path] = (),
 ) -> str:
     """Preview interface values and optional graph without executing or saving.
 
@@ -87,9 +88,9 @@ def inspect_workflow(
     """
     from flowgraph.application.node_registry import create_node_registry
 
-    registry = create_node_registry()
+    registry = create_node_registry(plugins=plugins)
     workflow = load_workflow(path, registry)
-    _apply_overrides(workflow, overrides or {})
+    _apply_overrides(workflow, overrides or {}, registry)
     return format_workflow_inspection(workflow, registry, full=full, inputs=inputs)
 
 
@@ -433,13 +434,14 @@ def execute_cli_workflow(
     *,
     inputs: Mapping[str, Any] | None = None,
     overrides: Mapping[str, Mapping[str, Any]] | None = None,
+    plugins: Sequence[str | Path] = (),
 ) -> tuple[WorkflowGraph, WorkflowRunResult]:
     """Load and execute a workflow using published inputs and parameter overrides."""
     from flowgraph.application.node_registry import create_node_registry
 
-    registry = create_node_registry()
+    registry = create_node_registry(plugins=plugins)
     workflow = load_workflow(path, registry)
-    _apply_overrides(workflow, overrides or {})
+    _apply_overrides(workflow, overrides or {}, registry)
     injected = resolve_workflow_inputs(workflow, inputs or {})
     return workflow, WorkflowExecutor(registry).run(workflow, initial_inputs=injected)
 
@@ -534,10 +536,11 @@ def resolve_workflow_inputs(
     return injected
 
 
-def _apply_overrides(workflow: WorkflowGraph, overrides: Mapping[str, Mapping[str, Any]]) -> None:
-    from flowgraph.application.node_registry import create_node_registry
-
-    registry = create_node_registry()
+def _apply_overrides(
+    workflow: WorkflowGraph,
+    overrides: Mapping[str, Mapping[str, Any]],
+    registry: NodeRegistry,
+) -> None:
     for node_id, parameters in overrides.items():
         node = workflow.get_node(node_id)
         if node is None:

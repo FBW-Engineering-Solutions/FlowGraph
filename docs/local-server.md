@@ -50,6 +50,29 @@ the UI. Starting this server does not change standalone WASM deployments.
 
 ## Other clients
 
+### Custom Python nodes
+
+Configure trusted Python-file plugins at startup:
+
+```bash
+uv run flowgraph serve --workspace /absolute/path/to/workspace \
+  --plugin /absolute/path/to/custom_nodes.py
+```
+
+Repeat `--plugin` for several files. Each exports `AVAILABLE_NODES`, an iterable
+of `NodeDefinition` objects. The server validates definitions before listening,
+includes plugin nodes in `/api/v1/catalog`, and loads them in both one-shot and
+persistent session workers. Relative paths resolve against the launch directory,
+not the workspace. Restart after changes, and keep files unchanged while serving.
+
+Plugin imports execute trusted Python with your permissions; dependencies must
+already be installed. There is no HTTP plugin-upload/loading endpoint, and
+workflows cannot select plugin files. Standalone browser WASM and Desktop's
+local registry are unchanged. See the [custom-node guide](../doc/user-guide/custom-nodes.md)
+for a complete file example and Python APIs.
+
+### Client origins
+
 For a separately hosted editor, pass its origin with `--allow-origin`. For example,
 the local editor started by `make serve-serial` uses:
 
@@ -81,6 +104,7 @@ the public editor default.
 | Option | Default | Purpose |
 | --- | --- | --- |
 | `--workspace` | Required | Existing directory for workflow execution and file operations |
+| `--plugin FILE.py` | None | Trusted Python node definitions; repeatable, loaded at startup and in workers |
 | `--port` | `8765` | Loopback API port; `0` selects an available port |
 | `--allow-origin` | Public editor origin | Allowed client origin; repeatable as described above |
 | `--execution-timeout` | `120` | Execution timeout in seconds |

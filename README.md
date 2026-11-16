@@ -39,7 +39,15 @@ uv run flowgraph run workflow.json --input name=value
 uv run flowgraph run workflow.json -i name=value
 uv run flowgraph run workflow.json --override node-id.parameter=value
 uv run flowgraph run workflow.json --json-output results.json
+uv run flowgraph run workflow.json --plugin /path/custom_nodes.py
+uv run flowgraph inspect workflow.json --plugin /path/custom_nodes.py --full
 ```
+
+Use repeatable `--plugin FILE.py` to load trusted custom definitions exported as
+`AVAILABLE_NODES`. The same option on `flowgraph serve` adds nodes to its catalog
+and execution workers. Imports execute Python code, including during inspection;
+only load trusted files. See the [plugin guide](doc/user-guide/custom-nodes.md#load-python-file-plugins-from-the-cli-or-server)
+for the file format, path rules, dependencies and restart requirements.
 
 Use `--input` or its short form `-i` for each published workflow input; repeat
 the option to provide multiple inputs.
