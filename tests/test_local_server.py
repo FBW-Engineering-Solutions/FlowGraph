@@ -405,15 +405,75 @@ def test_server_activity_diagnostics_are_opt_in_and_redacted(api, capsys, verbos
     assert "HTTP GET /api/v1/runtime -> 401" in output.err
     assert output.err.count(f"Execution {job['id']}: running") == 1
     assert output.err.count(f"Execution {job['id']}: completed") == 1
+    assert output.err.count(f"Execution {job['id']}: Node 'source' output 'value' = 'hello'") == 1
     for private in (
         api.token,
         "secret",
         "private-name",
         "private-unknown",
         "private-file",
-        "hello",
     ):
         assert private not in output.err
+
+
+@pytest.mark.parametrize("verbose", [False, True])
+@pytest.mark.parametrize("incremental", [False, True])
+def test_node_console_output_is_opt_in(tmp_path, capfd, verbose, incremental):
+    manager = JobManager(tmp_path, verbose=verbose)
+    options = {"session_id": "console"} if incremental else None
+    code = (
+        "def Execute() -> tuple[str]:\n"
+        "    import sys\n"
+        "    import logging\n"
+        "    print('node-stdout-marker')\n"
+        "    print('node-stderr-marker', file=sys.stderr)\n"
+        "    logging.warning('node-log-marker')\n"
+        "    return ('node-value-marker',)\n"
+    )
+    try:
+        for run in range(3 if incremental else 1):
+            run_options = {**options, "from_scratch": True} if run == 2 else options
+            job = manager.submit(workflow(code), run_options)
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                job = manager.get(job["id"])
+                if job["state"] != "running":
+                    break
+                time.sleep(0.02)
+            assert job["state"] == "completed", job
+            for _ in range(2):
+                manager.get(job["id"])
+            output = capfd.readouterr()
+            if verbose:
+                # Cached results are reported again, but cached code does not print.
+                executions = 0 if incremental and run == 1 else 1
+                assert output.out.count("node-stdout-marker") == executions
+                assert output.err.count("node-stderr-marker") == executions
+                assert output.err.count("node-log-marker") == executions
+                assert output.err.count("node-value-marker") == 1
+                assert f"Execution {job['id']}: Node 'python' output" in output.err
+            else:
+                assert output.out == output.err == ""
+    finally:
+        manager.close()
+
+
+def test_node_console_summaries_are_bounded_and_do_not_mutate_values(tmp_path, capsys):
+    manager = JobManager(tmp_path, verbose=True)
+    value = ["x" * 10000] * 10000
+    result = {"node_id": "large", "nodes": {"outputs": {"large": {"data": value}}}}
+    try:
+        manager._report_node_outputs("job", result)
+        output = capsys.readouterr()
+        assert output.out == ""
+        assert "Node 'large' output 'data'" in output.err
+        assert "..." in output.err
+        assert len(output.err) < 2000
+        assert result["nodes"]["outputs"]["large"]["data"] is value
+        assert len(value) == 10000
+        assert len(value[0]) == 10000
+    finally:
+        manager.close()
 
 
 def test_verbose_job_failure_cancellation_and_timeout(api, capsys):
@@ -452,6 +512,53 @@ def test_cli_verbose_lifecycle(tmp_path, monkeypatch, capsys, option):
     assert f"Workspace: {str(tmp_path.resolve())!r}" in output.err
     assert "Allowed editor origins: ['https://flowgraph-web.fbw-es.com']" in output.err
     assert "Limits: execution=120s, request=16777216 bytes" in output.err
+
+
+def test_execution_state_recovery_is_authenticated_and_read_only(api):
+    assert request(api, "GET", "/api/v1/runtime")[1]["capabilities"]["executionRecovery"] == 1
+    assert request(api, "GET", "/api/v1/execution-state")[0] == 404
+    assert (
+        request(api, "GET", "/api/v1/execution-state", headers={"Authorization": "Bearer wrong"})[0]
+        == 401
+    )
+    submitted = workflow()
+    options = {"session_id": "recover-me"}
+    status, job = request(
+        api, "POST", "/api/v1/executions", {"workflow": submitted, "options": options}
+    )
+    assert status == 202
+    status, snapshot = request(api, "GET", "/api/v1/execution-state")
+    assert status == 200
+    assert snapshot["workflow"] == submitted
+    assert snapshot["options"] == options
+    assert snapshot["job"]["id"] == job["id"]
+    finished = wait_job(api, job["id"])
+    assert request(api, "GET", "/api/v1/execution-state")[1]["job"] == finished
+    status, selected = request(
+        api,
+        "POST",
+        "/api/v1/executions",
+        {"workflow": submitted, "options": {**options, "targets": ["source"]}},
+    )
+    assert status == 202
+    snapshot = request(api, "GET", "/api/v1/execution-state")[1]
+    assert snapshot["job"]["id"] == selected["id"]
+    assert snapshot["previous_result"] == finished["result"]
+    wait_job(api, selected["id"])
+    assert len(api.jobs.jobs) == 2  # Recovery must never submit another execution.
+
+
+def test_execution_state_can_reconnect_and_cancel_running_job(api):
+    submitted = workflow(
+        "def Execute() -> tuple[int]:\n    import time\n    time.sleep(30)\n    return (1,)\n"
+    )
+    status, job = request(api, "POST", "/api/v1/executions", {"workflow": submitted})
+    assert status == 202
+    snapshot = request(api, "GET", "/api/v1/execution-state")[1]
+    assert snapshot["job"]["state"] == "running"
+    assert api.jobs.process.poll() is None
+    request(api, "POST", f"/api/v1/executions/{job['id']}/cancel", b"")
+    assert request(api, "GET", "/api/v1/execution-state")[1]["job"]["state"] == "cancelled"
 
 
 def test_execution_and_invalid_workflow_recovery(api):

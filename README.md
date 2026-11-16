@@ -131,7 +131,10 @@ uv run flowgraph serve --workspace /absolute/path/to/existing/workspace
 ```
 
 Add `--verbose` (or `-v`) for server lifecycle, configuration, sanitized HTTP
-activity, and execution state changes on stderr. For an isolated tool launch:
+activity, execution state changes, and bounded node output-port summaries on
+stderr. Worker stdout/stderr (prints and logs) also appear in the console.
+Verbose logs may contain sensitive workflow data; keep them private.
+For an isolated tool launch:
 
 ```bash
 uvx --with imagej flowgraph serve --workspace . --verbose

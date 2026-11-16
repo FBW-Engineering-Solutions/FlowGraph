@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import reprlib
 import subprocess
 import sys
 import tempfile
@@ -47,6 +48,24 @@ class JobManager:
     def _report_state(self, identifier: str, state: str) -> None:
         if self.verbose:
             print(f"[flowgraph] Execution {identifier}: {state}", file=sys.stderr, flush=True)
+
+    def _report_node_outputs(self, identifier: str, result: dict) -> None:
+        """Summarize existing transport values without copying runtime node data."""
+        if not self.verbose:
+            return
+        formatter = reprlib.Repr()
+        formatter.maxstring = 240
+        formatter.maxother = 240
+        formatter.maxlevel = 3
+        node_id = result["node_id"]
+        outputs = result["nodes"]["outputs"].get(node_id, {})
+        for port, value in outputs.items():
+            print(
+                f"[flowgraph] Execution {identifier}: "
+                f"Node {node_id!r} output {port!r} = {formatter.repr(value)}",
+                file=sys.stderr,
+                flush=True,
+            )
 
     def submit(
         self, workflow: dict, options: dict | None = None, timeout_seconds: float | None = None
@@ -121,6 +140,7 @@ class JobManager:
                     process = subprocess.Popen(
                         [
                             sys.executable,
+                            "-u",
                             "-m",
                             "flowgraph.server.worker",
                             *(
@@ -137,8 +157,8 @@ class JobManager:
                         cwd=self.workspace,
                         env=environment,
                         stdin=subprocess.DEVNULL,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
+                        stdout=None if self.verbose else subprocess.DEVNULL,
+                        stderr=None if self.verbose else subprocess.DEVNULL,
                     )
                 if session_id is not None:
                     self.sessions[session_id] = (process, session_root, time.monotonic())
@@ -212,6 +232,7 @@ class JobManager:
                                 raise ValueError("Live node results exceed the server size limit")
                             with self.lock:
                                 self.jobs[identifier]["node_results"].append(event["node_result"])
+                            self._report_node_outputs(identifier, event["node_result"])
                         else:
                             progress[event["node_id"]] = event
                 with self.lock:

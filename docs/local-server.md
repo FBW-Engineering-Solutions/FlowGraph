@@ -32,7 +32,10 @@ Stop the server with **Ctrl+C**; shutdown terminates active execution.
 
 Add `--verbose` (or `-v`) to print startup/shutdown state, the resolved workspace,
 allowed editor origins, execution/request/result limits, sanitized HTTP endpoints
-and response codes, and execution state transitions to stderr. For example:
+and response codes, execution state transitions, and labeled node output-port
+summaries to stderr. Worker stdout (including `print()`) and stderr (including
+logs and tracebacks) are also forwarded to the console without Python buffering.
+This applies to one-shot executions and persistent sessions. For example:
 
 ```bash
 uvx --with imagej flowgraph serve --workspace . --verbose
@@ -40,9 +43,14 @@ uvx --with imagej flowgraph serve --workspace . --verbose
 
 Execution transitions include running, completed, failed, cancelled, and advisory
 timeout warnings; polling does not repeat transition messages. HTTP polling requests are
-still logged. Diagnostics omit credentials, query values, file/workflow contents,
-and arbitrary request paths. The usual token and launch link remain on stdout;
-keep them private. Without the flag, additional diagnostics are disabled.
+still logged. HTTP diagnostics omit credentials, query values, request bodies,
+and arbitrary request paths. **Node messages and output values can contain sensitive
+workflow data or credentials; keep verbose console logs private.** Output-port
+summaries are bounded and use the existing serialized results, without copying
+runtime data or dumping full arrays, meshes, or images. Each received node result
+is logged once, including reused session results; polling does not repeat it.
+The usual token and launch link remain on stdout; keep them private. Without the
+flag, additional diagnostics are disabled and worker stdout/stderr are discarded.
 
 Core serves only the API, not editor assets: `/` and other non-API paths return
 404. The public editor, a separately served editor, or FlowGraph Desktop supplies

@@ -98,7 +98,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     serve_parser.add_argument("--max-request-bytes", type=int, default=16 << 20)
     serve_parser.add_argument(
-        "--verbose", "-v", action="store_true", help="print server state and activity to stderr"
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="print server activity and node output summaries to stderr; forward worker stdout/stderr",
     )
     for command_parser in (inspect_parser, run_parser, serve_parser):
         command_parser.add_argument(
