@@ -61,13 +61,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="write public workflow outputs as JSON to FILE",
     )
     serve_parser = commands.add_parser(
-        "serve", help="start the experimental loopback execution API"
+        "serve", help="start the authenticated execution API (loopback by default)"
     )
     serve_parser.add_argument(
         "--workspace", type=Path, required=True, help="existing workspace directory"
     )
     serve_parser.add_argument(
         "--port", type=int, default=8765, help="local server port (default: 8765)"
+    )
+    serve_parser.add_argument(
+        "--host", default="127.0.0.1", help="IPv4 listening address (default: 127.0.0.1)"
+    )
+    serve_parser.add_argument(
+        "--public-url",
+        help="HTTPS backend origin exposed by a reverse proxy; preserve its Host header",
     )
     serve_parser.add_argument(
         "--allow-origin",
@@ -96,6 +103,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             with LocalServer(
                 args.workspace,
                 port=args.port,
+                host=args.host,
+                public_url=args.public_url,
                 execution_timeout=args.execution_timeout,
                 max_request=args.max_request_bytes,
                 verbose=args.verbose,
@@ -108,9 +117,19 @@ def main(argv: Sequence[str] | None = None) -> int:
                 editor_origin = (
                     args.allow_origin[0] if args.allow_origin is not None else DEFAULT_EDITOR_ORIGIN
                 )
-                fragment = urlencode({"token": server.token, "port": urlsplit(server.origin).port})
+                fragment = urlencode(
+                    {"token": server.token, "backend": server.origin}
+                    if args.public_url is not None
+                    else {"token": server.token, "port": urlsplit(server.origin).port}
+                )
                 print(f"Open editor: {editor_origin}/#{fragment}", flush=True)
-                print("Trusted local workflows only; native Python is not sandboxed.", flush=True)
+                print("Trusted workflows only; native Python is not sandboxed.", flush=True)
+                if args.public_url is not None:
+                    print(
+                        "HTTPS proxy required: preserve Host; firewall the HTTP backend port. "
+                        "This is a trusted single-user API, not a public multi-user service.",
+                        flush=True,
+                    )
                 try:
                     server.serve_forever()
                 except KeyboardInterrupt:

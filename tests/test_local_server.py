@@ -577,6 +577,112 @@ def test_cli_and_configuration_validation(tmp_path):
         Workspace(tmp_path / "missing")
 
 
+@pytest.mark.parametrize(
+    "public_url",
+    [
+        "http://python.example",
+        "https://user:pass@python.example",
+        "https://python.example/api",
+        "https://python.example?token=x",
+        "https://python.example#x",
+        "https://python.example:bad",
+        "https://python.example\r\nInjected: yes",
+    ],
+)
+def test_remote_configuration_rejects_unsafe_public_urls(tmp_path, public_url):
+    with pytest.raises(ValueError):
+        LocalServer(tmp_path, port=0, public_url=public_url)
+
+
+def test_non_loopback_binding_requires_https_proxy_configuration(tmp_path):
+    with pytest.raises(ValueError, match="HTTPS reverse proxy"):
+        LocalServer(tmp_path, port=0, host="0.0.0.0")
+
+
+@pytest.mark.parametrize("public_url", ["https://192.168.1.20:9443", "https://python.example"])
+def test_https_proxy_preserves_host_origin_cors_and_auth(tmp_path, public_url):
+    editor = "https://editor.example"
+    with LocalServer(
+        tmp_path, port=0, host="0.0.0.0", public_url=public_url, allowed_origins=(editor,)
+    ) as server:
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            headers = {"Host": server.authority, "Origin": editor, "Sec-Fetch-Site": "cross-site"}
+            assert server.origin == public_url
+            assert request(server, "GET", "/api/v1/runtime", headers=headers)[0] == 200
+            assert (
+                request(server, "GET", "/api/v1/runtime", headers={**headers, "Authorization": ""})[
+                    0
+                ]
+                == 401
+            )
+            assert (
+                request(
+                    server, "GET", "/api/v1/runtime", headers={**headers, "Host": "evil.example"}
+                )[0]
+                == 403
+            )
+            assert (
+                request(
+                    server,
+                    "GET",
+                    "/api/v1/runtime",
+                    headers={**headers, "Origin": "https://evil.example"},
+                )[0]
+                == 403
+            )
+            assert (
+                request(
+                    server,
+                    "OPTIONS",
+                    "/api/v1/runtime",
+                    headers={
+                        **headers,
+                        "Access-Control-Request-Method": "GET",
+                        "Access-Control-Request-Headers": "authorization",
+                    },
+                )[0]
+                == 200
+            )
+        finally:
+            server.shutdown()
+            thread.join(timeout=5)
+
+
+def test_cli_remote_launch_link(tmp_path, monkeypatch, capsys):
+    from urllib.parse import parse_qs, urlsplit
+
+    def interrupt(self):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(LocalServer, "serve_forever", interrupt)
+    assert (
+        main(
+            [
+                "serve",
+                "--workspace",
+                str(tmp_path),
+                "--port",
+                "0",
+                "--public-url",
+                "https://python.example",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    launch = next(
+        line.removeprefix("Open editor: ")
+        for line in output.splitlines()
+        if line.startswith("Open editor: ")
+    )
+    fragment = parse_qs(urlsplit(launch).fragment)
+    assert fragment["backend"] == ["https://python.example"]
+    assert len(fragment["token"][0]) >= 32
+    assert "HTTPS proxy required" in output
+
+
 def test_server_never_hosts_editor_or_workspace_assets(tmp_path):
     (tmp_path / "index.html").write_text("private workspace content")
     (tmp_path / "native-bootstrap.js").write_text("private script")
