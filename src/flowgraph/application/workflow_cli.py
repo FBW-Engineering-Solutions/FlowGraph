@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import reprlib
 import sys
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -435,15 +437,64 @@ def execute_cli_workflow(
     inputs: Mapping[str, Any] | None = None,
     overrides: Mapping[str, Mapping[str, Any]] | None = None,
     plugins: Sequence[str | Path] = (),
+    verbose: bool = False,
 ) -> tuple[WorkflowGraph, WorkflowRunResult]:
-    """Load and execute a workflow using published inputs and parameter overrides."""
+    """Execute a workflow, optionally reporting live console diagnostics."""
     from flowgraph.application.node_registry import create_node_registry
 
     registry = create_node_registry(plugins=plugins)
     workflow = load_workflow(path, registry)
     _apply_overrides(workflow, overrides or {}, registry)
     injected = resolve_workflow_inputs(workflow, inputs or {})
-    return workflow, WorkflowExecutor(registry).run(workflow, initial_inputs=injected)
+
+    def report(node_id, inputs, outputs):
+        report_node_outputs("run", node_id, outputs)
+
+    with _execution_console(verbose):
+        result = WorkflowExecutor(registry).run(
+            workflow, initial_inputs=injected, on_node_result=report if verbose else None
+        )
+    return workflow, result
+
+
+def report_node_outputs(identifier: str, node_id: str, outputs: Mapping[str, Any]) -> None:
+    """Print bounded summaries without copying node data or building previews."""
+    formatter = reprlib.Repr()
+    formatter.maxstring = 240
+    formatter.maxother = 240
+    formatter.maxlevel = 3
+    for port, value in outputs.items():
+        print(
+            f"[flowgraph] Execution {identifier}: "
+            f"Node {node_id!r} output {port!r} = {formatter.repr(value)}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
+@contextmanager
+def _execution_console(verbose: bool):
+    """Enable live Python console output temporarily, preserving host streams."""
+    if not verbose:
+        yield
+        return
+    streams = []
+    try:
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                streams.append((stream, stream.line_buffering, stream.write_through))
+                stream.reconfigure(line_buffering=True, write_through=True)
+        print("[flowgraph] Execution run: running", file=sys.stderr, flush=True)
+        try:
+            yield
+        except BaseException:
+            print("[flowgraph] Execution run: failed", file=sys.stderr, flush=True)
+            raise
+        else:
+            print("[flowgraph] Execution run: completed", file=sys.stderr, flush=True)
+    finally:
+        for stream, line_buffering, write_through in reversed(streams):
+            stream.reconfigure(line_buffering=line_buffering, write_through=write_through)
 
 
 def workflow_outputs(workflow: WorkflowGraph, result: WorkflowRunResult) -> dict[str, Any]:

@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import math
 import os
-import reprlib
 import subprocess
 import sys
 import tempfile
@@ -17,6 +16,7 @@ from copy import deepcopy
 from pathlib import Path
 
 from flowgraph.application.plugins import resolve_plugin_paths
+from flowgraph.application.workflow_cli import report_node_outputs
 
 
 class JobManager:
@@ -53,19 +53,9 @@ class JobManager:
         """Summarize existing transport values without copying runtime node data."""
         if not self.verbose:
             return
-        formatter = reprlib.Repr()
-        formatter.maxstring = 240
-        formatter.maxother = 240
-        formatter.maxlevel = 3
         node_id = result["node_id"]
         outputs = result["nodes"]["outputs"].get(node_id, {})
-        for port, value in outputs.items():
-            print(
-                f"[flowgraph] Execution {identifier}: "
-                f"Node {node_id!r} output {port!r} = {formatter.repr(value)}",
-                file=sys.stderr,
-                flush=True,
-            )
+        report_node_outputs(identifier, node_id, outputs)
 
     def submit(
         self, workflow: dict, options: dict | None = None, timeout_seconds: float | None = None

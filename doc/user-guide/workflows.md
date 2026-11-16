@@ -186,6 +186,22 @@ the workflow JSON. This fallback behavior belongs to `flowgraph run` and
 `execute_cli_workflow()`; it does not change the input requirements of
 `WorkflowGraph.execute()` or other execution APIs.
 
+### Verbose execution
+
+```bash
+flowgraph run workflow.json --verbose
+flowgraph run workflow.json -v --json-output results.json
+```
+
+Like `flowgraph serve -v`, verbose runs report execution states and labeled,
+bounded node output-port summaries on stderr as nodes finish. Node prints and
+logs remain visible; Python stdout/stderr are temporarily line-buffered for live
+console feedback. Summaries inspect runtime outputs without copying them or
+generating image/mesh previews. Normal runs retain their existing console behavior
+without these extra diagnostics. Public output formatting, JSON files, input
+overrides, plugins and exit codes are unchanged. Verbose logs can expose sensitive
+workflow values; keep them private.
+
 ## Save and load workflows
 
 Use **File → Save workflow** to write the graph to JSON and **File → Load
