@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 from Muscat.MeshTools.MeshInspectionTools import ExtractElementsByElementFilter
-from Muscat.MeshTools.MeshModificationTools import ComputeSkin
+from Muscat.MeshTools.MeshModificationTools import CleanLonelyNodes, ComputeSkin
 from Muscat.MeshTools.MeshTetrahedrization import Tetrahedrization
 from Muscat.Simple import ED, ElementFilter
 from PIL.Image import Image, Resampling
@@ -276,6 +276,8 @@ def _display_meshes(workflow: Any, values: Mapping[str, Mapping[str, Any]]) -> d
             )
             surface.elemFields = _surface_cell_fields(mesh, surface)
             triangles = Tetrahedrization(surface)
+            # Compact only the preview, preserving source IDs for nodal field mapping.
+            CleanLonelyNodes(triangles, inPlace=True)
             faces = triangles.GetElementsOfType(ED.Triangle_3).connectivity
             if not faces.size:
                 previews[node.id] = {"error": "The mesh has no renderable surface triangles."}
