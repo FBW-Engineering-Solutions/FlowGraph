@@ -257,6 +257,9 @@ def test_runtime_catalog_and_authentication(api):
     assert runtime["capabilities"]["mountDirectory"] is False
     assert "numpy" in runtime["packages"]
     assert runtime["versions"]["Python"]
+    for name in ("pyimagej", "cosapp", "pyplaid"):
+        assert name in runtime["versions"]
+        assert runtime["versions"][name] is None or isinstance(runtime["versions"][name], str)
     status, catalog = request(api, "GET", "/api/v1/catalog")
     assert status == 200
     assert catalog["format"] == "flowgraph-web-node-catalog"
