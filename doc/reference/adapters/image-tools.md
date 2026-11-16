@@ -15,6 +15,7 @@ a detached image copy, so downstream nodes can use it after the input file close
 | --- | --- | --- |
 | **Read Image (Pillow)** (`read-image`) | Parameter/input `path: Path`; output `image: Image` | Loads a Pillow image from an existing file. |
 | **Pillow To ImageJ** (`pillow-to-imagej`) | Input `image: Image`; output `image: ImageJ` | Copies the Pillow image into a detached NumPy array for ImageJ-compatible processing. |
+| **ImageJ To Pillow** (`imagej-to-pillow`) | Input `image: ImageJ`; output `image: Image` | Converts a single NumPy image to Pillow without intensity scaling. |
 | **Write Image (Pillow)** (`write-image`) | Parameter/input `filename: Path`, input `image: Image`; no outputs | Saves the image using the output filename extension to select the format. |
 | **Resize Image** (`resize-image`) | Input `image: Image`; parameter/input `width: Integer`, `height: Integer`; output `image: Image` | Resizes to a positive target size with Pillow's Lanczos resampling. |
 | **Crop Image** (`crop-image`) | Input `image: Image`; parameter/input `left: Integer`, `top: Integer`, `right: Integer`, `bottom: Integer`; output `image: Image` | Crops to an in-bounds rectangle. Coordinates use Pillow's exclusive right and bottom edges. |
@@ -88,6 +89,20 @@ Memory use was not measured; only temporary array sizes are bounded by design.
 **Pillow To ImageJ** has no
 parameters and produces an independent NumPy array rather than modifying the
 source Pillow image.
+
+**ImageJ To Pillow** has no parameters and accepts a single image with shape
+`(height, width)` or `(height, width, channels)` with 2, 3, or 4 channels.
+Pillow infers the mode from the array dtype and shape: common supported inputs
+include boolean, uint8/uint16, int32 and floating-point grayscale, plus uint8
+LA/RGB/RGBA. Floating-point grayscale becomes Pillow's 32-bit `F` mode; values
+are not normalized or clipped to uint8. Unsupported dtypes/shapes and empty images
+raise `ImageJConversionError`; select a plane before converting a stack or volume.
+Axis order must already be height, width, channels. Palette and color-space metadata
+are not represented by the NumPy array and cannot be reconstructed.
+The output is marked read-only and shares the input buffer where Pillow supports
+it; other modes or non-contiguous arrays require Pillow to allocate storage.
+Pillow pixel writes detach shared storage rather than modifying the input array.
+Connect the output to **Show Image**, **Write Image (Pillow)** or other Pillow nodes.
 
 ## Image to mesh colors
 
