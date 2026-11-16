@@ -82,6 +82,50 @@ def test_failed_node_progress_retains_elapsed_time():
     assert failed[0]["elapsed_seconds"] >= 0
 
 
+@pytest.mark.parametrize("incremental", [False, True])
+def test_live_results_are_single_node_deltas_before_later_nodes_run(incremental):
+    registry = create_node_registry()
+    payload = json.loads(_workflow_json())
+    payload["nodes"].append(
+        {
+            "id": "failure",
+            "definition_id": "user-function",
+            "parameters": {
+                "code": 'def Execute() -> tuple[int]:\n    raise ValueError("later failure")\n'
+            },
+        }
+    )
+    deltas = []
+
+    def progress(event):
+        if event == {"node_id": "output", "state": "running"}:
+            assert deltas[0]["nodes"]["outputs"] == {"source": {"value": "hello"}}
+
+    options = {"session_id": "live-results"} if incremental else None
+    try:
+        for _ in range(2 if incremental else 1):
+            deltas.clear()
+            response = json.loads(
+                execute_workflow_json(
+                    json.dumps(payload),
+                    options,
+                    registry=registry,
+                    on_progress=progress,
+                    on_node_result=deltas.append,
+                )
+            )
+            assert response["status"] == "error"
+            assert {delta["node_id"] for delta in deltas} == {"source", "output"}
+            for delta in deltas:
+                assert list(delta["nodes"]["inputs"]) == [delta["node_id"]]
+                assert list(delta["nodes"]["outputs"]) == [delta["node_id"]]
+                assert list(delta["display_inputs"]) == [delta["node_id"]]
+            assert response["partial"]["outputs"]["source"] == {"value": "hello"}
+            assert all("nodes" not in event for event in response["progress"])
+    finally:
+        workflow_execution.clear_execution_session("live-results")
+
+
 def test_scoped_json_execution_blocks_outdated_inputs_without_upstream_execution():
     session_id = "scoped-json-regression"
     payload = _workflow_json()

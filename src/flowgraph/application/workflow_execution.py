@@ -63,6 +63,7 @@ def execute_workflow_json(
     *,
     registry: NodeRegistry | None = None,
     on_progress: Callable[[dict[str, Any]], None] | None = None,
+    on_node_result: Callable[[dict[str, Any]], None] | None = None,
 ) -> str:
     """Execute one workflow JSON document and return a serialized response.
 
@@ -93,6 +94,23 @@ def execute_workflow_json(
             registry = _REGISTRY
         workflow = workflow_from_json(workflow_json, registry, source_name="Workflow execution")
         injected = resolve_workflow_inputs(workflow, {}, on_warning=warnings.append)
+
+        def report_result(node_id, inputs, outputs):
+            # Serialize this node only. Never resend accumulated results or leak
+            # Python runtime objects across the execution transport boundary.
+            values = {node_id: inputs}
+            on_node_result(
+                _json_safe(
+                    {
+                        "node_id": node_id,
+                        "nodes": {"inputs": values, "outputs": {node_id: outputs}},
+                        "display_inputs": _display_result(values),
+                        "display_images": _display_images(workflow, values),
+                        "display_meshes": _display_meshes(workflow, values),
+                    }
+                )
+            )
+
         if options is not None:
             if not isinstance(options, Mapping):
                 raise ValueError("Execution options must be an object")
@@ -120,10 +138,14 @@ def execute_workflow_json(
                 missing_only=options.get("missing_only", False),
                 initial_inputs=injected,
                 on_progress=report,
+                on_node_result=report_result if on_node_result is not None else None,
             )
         else:
             result = WorkflowExecutor(registry).run(
-                workflow, initial_inputs=injected, on_progress=report
+                workflow,
+                initial_inputs=injected,
+                on_progress=report,
+                on_node_result=report_result if on_node_result is not None else None,
             )
         response = {
             "status": "ok",

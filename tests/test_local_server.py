@@ -203,6 +203,62 @@ def test_job_exposes_live_progress_before_completion(tmp_path, incremental):
         manager.close()
 
 
+@pytest.mark.parametrize("incremental", [False, True])
+def test_job_result_cursor_only_returns_new_nodes(tmp_path, incremental):
+    payload = workflow()
+    payload["nodes"].append(
+        {
+            "id": "slow-failure",
+            "definition_id": "user-function",
+            "parameters": {
+                "code": "def Execute() -> tuple[int]:\n    import time\n    time.sleep(0.5)\n"
+                '    raise ValueError("failure")\n'
+            },
+        }
+    )
+    manager = JobManager(tmp_path)
+    try:
+        job = manager.submit(payload, {"session_id": "deltas"} if incremental else None)
+        cursor = 0
+        deltas = []
+        saw_live_result = False
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            job = manager.get(job["id"], cursor)
+            if job["state"] == "running" and job["node_results"]:
+                saw_live_result = True
+            deltas.extend(job["node_results"])
+            cursor = job["result_cursor"]
+            if job["state"] != "running":
+                break
+            time.sleep(0.01)
+        assert saw_live_result
+        assert job["state"] == "failed", job
+        assert [delta["node_id"] for delta in deltas] == ["source", "output"]
+        assert manager.get(job["id"], cursor)["node_results"] == []
+        assert job["result"]["partial"]["outputs"]["source"] == {"value": "hello"}
+        with pytest.raises(ValueError, match="cursor"):
+            manager.get(job["id"], cursor + 1)
+    finally:
+        manager.close()
+
+
+def test_http_result_cursor(api):
+    status, runtime = request(api, "GET", "/api/v1/runtime")
+    assert status == 200
+    assert runtime["capabilities"]["liveNodeResults"] == 1
+    status, job = request(api, "POST", "/api/v1/executions", {"workflow": workflow()})
+    assert status == 202
+    job = wait_job(api, job["id"])
+    assert [delta["node_id"] for delta in job["node_results"]] == ["source", "output"]
+    path = f"/api/v1/executions/{job['id']}?after={job['result_cursor']}"
+    status, next_poll = request(api, "GET", path)
+    assert status == 200
+    assert next_poll["node_results"] == []
+    assert next_poll["result_cursor"] == job["result_cursor"]
+    assert request(api, "GET", path.replace("after=2", "after=-1"))[0] == 400
+
+
 def test_package_api_opt_in_metadata_and_idle_session_refresh(api, monkeypatch):
     status, runtime = request(api, "GET", "/api/v1/runtime")
     assert status == 200

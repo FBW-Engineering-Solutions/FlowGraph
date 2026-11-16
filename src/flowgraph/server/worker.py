@@ -55,6 +55,7 @@ def main() -> None:
                     envelope["options"],
                     registry=registry,
                     on_progress=report,
+                    on_node_result=lambda result: report({"node_result": result}),
                 )
             temporary = response.with_suffix(".tmp")
             temporary.write_text(result, encoding="utf-8")
@@ -64,7 +65,10 @@ def main() -> None:
         with progress_writer(response) as report:
             response.write_text(
                 execute_workflow_json(
-                    request.read_text(encoding="utf-8"), registry=registry, on_progress=report
+                    request.read_text(encoding="utf-8"),
+                    registry=registry,
+                    on_progress=report,
+                    on_node_result=lambda result: report({"node_result": result}),
                 ),
                 encoding="utf-8",
             )

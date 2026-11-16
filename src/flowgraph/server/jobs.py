@@ -86,6 +86,7 @@ class JobManager:
                 "timed_out": False,
                 "timeout_seconds": timeout,
                 "progress": [],
+                "node_results": [],
             }
             temporary = tempfile.TemporaryDirectory(prefix="flowgraph-job-")
             root = Path(temporary.name)
@@ -164,7 +165,7 @@ class JobManager:
             self.threads = [item for item in self.threads if item.is_alive()]
             self.threads.append(thread)
             thread.start()
-            return dict(job)
+            return {**job, "node_results": [], "result_cursor": 0}
 
     def _watch(self, identifier, process, temporary, session_id=None, timeout=None) -> None:
         result = None
@@ -174,9 +175,10 @@ class JobManager:
             progress_file = response.with_name("progress.jsonl")
             progress_offset = 0
             progress = {}
+            result_bytes = 0
 
             def read_progress():
-                nonlocal progress_offset
+                nonlocal progress_offset, result_bytes
                 if not progress_file.exists():
                     return
                 with progress_file.open("rb") as stream:
@@ -186,7 +188,15 @@ class JobManager:
                             break
                         progress_offset += len(line)
                         event = json.loads(line)
-                        progress[event["node_id"]] = event
+                        if "node_result" in event:
+                            result_bytes += len(line)
+                            if result_bytes > self.max_result:
+                                self._stop(process)
+                                raise ValueError("Live node results exceed the server size limit")
+                            with self.lock:
+                                self.jobs[identifier]["node_results"].append(event["node_result"])
+                        else:
+                            progress[event["node_id"]] = event
                 with self.lock:
                     self.jobs[identifier]["progress"] = list(progress.values())
 
@@ -246,9 +256,15 @@ class JobManager:
                 process.kill()
                 process.wait()
 
-    def get(self, identifier: str) -> dict:
+    def get(self, identifier: str, after: int = 0) -> dict:
         with self.lock:
-            return dict(self.jobs[identifier])
+            job = dict(self.jobs[identifier])
+            results = job["node_results"]
+            if after < 0 or after > len(results):
+                raise ValueError("Invalid node result cursor")
+            job["node_results"] = results[after:]
+            job["result_cursor"] = len(results)
+            return job
 
     def cancel(self, identifier: str) -> dict:
         with self.lock:

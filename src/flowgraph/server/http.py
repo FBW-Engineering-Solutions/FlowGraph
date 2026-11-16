@@ -209,6 +209,7 @@ class LocalServer(ThreadingHTTPServer):
                 "advisoryExecutionTimeout": 1,
                 "incrementalExecution": 1,
                 "scopedExecution": 1,
+                "liveNodeResults": 1,
                 "installPackages": self.packages.info()["enabled"],
             },
             "directory": str(self.workspace.root),
@@ -404,7 +405,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             elif path.startswith("/api/v1/executions/"):
                 parts = path.removeprefix("/api/v1/executions/").split("/")
                 if method == "GET" and len(parts) == 1:
-                    self._reply(200, self.server.jobs.get(parts[0]))
+                    cursor = parse_qs(urlsplit(self.path).query).get("after", ["0"])[0]
+                    self._reply(200, self.server.jobs.get(parts[0], int(cursor)))
                 elif method == "POST" and len(parts) == 2 and parts[1] == "cancel":
                     self._body()
                     self._reply(200, self.server.jobs.cancel(parts[0]))

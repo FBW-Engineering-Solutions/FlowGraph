@@ -168,6 +168,7 @@ class WorkflowSession:
         parallel_tasks: int = 1,
         gpu_available: bool = False,
         on_progress: Callable[[dict[str, Any]], None] | None = None,
+        on_node_result: Callable[[str, Mapping[str, Any], Mapping[str, Any]], None] | None = None,
     ) -> WorkflowRunResult:
         """Execute targets and missing dependencies, preserving independent results."""
         if upstream not in {"normal", "missing", "none"}:
@@ -334,6 +335,8 @@ class WorkflowSession:
                 reused.append(node_id)
                 if on_progress is not None:
                     on_progress({"node_id": node_id, "state": "reused"})
+                if on_node_result is not None:
+                    on_node_result(node_id, inputs[node_id], outputs[node_id])
                 self.entries.move_to_end(node_id)
                 continue
             if node_id not in scope:
@@ -358,6 +361,7 @@ class WorkflowSession:
                     initial_outputs=outputs,
                     initial_inputs=injected,
                     on_progress=on_progress,
+                    on_node_result=on_node_result,
                 )
             except NodeExecutionError as error:
                 failed.append(node_id)
