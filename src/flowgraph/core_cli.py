@@ -38,6 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_parser = commands.add_parser("run", help="execute a workflow without opening the UI")
     run_parser.add_argument("workflow", type=str, help="workflow JSON file")
+    run_parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="print execution state and node output summaries to stderr; show live node stdout/stderr",
+    )
     for command_parser in (inspect_parser, run_parser):
         command_parser.add_argument(
             "--input",
@@ -174,6 +180,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 inputs=parse_inputs(args.input),
                 overrides=parse_overrides(args.override),
                 plugins=args.plugin,
+                verbose=args.verbose,
             )
             outputs = workflow_outputs(workflow, result)
             if args.json_output:

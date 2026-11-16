@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -61,6 +63,124 @@ def _override_workflow() -> WorkflowGraph:
     workflow.add_edge(WorkflowEdge("source", "value", "output", "value"), registry)
     workflow.sync_boundary_nodes(registry)
     return workflow
+
+
+@pytest.mark.parametrize("option", [None, "--verbose", "-v"])
+@pytest.mark.parametrize("json_output", [False, True])
+def test_cli_run_verbose_diagnostics(tmp_path, capsys, option, json_output):
+    path = tmp_path / "workflow.json"
+    destination = tmp_path / "outputs.json"
+    save_workflow(_override_workflow(), path)
+    args = ["run", str(path), "--override", "source.value=updated"]
+    if option:
+        args.append(option)
+    if json_output:
+        args.extend(["--json-output", str(destination)])
+    assert main(args) == 0
+    output = capsys.readouterr()
+    if json_output:
+        assert output.out == ""
+        assert json.loads(destination.read_text()) == {"result": "updated"}
+    else:
+        assert "result: 'updated'" in output.out
+    if option:
+        assert output.err.count("Execution run: running") == 1
+        assert output.err.count("Node 'source' output 'value' = 'updated'") == 1
+        assert output.err.count("Node 'output' output 'value' = 'updated'") == 1
+        assert output.err.count("Execution run: completed") == 1
+    else:
+        assert output.err == ""
+
+
+def test_cli_run_verbose_console_and_failure(tmp_path, capfd):
+    path = tmp_path / "workflow.json"
+    code = (
+        "def Execute() -> tuple[str]:\n"
+        "    import sys\n"
+        "    import logging\n"
+        "    print('node-stdout-marker')\n"
+        "    print('node-stderr-marker', file=sys.stderr)\n"
+        "    logging.warning('node-log-marker')\n"
+        "    raise ValueError('node-failure-marker')\n"
+    )
+    save_workflow(
+        WorkflowGraph([USER_FUNCTION.create_instance("python", parameters={"code": code})]),
+        path,
+    )
+    assert main(["run", str(path), "-v"]) == 2
+    output = capfd.readouterr()
+    assert "node-stdout-marker" in output.out
+    assert "node-stderr-marker" in output.err
+    assert "node-failure-marker" in output.err
+    assert "Execution run: failed" in output.err
+    assert "Execution run: completed" not in output.err
+    assert "Traceback" not in output.err
+
+
+def test_cli_verbose_summaries_are_bounded_and_preserve_outputs(tmp_path, capsys):
+    path = tmp_path / "workflow.json"
+    value = "x" * 10000
+    save_workflow(_override_workflow(), path)
+    _, result = execute_cli_workflow(path, overrides={"source": {"value": value}}, verbose=True)
+    output = capsys.readouterr()
+    assert "..." in output.err
+    assert len(output.err) < 2000
+    assert result.node_outputs["source"]["value"] == value
+
+
+def test_cli_verbose_subprocess_prints_and_logs(tmp_path):
+    path = tmp_path / "workflow.json"
+    code = (
+        "def Execute() -> tuple[str]:\n"
+        "    import sys\n"
+        "    import logging\n"
+        "    print('node-stdout-marker')\n"
+        "    print('node-stderr-marker', file=sys.stderr)\n"
+        "    logging.warning('node-log-marker')\n"
+        "    return ('node-result-marker',)\n"
+    )
+    save_workflow(
+        WorkflowGraph([USER_FUNCTION.create_instance("python", parameters={"code": code})]),
+        path,
+    )
+    completed = subprocess.run(
+        [sys.executable, "-m", "flowgraph", "run", str(path), "-v"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    assert "node-stdout-marker" in completed.stdout
+    assert "node-stderr-marker" in completed.stderr
+    assert "node-log-marker" in completed.stderr
+    assert "node-result-marker" in completed.stderr
+    assert (
+        completed.stderr.index("Execution run: running")
+        < completed.stderr.index("Node 'python' output")
+        < completed.stderr.index("Execution run: completed")
+    )
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_cli_verbose_restores_stream_configuration(monkeypatch, fails):
+    import io
+
+    from flowgraph.application.workflow_cli import _execution_console
+
+    stdout = io.TextIOWrapper(io.BytesIO())
+    stderr = io.TextIOWrapper(io.BytesIO())
+    monkeypatch.setattr(sys, "stdout", stdout)
+    monkeypatch.setattr(sys, "stderr", stderr)
+    try:
+        with _execution_console(True):
+            assert stdout.line_buffering and stdout.write_through
+            assert stderr.line_buffering and stderr.write_through
+            if fails:
+                raise ValueError("expected failure")
+    except ValueError:
+        assert fails
+    assert not stdout.line_buffering and not stdout.write_through
+    assert not stderr.line_buffering and not stderr.write_through
 
 
 def test_cli_assignment_parsers_decode_json_and_validate_shape() -> None:

@@ -39,6 +39,7 @@ uv run flowgraph run workflow.json --input name=value
 uv run flowgraph run workflow.json -i name=value
 uv run flowgraph run workflow.json --override node-id.parameter=value
 uv run flowgraph run workflow.json --json-output results.json
+uv run flowgraph run workflow.json --verbose
 uv run flowgraph run workflow.json --plugin /path/custom_nodes.py
 uv run flowgraph inspect workflow.json --plugin /path/custom_nodes.py --full
 ```
@@ -51,6 +52,14 @@ for the file format, path rules, dependencies and restart requirements.
 
 Use `--input` or its short form `-i` for each published workflow input; repeat
 the option to provide multiple inputs.
+
+Add `--verbose` (or `-v`) to `run` for execution states and live, bounded node
+output-port summaries on stderr, matching `serve` diagnostics. Node stdout/stderr
+remain visible and Python console output is line-buffered in verbose mode.
+Summaries use runtime values without making copies or generating previews.
+Verbose logs may contain sensitive workflow data; keep them private.
+Final outputs and `--json-output` retain their normal behavior.
+
 `flowgraph inspect` displays the resolved default to the right of each published
 input, or marks it as required or having conflicting saved values.
 Inspection is compact by default; add `--full` (or `-f`) to include the workflow
