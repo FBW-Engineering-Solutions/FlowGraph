@@ -1,5 +1,5 @@
 # Compatibility list mirroring the runtime dependencies in pyproject.toml.
 # Use `uv sync` for development; pyproject.toml is the canonical dependency file.
 vtk>=9.2
-muscat>=2.5.2
+muscat>=2.6.0
 packaging>=24

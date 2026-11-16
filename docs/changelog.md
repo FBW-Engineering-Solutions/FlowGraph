@@ -2,11 +2,62 @@ New in version 0.1.9:
 **********************
 **********************
 
+- Require Muscat 2.6.0 or newer for compatibility with the quadratic-to-linear API.
 - Use Muscat 2.6's `linearizeMiddlePoints` parameter in both quadratic-to-linear
   nodes without a legacy alias.
-
 - Bump the core package, runtime and lockfile version to 0.1.9; synchronize
   Desktop's core dependency without changing Desktop's own version.
+
+New functionalities and improvements:
+
+- Add Workspace Folder (`workspace-folder`) with a workspace-relative Text
+  selection and Path (`pathlib.Path`) output. Read Directory Files now accepts
+  Path directly; Path can also convert to FilePath for file consumers.
+- Replace Select uploaded file with Workspace File (`workspace-file`). Resolve
+  relative selections against the host-configured workspace, validate containment
+  and file existence, and invalidate caches when the workspace root changes.
+  Existing absolute file references remain external references.
+- Add `flowgraph run --verbose` / `-v` and extend server verbose mode with live
+  execution diagnostics, worker stdout/stderr and bounded node output summaries.
+  Normal output stays unchanged; verbose logs may contain sensitive data.
+- Expose node progress, elapsed time and cursor-based live node results in server
+  job polling. Add authenticated execution-state recovery for submitted workflows
+  and session options; recovery is in-memory, not persistent across server restarts.
+- Make native execution timeouts advisory: retain workers and late results until
+  explicit cancellation or service shutdown, and expose timeout state to clients.
+- Add trusted Python-file plugins through repeatable `--plugin FILE.py` options
+  for CLI and server startup, plus explicit registries for Python hosts. Plugins
+  export `AVAILABLE_NODES`; duplicate definition IDs are rejected.
+- Add opt-in native package check/install APIs with isolated workspace storage
+  and verified wheels, and WASM package checks with confirmed session-only
+  installation. Package installation is not enabled by default.
+- Add `flowgraph serve --host` and `--public-url` for HTTPS reverse-proxy hosting,
+  retaining bearer authentication, Host/Origin validation and loopback defaults.
+- Add ImageJ To Pillow (`imagej-to-pillow`), ImagePlus script input/output support,
+  script parameter metadata handling and a bundled Gaussian Blur example. Report
+  PyImageJ, CoSApp and Plaid versions in server runtime metadata.
+- Improve Compute Skin's boundary extraction and read-only metadata retention;
+  skip boundary extraction when its output is unused. Remove unused preview nodes
+  before 3D-view serialization without modifying the source mesh.
+- Use Muscat's NodeFilter directly for nested nodal selection. Keep packaging
+  inventory checks compatible with unversioned editable dependencies.
+
+Breaking changes and workflow migration:
+
+- No legacy aliases are provided for the renamed node definition IDs. In saved
+  workflow JSON, change `definition_id` from `select-server-file` to
+  `workspace-file`. For workflows saved during development with `workspace`,
+  change it to `workspace-folder`. Apply these changes in nested workflows too;
+  do not rename node instance IDs or edge endpoints merely to match definitions.
+  Workspace Folder is new since 0.1.8; its root selection defaults to `.`.
+- In both quadratic-to-linear nodes, rename the saved parameter key
+  `linearizedMiddlePoints` to `linearizeMiddlePoints`, preserving its value.
+  The old parameter name has no alias. Muscat 2.6.0 or newer is required.
+- Compute Skin (`extract-skin`) retains the full mesh on `mesh` and exposes the
+  boundary-only mesh on `skin_mesh`. Reconnect consumers needing only the boundary
+  to `skin_mesh` and review the configurable `Skin_Name`.
+- Rebuild or update Desktop/Web clients and their catalogs against the matching
+  Core version before using these changed node definitions and port types.
 
 New in version 0.1.8:
 **********************
