@@ -29,6 +29,28 @@ This creates `name: Text` and `scale: Float` inputs plus `output1: Text` and
 `output2: Float`. Use `tuple[()]` for no outputs. The runtime requires the
 returned tuple length and values to match the declared output ports.
 
+### Editable scalar inputs
+
+Arguments annotated `bool`, `int`, `float`, or `str` also create editable node
+parameters: a checkbox, integer field, numeric field, or text field. Their input
+ports remain connectable. An upstream connection overrides the configured value
+and disables its editor; disconnecting restores the configured fallback. Complex
+types such as `MeshDocument`, lists, and `Any` remain connection-only.
+
+```python
+def Execute(enabled: bool = True, iterations: int = 10,
+            scale: float = 1.0, name: str = "result") -> tuple[str, float]:
+    return (name, scale * iterations if enabled else 0.0)
+```
+
+Python defaults initialize the controls. Without a default, controls start at
+`False`, `0`, `0.0`, or `""`. Scalar defaults must be type-compatible literals,
+not expressions or function calls; inspecting a signature never runs user code.
+An integer literal is accepted for a float default. Configured values are saved
+with the workflow, separately from the source editor, under parameter keys such
+as `__user_input__scale`. Editing the signature updates the controls; existing
+saved values for unchanged names are retained and must match their current type.
+
 The Web Editor checks this declaration without executing it and updates the node
 ports as the source changes.
 

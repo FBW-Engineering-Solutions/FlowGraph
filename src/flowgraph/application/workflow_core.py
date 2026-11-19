@@ -153,6 +153,7 @@ class ParameterDefinition:
     options: tuple[ParameterOption, ...] = ()
     file_patterns: tuple[str, ...] = ()
     port: bool = True  # if this param must be export as a port
+    input_port: str | None = None
 
 
 @dataclass(frozen=True)
@@ -255,6 +256,15 @@ class NodeDefinition:
     cache_policy: str | None = None
     cache_revision: str = "1"
     cache_dependencies: Callable[[Mapping[str, Any], Mapping[str, Any]], Any] | None = None
+    instance_parameter_resolver: (
+        Callable[[NodeInstance], tuple[ParameterDefinition, ...]] | None
+    ) = None
+
+    def parameters_for_instance(self, instance: NodeInstance) -> tuple[ParameterDefinition, ...]:
+        """Return the editable schema for a configured node without executing it."""
+        if self.instance_parameter_resolver is not None:
+            return self.instance_parameter_resolver(instance)
+        return self.parameters
 
     def __post_init__(self) -> None:
         # None distinguishes omission from an explicit pure path-only override.
@@ -1386,9 +1396,20 @@ class WorkflowExecutor:
                     if port.is_param and port.name in node_inputs
                 }
                 # A connected parameter port is the authoritative source for that
-                # parameter. Persist its resolved value so the UI and saved
-                # workflow reflect the value used for this execution.
-                node.parameters.update(parameter_inputs)
+                # parameter. Preserve separately authored fallbacks on aliased
+                # controls; legacy same-name parameter ports persist resolved values.
+                aliased_parameter_ports = {
+                    parameter.input_port
+                    for parameter in definition.parameters_for_instance(node)
+                    if parameter.input_port is not None
+                }
+                node.parameters.update(
+                    {
+                        name: value
+                        for name, value in parameter_inputs.items()
+                        if name not in aliased_parameter_ports
+                    }
+                )
                 try:
                     exec_context = replace(
                         self._exec_context,
