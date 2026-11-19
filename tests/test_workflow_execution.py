@@ -539,6 +539,58 @@ def test_display_meshes_maps_volume_fields_to_new_boundary_faces() -> None:
     assert mesh.GetNumberOfElements() == 6
 
 
+def test_display_meshes_preserves_overlapping_tags_without_mutating_input() -> None:
+    from Muscat.MeshContainers import ElementsDescription as ED
+
+    from flowgraph.domain.mesh_document import MeshDocument
+
+    mesh = CreateSquare(dimensions=[3, 2])
+    mesh.nodesTags.CreateTag("shared").SetIds([0, 2, 4])
+    mesh.nodesTags.CreateTag("overlap").SetIds([2, 3])
+    mesh.nodesTags.CreateTag("empty").SetIds([])
+    quads = mesh.elements[ED.ElementType.Quadrangle_4]
+    quads.tags.CreateTag("shared").SetIds([0])
+    quads.tags.CreateTag("overlap").SetIds([0, 1])
+    mesh.nodeFields["shared"] = np.arange(mesh.GetNumberOfNodes(), dtype=float)
+    registry = create_node_registry()
+    workflow = WorkflowGraph([registry.create_instance("mesh-sink", "view")])
+    document = MeshDocument(mesh)
+    preview = _display_meshes(workflow, {"view": {"mesh": document}})["view"]
+    source_ids = np.asarray(preview["fields"]["shared"], dtype=int)
+    assert preview["node_tags"]["shared"] == np.isin(source_ids, [0, 2, 4]).astype(int).tolist()
+    assert preview["node_tags"]["overlap"] == np.isin(source_ids, [2, 3]).astype(int).tolist()
+    assert preview["node_tags"]["empty"] == [0] * len(source_ids)
+    assert sorted(preview["cell_tags"]["shared"]) == [0, 0, 1, 1]
+    assert preview["cell_tags"]["overlap"] == [1] * 4
+    assert not any(name.startswith("__flowgraph_preview_tag_") for name in preview["cell_fields"])
+    np.testing.assert_array_equal(mesh.nodesTags["shared"].GetIds(), [0, 2, 4])
+    np.testing.assert_array_equal(quads.tags["shared"].GetIds(), [0])
+    assert not any(name.startswith("__flowgraph_preview_tag_") for name in mesh.elemFields)
+
+
+def test_display_meshes_maps_volume_tags_to_generated_skin_and_compacts_node_tags() -> None:
+    from Muscat.MeshContainers import ElementsDescription as ED
+
+    from flowgraph.domain.mesh_document import MeshDocument
+
+    mesh = CreateCube(dimensions=[3, 3, 3], ofTetras=True)
+    del mesh.elements[ED.ElementType.Triangle_3]
+    elements = mesh.elements[ED.ElementType.Tetrahedron_4]
+    elements.tags.CreateTag("volume").SetIds(np.arange(elements.GetNumberOfElements()))
+    center = (mesh.nodes.min(axis=0) + mesh.nodes.max(axis=0)) / 2
+    interior = np.flatnonzero(np.all(mesh.nodes == center, axis=1))
+    assert len(interior) == 1
+    mesh.nodesTags.CreateTag("interior").SetIds(interior)
+    mesh.nodesTags.CreateTag("all").SetIds(np.arange(mesh.GetNumberOfNodes()))
+    registry = create_node_registry()
+    workflow = WorkflowGraph([registry.create_instance("mesh-sink", "view")])
+    preview = _display_meshes(workflow, {"view": {"mesh": MeshDocument(mesh)}})["view"]
+    assert len(preview["x"]) == 26
+    assert preview["node_tags"]["interior"] == [0] * 26
+    assert preview["node_tags"]["all"] == [1] * 26
+    assert preview["cell_tags"]["volume"] == [1] * len(preview["i"])
+
+
 def test_execute_workflow_json_returns_mesh_preview_for_sink() -> None:
     registry = create_node_registry()
     workflow = WorkflowGraph(

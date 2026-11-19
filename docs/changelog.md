@@ -2,6 +2,8 @@ New in version 0.1.9:
 **********************
 **********************
 
+- Rename display nodes to Show Mesh and Show Table without changing saved IDs.
+
 - Use 2D Vector (VEC2D) for ROI/LOI point outputs, preserving combined Any outputs.
 
 - Add ROI (`image-roi`) with optional image input, editable integer corners and

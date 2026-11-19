@@ -8,7 +8,7 @@ description: Nodes that consume data in application views.
 
 # Sink nodes
 
-## To 3D View (`mesh-sink`)
+## Show Mesh (`mesh-sink`)
 
 Requires `mesh: Mesh document` and has no outputs. The node displays the
 canonical mesh in the 3D view. UI-only parameters are `color_field=""` (solid
@@ -81,7 +81,7 @@ input's Python `str()` representation on the workflow using the same presentatio
 style as the Paragraph documentation node. Any value type can be connected to its
 input.
 
-## Plot Table (`plot-table`)
+## Show Table (`plot-table`)
 
 Requires `table: Table document` as its only input and has no outputs or
 parameters. The workflow view plots numeric list-valued columns in the table;

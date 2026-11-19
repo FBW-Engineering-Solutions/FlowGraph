@@ -312,7 +312,7 @@ def test_workflow_web_catalog_exports_plot_table_sink() -> None:
     nodes = _nodes(workflow_web_catalog()["groups"])
     plot_table = next(node for node in nodes if node["id"] == "plot-table")
 
-    assert plot_table["label"] == "Plot Table"
+    assert plot_table["label"] == "Show Table"
     assert plot_table["presentation"] == "plot-table"
     assert plot_table["ports"] == [
         {

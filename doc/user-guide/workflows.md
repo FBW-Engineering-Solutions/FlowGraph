@@ -24,7 +24,7 @@ For example, a mesh conversion workflow can be arranged as:
 ```text
 Select file ── path (Text) ──▶ Read Mesh (Muscat)
                                    │ mesh (Mesh document)
-                                   ├────────▶ To 3D View
+                                   ├────────▶ Show Mesh
                                    └────────▶ Write Mesh (MeshIO)
 ```
 

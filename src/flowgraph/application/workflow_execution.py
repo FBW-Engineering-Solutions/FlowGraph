@@ -280,6 +280,32 @@ def _surface_cell_fields(mesh: Any, surface: Any) -> dict[str, np.ndarray]:
     return fields
 
 
+def _surface_cell_tags(mesh: Any, surface: Any) -> dict[str, np.ndarray]:
+    """Project explicit face and volume tags independently, including overlapping groups."""
+    tagged_faces: dict[str, set[tuple[int, ...]]] = {}
+    for elements in mesh.elements.values():
+        dimension = ED.dimensionality[elements.elementType]
+        if dimension not in (2, 3):
+            continue
+        for tag in elements.tags:
+            faces = tagged_faces.setdefault(tag.name, set())
+            for connectivity in elements.connectivity[tag.GetIds()]:
+                if dimension == 2:
+                    faces.add(tuple(sorted(connectivity)))
+                else:
+                    for _, local_face in ED.faces1[elements.elementType]:
+                        faces.add(tuple(sorted(connectivity[local_face])))
+    connectivity = [
+        tuple(sorted(surface.originalIDNodes[cell]))
+        for elements in surface.elements.values()
+        for cell in elements.connectivity
+    ]
+    return {
+        name: np.asarray([cell in faces for cell in connectivity], dtype=np.uint8)
+        for name, faces in tagged_faces.items()
+    }
+
+
 def _display_meshes(workflow: Any, values: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     """Project only 3D-view sink inputs into Plotly-ready surface triangles."""
     previews: dict[str, Any] = {}
@@ -299,6 +325,15 @@ def _display_meshes(workflow: Any, values: Mapping[str, Mapping[str, Any]]) -> d
                 surface, ElementFilter(dimensionality=2), copy=False
             )
             surface.elemFields = _surface_cell_fields(mesh, surface)
+            # Carry membership through the same triangulation as cell fields, using
+            # collision-free temporary names that never escape into the field list.
+            tag_fields = {}
+            for name, membership in _surface_cell_tags(mesh, surface).items():
+                key = f"__flowgraph_preview_tag_{len(tag_fields)}"
+                while key in surface.elemFields:
+                    key += "_"
+                tag_fields[key] = name
+                surface.elemFields[key] = membership
             triangles = Tetrahedrization(surface)
             # Compact only the preview, preserving source IDs for nodal field mapping.
             CleanLonelyNodes(triangles, inPlace=True)
@@ -319,9 +354,14 @@ def _display_meshes(workflow: Any, values: Mapping[str, Mapping[str, Any]]) -> d
                 "field_components": {},
                 "cell_fields": {},
                 "cell_field_components": {},
+                "node_tags": {},
+                "cell_tags": {},
             }
             for name, data in triangles.elemFields.items():
                 array = np.asarray(data)
+                if name in tag_fields:
+                    preview["cell_tags"][tag_fields[name]] = array.tolist()
+                    continue
                 if array.ndim == 2 and array.shape[1] > 1:
                     preview["cell_field_components"][name] = array.tolist()
                     array = np.linalg.norm(array, axis=1)
@@ -329,6 +369,8 @@ def _display_meshes(workflow: Any, values: Mapping[str, Mapping[str, Any]]) -> d
             # Muscat's skin/triangulation does not carry nodeFields across. The
             # originalIDNodes arrays trace each output vertex back to the input mesh.
             indices = np.asarray(surface.originalIDNodes)[np.asarray(triangles.originalIDNodes)]
+            for tag in mesh.nodesTags:
+                preview["node_tags"][tag.name] = np.isin(indices, tag.GetIds()).astype(int).tolist()
             for name, data in mesh.nodeFields.items():
                 if name.startswith("flowgraph_"):
                     continue

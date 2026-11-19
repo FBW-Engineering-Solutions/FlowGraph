@@ -107,8 +107,10 @@ TRANSFER_FIELDS_NODE = NodeDefinition(
             "method",
             ParameterKind.STR_SELECT,
             "Interpolation",
-            "Interp/Clamp",
+            "Interpolation / Clamp",
             options=(
+
+                ParameterOption("Nearest/Nearest", "Nearest point"),
                 ParameterOption("Interp/Clamp", "Interpolation / Clamp"),
                 ParameterOption("Interp/Nearest", "Interpolation / Nearest"),
                 ParameterOption("Interp/Extrap", "Interpolation / Extrapolation"),
