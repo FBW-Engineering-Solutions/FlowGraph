@@ -8,6 +8,8 @@ from flowgraph.adapters.data_types import (
     MESH_DOCUMENT,
     STRING,
     TABLE_DOCUMENT,
+    VEC2D,
+    VEC2DI,
 )
 from flowgraph.application.workflow_core import (
     ExecContext,
@@ -76,6 +78,78 @@ SHOW_IMAGE = NodeDefinition(
 )
 
 
+def _region_of_interest(
+    _inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    _exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Return immutable image coordinates without copying the optional image."""
+    corners = []
+    for name in ("corner1", "corner2"):
+        value = parameters[name]
+        if len(value) != 2 or any(type(component) is not int for component in value):
+            raise ValueError(f"{name} must contain exactly two integers")
+        corners.append(tuple(value))
+    return {
+        "roi": tuple(corners),
+        "point1": [float(component) for component in corners[0]],
+        "point2": [float(component) for component in corners[1]],
+    }
+
+
+REGION_OF_INTEREST = NodeDefinition(
+    id="image-roi",
+    requirements=(),
+    icon="mdi-image-outline",
+    label="ROI",
+    description="Defines a rectangular image region using two integer pixel coordinates.",
+    ports=(
+        PortDefinition("input", PortDirection.INPUT, IMAGE, "Image", required=False),
+        PortDefinition("roi", PortDirection.OUTPUT, ANY, "ROI"),
+        PortDefinition("point1", PortDirection.OUTPUT, VEC2D, "Point 1"),
+        PortDefinition("point2", PortDirection.OUTPUT, VEC2D, "Point 2"),
+    ),
+    executor=_region_of_interest,
+    parameters=(
+        ParameterDefinition("corner1", VEC2DI, "Corner 1", [0, 0], port=False),
+        ParameterDefinition("corner2", VEC2DI, "Corner 2", [0, 0], port=False),
+    ),
+    presentation="image-roi",
+)
+
+
+def _line_of_interest(
+    inputs: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    exec_context: ExecContext | None = None,
+) -> Mapping[str, Any]:
+    """Return immutable endpoints in their original order, without copying the image."""
+    outputs = dict(_region_of_interest(inputs, parameters, exec_context))
+    outputs["loi"] = outputs.pop("roi")
+    return outputs
+
+
+LINE_OF_INTEREST = NodeDefinition(
+    id="image-loi",
+    requirements=(),
+    icon="mdi-image-outline",
+    label="LOI",
+    description="Defines a line of interest using two integer pixel coordinates.",
+    ports=(
+        PortDefinition("input", PortDirection.INPUT, IMAGE, "Image", required=False),
+        PortDefinition("loi", PortDirection.OUTPUT, ANY, "LOI"),
+        PortDefinition("point1", PortDirection.OUTPUT, VEC2D, "Point 1"),
+        PortDefinition("point2", PortDirection.OUTPUT, VEC2D, "Point 2"),
+    ),
+    executor=_line_of_interest,
+    parameters=(
+        ParameterDefinition("corner1", VEC2DI, "Point 1", [0, 0], port=False),
+        ParameterDefinition("corner2", VEC2DI, "Point 2", [0, 0], port=False),
+    ),
+    presentation="image-loi",
+)
+
+
 def _consume_value(
     _inputs: Mapping[str, Any],
     _parameters: Mapping[str, Any],
@@ -108,4 +182,11 @@ PLOT_TABLE = NodeDefinition(
 )
 
 
-AVAILABLE_NODES = (TO_3D_VIEW, SHOW_IMAGE, DISPLAY_VALUE, PLOT_TABLE)
+AVAILABLE_NODES = (
+    TO_3D_VIEW,
+    SHOW_IMAGE,
+    REGION_OF_INTEREST,
+    LINE_OF_INTEREST,
+    DISPLAY_VALUE,
+    PLOT_TABLE,
+)
