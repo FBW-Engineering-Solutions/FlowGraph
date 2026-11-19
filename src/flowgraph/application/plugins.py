@@ -22,9 +22,9 @@ def resolve_plugin_paths(paths: Sequence[str | Path]) -> tuple[Path, ...]:
     for value in paths:
         path = Path(value).expanduser().resolve()
         if path.suffix != ".py" or not path.is_file():
-            raise PluginError(f"Plugin {str(path)!r}: expected an existing Python (.py) file")
+            raise PluginError(f"Plugin '{path}': expected an existing Python (.py) file")
         if path in resolved:
-            raise PluginError(f"Plugin {str(path)!r}: file was supplied more than once")
+            raise PluginError(f"Plugin '{path}': file was supplied more than once")
         resolved.append(path)
     return tuple(resolved)
 
@@ -55,6 +55,6 @@ def load_plugin_groups(paths: Sequence[str | Path]) -> tuple[AdapterGroup, ...]:
             module.AVAILABLE_NODES = definitions
         except (Exception, SystemExit) as error:
             sys.modules.pop(name, None)
-            raise PluginError(f"Plugin {str(path)!r}: {type(error).__name__}: {error}") from error
+            raise PluginError(f"Plugin '{path}': {type(error).__name__}: {error}") from error
         groups.append(AdapterGroup(f"Plugins / {path.name}", definitions))
     return tuple(groups)

@@ -2,7 +2,7 @@
 
 import re
 from collections.abc import Mapping
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from flowgraph.application.workflow_core import (
@@ -112,7 +112,7 @@ def _workspace_directory(
     if not isinstance(selected, str):
         raise TypeError("Workspace Folder selection must be text")
     relative = Path(selected)
-    if relative.is_absolute():
+    if relative.is_absolute() or PureWindowsPath(selected).anchor:
         raise ValueError("Workspace Folder requires a workspace-relative folder path")
     folder = (root / relative).resolve()
     if not folder.is_relative_to(root):

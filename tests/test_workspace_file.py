@@ -107,6 +107,10 @@ def test_workspace_directory_relocation_and_listing(tmp_path):
         ("file.txt", "not a directory"),
         ("../outside", "escapes"),
         ("/outside", "workspace-relative"),
+        ("\\outside", "workspace-relative"),
+        ("C:\\outside", "workspace-relative"),
+        ("C:outside", "workspace-relative"),
+        ("\\\\server\\share\\outside", "workspace-relative"),
         (None, "must be text"),
     ],
 )
@@ -205,7 +209,7 @@ def test_cli_and_json_execution(tmp_path, capsys):
     expected = str(root / "my/files/mesh.stl")
     assert result.node_outputs["file"]["path"] == expected
     assert main(["run", str(workflow), "--workspace", str(root)]) == 0
-    assert expected in capsys.readouterr().out
+    assert repr(expected) in capsys.readouterr().out
     for options in (None, {"session_id": "workspace-portability"}):
         response = json.loads(
             execute_workflow_json(workflow_to_json(graph), options, workspace=root)

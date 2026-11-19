@@ -758,19 +758,69 @@ def test_execution_timeout_validation(api, timeout):
     assert api.jobs.active is None
 
 
-def test_worker_crash_and_result_limit_are_reported(api):
+@pytest.mark.parametrize("session", [False, True])
+def test_worker_crash_and_result_limit_are_reported(api, session):
+    options = {"options": {"session_id": "failed-worker"}} if session else {}
     crash = "def Execute() -> tuple[int]:\n    import os\n    os._exit(7)\n    return (1,)\n"
-    status, job = request(api, "POST", "/api/v1/executions", {"workflow": workflow(crash)})
+    status, job = request(
+        api, "POST", "/api/v1/executions", {"workflow": workflow(crash), **options}
+    )
     assert status == 202
     failed = wait_job(api, job["id"])
     assert failed["state"] == "failed"
     assert "without a result (7)" in failed["error"]
     api.jobs.max_result = 1
-    status, job = request(api, "POST", "/api/v1/executions", {"workflow": workflow()})
+    status, job = request(api, "POST", "/api/v1/executions", {"workflow": workflow(), **options})
     assert status == 202
     failed = wait_job(api, job["id"])
     assert failed["state"] == "failed"
     assert "size limit" in failed["error"]
+    assert api.jobs.active is None
+    assert "failed-worker" not in api.jobs.sessions
+    api.jobs.max_result = 64 << 20
+    status, retry = request(api, "POST", "/api/v1/executions", {"workflow": workflow(), **options})
+    assert status == 202
+    assert wait_job(api, retry["id"])["state"] == "completed"
+
+
+@pytest.mark.parametrize("oversized", [False, True])
+def test_job_cleanup_failure_does_not_prevent_final_state(tmp_path, monkeypatch, caplog, oversized):
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import Mock
+
+    temporary = tempfile.TemporaryDirectory(prefix="flowgraph-job-test-")
+    root = Path(temporary.name)
+    cleanup = temporary.cleanup
+
+    def locked_cleanup():
+        cleanup()
+        raise PermissionError("file is being used by another process")
+
+    monkeypatch.setattr(temporary, "cleanup", locked_cleanup)
+    manager = JobManager(tmp_path, max_result=1 if oversized else 1024)
+    manager.jobs["test"] = {"state": "running", "node_results": []}
+    manager.active = "test"
+    process = Mock()
+    process.poll.return_value = None if oversized else 0
+    process.returncode = 0
+    manager.process = process
+    (root / "response.json").write_text('{"status": "ok"}', encoding="utf-8")
+    (root / "progress.jsonl").write_text('{"node_result": {}}\n', encoding="utf-8")
+
+    manager._watch("test", process, temporary)
+
+    job = manager.get("test")
+    assert job["state"] == ("failed" if oversized else "completed")
+    if oversized:
+        assert "size limit" in job["error"]
+        process.terminate.assert_called_once()
+        process.wait.assert_called_once()
+    else:
+        process.terminate.assert_not_called()
+    assert manager.active is None
+    assert manager.process is None
+    assert "Could not remove execution temporary directory" in caplog.text
 
 
 @pytest.mark.parametrize(
