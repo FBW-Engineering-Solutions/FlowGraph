@@ -2,6 +2,10 @@ New in version 0.1.9:
 **********************
 **********************
 
+- Use a bounded staged close for ParaView HTTP connections so rejected uploads
+  can receive their error response without a Windows connection-reset race.
+  Origin authorization remains exact-match and rejected data is never accepted.
+
 - Fix Windows plugin path diagnostics, reject rooted Workspace Folder selections,
   and keep execution failures reportable when temporary-file cleanup fails.
   Preserve CLI string output formatting in cross-platform tests.

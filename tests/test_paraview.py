@@ -25,6 +25,7 @@ from flowgraph.paraview_gateway import (
     GatewayServer,
     LiveGateway,
     Update,
+    _Handler,
     _HTTPHandler,
     _read_frame,
     _write_frame,
@@ -596,6 +597,59 @@ def test_http_denies_untrusted_origin(origin):
         assert "--allow-origin" in reply.read().decode()
         client.close()
         assert accepted == []
+
+
+def test_http_rejection_allows_late_body_without_accepting_it():
+    with receiver(allowed_origins=("http://localhost:8082",)) as (port, accepted):
+        with socket.create_connection(("127.0.0.1", port), timeout=2) as sock:
+            sock.sendall(
+                b"POST /api/v1/dataset HTTP/1.1\r\nHost: localhost\r\n"
+                b"Origin: http://localhost:8082.evil\r\n"
+                b"Content-Type: application/octet-stream\r\nContent-Length: 65536\r\n\r\n"
+            )
+            reply = http.client.HTTPResponse(sock)
+            reply.begin()
+            assert reply.status == 403
+            assert reply.getheader("Access-Control-Allow-Origin") is None
+            assert "--allow-origin" in reply.read().decode()
+            sock.sendall(b"x" * 65536)
+            sock.shutdown(socket.SHUT_WR)
+            assert sock.recv(1) == b""
+        assert accepted == []
+
+
+@pytest.mark.parametrize("ending", [b"", TimeoutError(), ConnectionResetError()])
+def test_http_close_half_closes_before_draining(ending):
+    from unittest.mock import Mock
+
+    connection = Mock()
+    connection.recv.side_effect = [b"unread body", ending]
+    _Handler._close_http(SimpleNamespace(request=connection))
+    assert connection.method_calls[0][0] == "shutdown"
+    connection.shutdown.assert_called_once_with(socket.SHUT_WR)
+    assert connection.recv.call_count == 2
+    assert all(0 < call.args[0] <= 0.25 for call in connection.settimeout.call_args_list)
+
+
+def test_http_close_limits_discarded_bytes(monkeypatch):
+    from unittest.mock import Mock
+
+    monkeypatch.setattr("flowgraph.paraview_gateway.time.monotonic", lambda: 0)
+    connection = Mock()
+    connection.recv.side_effect = lambda size: b"x" * size
+    _Handler._close_http(SimpleNamespace(request=connection))
+    assert sum(call.args[0] for call in connection.recv.call_args_list) == 1 << 20
+
+
+def test_http_close_limits_total_drain_time(monkeypatch):
+    from unittest.mock import Mock
+
+    clock = iter([0, 0.1, 0.3])
+    monkeypatch.setattr("flowgraph.paraview_gateway.time.monotonic", lambda: next(clock))
+    connection = Mock()
+    connection.recv.return_value = b"x"
+    _Handler._close_http(SimpleNamespace(request=connection))
+    connection.recv.assert_called_once()
 
 
 def test_http_reply_uses_configured_origin_value():

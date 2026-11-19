@@ -528,6 +528,7 @@ class _Handler(socketserver.BaseRequestHandler):
             first = self.request.recv(1, socket.MSG_PEEK)
             if first and first in b"GPOHCDT":
                 _HTTPHandler(self.request, self.client_address, self.server)
+                self._close_http()
                 return
             metadata, payload = _read_frame(self.request)
             self.server.accept_update(metadata, payload)
@@ -538,6 +539,31 @@ class _Handler(socketserver.BaseRequestHandler):
                 _write_frame(self.request, {"ok": False, "error": str(error)[:2000]})
             except OSError:
                 pass
+
+    def _close_http(self) -> None:
+        """Deliver the final response before closing over unread upload data.
+
+        RFC 9112 section 9.6 recommends a write half-close followed by draining
+        incoming data to avoid resetting the response. Bound both time and bytes
+        so a rejected or slow client cannot monopolize the sequential receiver.
+        Never parse or accept the discarded data, including pipelined requests.
+        """
+        try:
+            self.request.shutdown(socket.SHUT_WR)
+            deadline = time.monotonic() + 0.25
+            remaining = 1 << 20
+            while remaining:
+                timeout = deadline - time.monotonic()
+                if timeout <= 0:
+                    break
+                self.request.settimeout(timeout)
+                chunk = self.request.recv(min(65536, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+        except OSError:
+            # The peer may already have closed or reset its connection.
+            pass
 
 
 class LiveGateway:
