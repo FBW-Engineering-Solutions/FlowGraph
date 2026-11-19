@@ -17,7 +17,7 @@ It keeps an unconnected spare input while below capacity. Lists must have equal
 lengths, and source output port names must be unique: duplicate names, unequal
 lengths, and an empty set of connections are errors. The node has no parameters.
 
-Connect the resulting table to [Plot Table](sinks.md),
+Connect the resulting table to [Show Table](sinks.md),
 [Write Table (Pandas)](writers.md), or a workflow output.
 
 ## Mesh to Table (`mesh-to-table`)
