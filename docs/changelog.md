@@ -2,7 +2,20 @@ New in version 0.1.9:
 **********************
 **********************
 
+- Use 2D Vector (VEC2D) for ROI/LOI point outputs, preserving combined Any outputs.
+
+- Add ROI (`image-roi`) with optional image input, editable integer corners and
+  immutable tuple output; web selection uses original pixel coordinates.
+
+- Add LOI (`image-loi`) with equivalent line selection, editable integer endpoints
+  and immutable tuple output preserving endpoint order.
+
+- Expose separate `point1` and `point2` tuple outputs on ROI and LOI while keeping
+  their combined selection outputs.
+
 - Require Muscat 2.6.0 or newer for compatibility with the quadratic-to-linear API.
+- Lock Muscat from PyPI and verify release configuration does not depend on a
+  sibling editable checkout.
 - Use Muscat 2.6's `linearizeMiddlePoints` parameter in both quadratic-to-linear
   nodes without a legacy alias.
 - Bump the core package, runtime and lockfile version to 0.1.9; synchronize

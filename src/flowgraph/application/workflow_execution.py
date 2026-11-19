@@ -207,7 +207,7 @@ def _display_images(
     previews: dict[str, dict[str, dict[str, Any]]] = {}
     encoded: dict[int, dict[str, Any]] = {}
     for node in workflow.nodes:
-        if node.definition_id != "local-view":
+        if node.definition_id not in {"local-view", "image-roi", "image-loi"}:
             continue
         value = values.get(node.id, {}).get("input")
         if not isinstance(value, Image):

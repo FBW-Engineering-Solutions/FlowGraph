@@ -30,8 +30,49 @@ The original image is never resized or modified: workflow processing and exports
 keep full resolution. The displayed dimensions and mouse-coordinate readout refer
 to the original image, with zero-based coordinates, even in the expanded viewport.
 Preview payloads retain original `width`, `height`, and `mode`; `preview_width` and
-`preview_height` describe the encoded PNG. Only Show Image inputs produce image
+`preview_height` describe the encoded PNG. Only Show Image, ROI and LOI inputs produce image
 previews; multiple viewers sharing an image reuse its encoding within a response.
+
+## ROI (`image-roi`)
+
+Defines an unrestricted rectangular region of interest. The optional `input: Image`
+provides a selection background; it is not modified or returned. The node works
+without an image. Parameters `corner1` and `corner2` are 2D integer vectors,
+both defaulting to `[0, 0]`. Output `roi: Any` is the immutable nested tuple
+`((x1, y1), (x2, y2))`, preserving manually entered corner order and values.
+Additional outputs `point1: 2D Vector` and `point2: 2D Vector` expose each point
+as a two-element float list `[x, y]`, following the existing `VEC2D` contract.
+The combined output retains its immutable integer tuples.
+
+In the web editor, both corners have visible X/Y numeric inputs. The image preview
+shows the saved ROI as a solid green rectangle. Click and drag in any direction to
+preview a dashed green rectangle while retaining the current selection. Release
+to update both parameters in one undoable change; pointer cancellation leaves them
+unchanged. Selection coordinates refer to the original image, not the downsampled
+preview, with `(0, 0)` at the top-left. Dragged corners are normalized to top-left
+and bottom-right and clamped to image boundaries (`0..width`, `0..height`); the
+bottom-right boundary may equal the image dimensions. Manual values are not clamped.
+The output reflects saved parameters when the workflow next executes.
+Desktop consumes the node through its standard parameter editor; interactive image
+selection is currently specific to the web editor.
+
+## LOI (`image-loi`)
+
+Defines a line of interest with the same optional Image background and integer
+coordinate editing as ROI. The two endpoint parameters retain the keys `corner1`
+and `corner2`, displayed as **Point 1** and **Point 2**, both defaulting to `[0, 0]`.
+Output `loi: Any` is the immutable tuple `((x1, y1), (x2, y2))`.
+Additional `point1: 2D Vector` and `point2: 2D Vector` outputs expose each endpoint
+as a two-element float list `[x, y]`, while retaining the combined tuple output.
+
+The web editor draws a solid green line between the saved endpoints, and a dashed
+green line during click-and-drag. Release commits both endpoints in one undo step;
+cancellation preserves the previous line. Unlike ROI, endpoint order is preserved:
+Point 1 is the drag start and Point 2 is the release position. Horizontal, vertical
+and diagonal lines are supported. Coordinates, boundary clamping, manual editing,
+preview retention and operation without an image follow ROI behavior. The image
+is not modified or copied by the node. Desktop uses its standard parameter editor;
+interactive image selection is web-editor-only.
 
 ## Show Value (`show-value`)
 
