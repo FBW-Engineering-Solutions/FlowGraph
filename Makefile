@@ -26,3 +26,7 @@ doc:
 
 servedoc: doc
 	uv run  --no-sync python -m http.server "$${PORT:-8000}" --directory site
+
+lint:
+	uv run ruff format  .
+	uv run ruff check .

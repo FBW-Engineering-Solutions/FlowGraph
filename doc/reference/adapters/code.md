@@ -38,8 +38,9 @@ and disables its editor; disconnecting restores the configured fallback. Complex
 types such as `MeshDocument`, lists, and `Any` remain connection-only.
 
 ```python
-def Execute(enabled: bool = True, iterations: int = 10,
-            scale: float = 1.0, name: str = "result") -> tuple[str, float]:
+def Execute(
+    enabled: bool = True, iterations: int = 10, scale: float = 1.0, name: str = "result"
+) -> tuple[str, float]:
     return (name, scale * iterations if enabled else 0.0)
 ```
 
