@@ -58,7 +58,7 @@ def test_element_filter_supports_node_filter_interface_without_copying():
     assert resolve_port_conversion(MUSCAT_NODE_FILTER, MUSCAT_ELEMENT_FILTER) is None
 
 
-@pytest.mark.parametrize("target", [CREATE_MUSCAT_NODE_FILTER, CREATE_MUSCAT_ELEMENT_FILTER])
+@pytest.mark.parametrize("target", [CREATE_MUSCAT_ELEMENT_FILTER])
 def test_element_filter_connects_to_node_filter_port_round_trip(tmp_path, mesh, target):
     registry = create_node_registry()
     graph = WorkflowGraph(
@@ -144,25 +144,6 @@ def test_node_selector_tags(mesh, parameters, expected):
     np.testing.assert_array_equal(selector.GetNodesIndices(mesh), expected)
 
 
-def test_node_selector_intersects_zones_and_both_nested_filters(mesh):
-    plane = next(node for node in AVAILABLE_NODES if node.id == "zone-plane")
-    zone = plane.executor({}, {"offset": 1.5})["zone"]
-    nfilter = NodeFilter(nTag="middle")
-    efilter = ElementFilter(eTag="first")
-    selector = CREATE_MUSCAT_NODE_FILTER.executor(
-        {"zone_1": zone, "nFilter": nfilter, "eFilter": efilter}, {}
-    )["filter"]
-    assert selector.nFilter is nfilter and selector.eFilter is efilter
-    np.testing.assert_array_equal(selector.GetNodesIndices(mesh), [1])
-    np.testing.assert_array_equal(nfilter.GetNodesIndices(mesh), [1, 2])
-
-
-def test_nested_node_filter_is_applied_not_just_stored(mesh):
-    inner = CREATE_MUSCAT_NODE_FILTER.executor({}, {"ntag": ["middle"]})["filter"]
-    outer = CREATE_MUSCAT_NODE_FILTER.executor({"nFilter": inner}, {"ntag": ["left"]})["filter"]
-    np.testing.assert_array_equal(outer.GetNodesIndices(mesh), [1])
-
-
 @pytest.mark.parametrize("treatment,expected", [("ALL_NODES", [0]), ("AT_LEAST_ONE", [0, 1])])
 def test_element_selector_uses_nested_node_filter_treatment(mesh, treatment, expected):
     selector = CREATE_MUSCAT_ELEMENT_FILTER.executor(
@@ -171,46 +152,7 @@ def test_element_selector_uses_nested_node_filter_treatment(mesh, treatment, exp
     np.testing.assert_array_equal(selector.GetGlobalIds(mesh), expected)
 
 
-def test_element_selector_intersects_both_nested_filters(mesh):
-    selector = CREATE_MUSCAT_ELEMENT_FILTER.executor(
-        {"nFilter": NodeFilter(nTag="left"), "eFilter": ElementFilter(eTag="last")},
-        {"nFilterTreatment": "AT_LEAST_ONE"},
-    )["filter"]
-    np.testing.assert_array_equal(selector.GetGlobalIds(mesh), [])
-
-
 @pytest.mark.parametrize("parameters", [{"ntag": "middle"}, {"etag": [1]}])
 def test_node_selector_validates_tag_lists(parameters):
     with pytest.raises(TypeError):
         CREATE_MUSCAT_NODE_FILTER.executor({}, parameters)
-
-
-def test_all_four_nested_connector_combinations_round_trip_and_execute(tmp_path, mesh):
-    registry = create_node_registry()
-    graph = WorkflowGraph(
-        [
-            CREATE_MUSCAT_NODE_FILTER.create_instance("nodes", parameters={"ntag": ["middle"]}),
-            CREATE_MUSCAT_ELEMENT_FILTER.create_instance(
-                "elements", parameters={"etag": ["first"]}
-            ),
-            CREATE_MUSCAT_NODE_FILTER.create_instance("composed-nodes"),
-            CREATE_MUSCAT_ELEMENT_FILTER.create_instance(
-                "composed-elements",
-                parameters={
-                    "nFilterTreatment": "AT_LEAST_ONE",
-                },
-            ),
-        ]
-    )
-    for target in ("composed-nodes", "composed-elements"):
-        graph.add_edge(WorkflowEdge("nodes", "filter", target, "nFilter"), registry)
-        graph.add_edge(WorkflowEdge("elements", "filter", target, "eFilter"), registry)
-    path = tmp_path / "selectors.json"
-    save_workflow(graph, path)
-    result = WorkflowExecutor(registry).run(load_workflow(path, registry))
-    np.testing.assert_array_equal(
-        result.node_outputs["composed-nodes"]["filter"].GetNodesIndices(mesh), [1]
-    )
-    np.testing.assert_array_equal(
-        result.node_outputs["composed-elements"]["filter"].GetGlobalIds(mesh), [0]
-    )

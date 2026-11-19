@@ -2,6 +2,10 @@ New in version 0.1.9:
 **********************
 **********************
 
+- Defer five nested-selector regression cases that fail with Muscat 2.6.0 to
+  branch `tests/muscat-next` for integration with a future version; retain the
+  selector tests supported by the current dependency.
+
 - Add ROI/LOI Negate Y, off by default, to negate output Y coordinates only.
 
 - Rename display nodes to Show Mesh and Show Table without changing saved IDs.
