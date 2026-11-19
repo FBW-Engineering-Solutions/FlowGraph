@@ -89,7 +89,7 @@ def _region_of_interest(
         value = parameters[name]
         if len(value) != 2 or any(type(component) is not int for component in value):
             raise ValueError(f"{name} must contain exactly two integers")
-        corners.append(tuple(value))
+        corners.append((value[0], -value[1] if parameters.get("negate_y", False) else value[1]))
     return {
         "roi": tuple(corners),
         "point1": [float(component) for component in corners[0]],
@@ -113,6 +113,14 @@ REGION_OF_INTEREST = NodeDefinition(
     parameters=(
         ParameterDefinition("corner1", VEC2DI, "Corner 1", [0, 0], port=False),
         ParameterDefinition("corner2", VEC2DI, "Corner 2", [0, 0], port=False),
+        ParameterDefinition(
+            "negate_y",
+            BOOLEAN,
+            "Negate Y",
+            False,
+            "Negate Y in all coordinate outputs without changing the image selection.",
+            port=False,
+        ),
     ),
     presentation="image-roi",
 )
@@ -145,6 +153,14 @@ LINE_OF_INTEREST = NodeDefinition(
     parameters=(
         ParameterDefinition("corner1", VEC2DI, "Point 1", [0, 0], port=False),
         ParameterDefinition("corner2", VEC2DI, "Point 2", [0, 0], port=False),
+        ParameterDefinition(
+            "negate_y",
+            BOOLEAN,
+            "Negate Y",
+            False,
+            "Negate Y in all coordinate outputs without changing the image selection.",
+            port=False,
+        ),
     ),
     presentation="image-loi",
 )
