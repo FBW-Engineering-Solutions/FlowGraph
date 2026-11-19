@@ -2,6 +2,8 @@ New in version 0.1.9:
 **********************
 **********************
 
+- Add ROI/LOI Negate Y, off by default, to negate output Y coordinates only.
+
 - Rename display nodes to Show Mesh and Show Table without changing saved IDs.
 
 - Use 2D Vector (VEC2D) for ROI/LOI point outputs, preserving combined Any outputs.

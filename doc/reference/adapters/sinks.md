@@ -44,6 +44,12 @@ Additional outputs `point1: 2D Vector` and `point2: 2D Vector` expose each point
 as a two-element float list `[x, y]`, following the existing `VEC2D` contract.
 The combined output retains its immutable integer tuples.
 
+Enable **Negate Y** (`negate_y`, Boolean, default `false`) to output `(x, -y)`
+for both corners in `roi`, `point1` and `point2`. This changes the sign about
+Y = 0, not about the image height. Saved corner parameters, preview coordinates
+and selection overlays remain unchanged. Existing workflows retain their outputs
+unless this option is enabled.
+
 In the web editor, both corners have visible X/Y numeric inputs. The image preview
 shows the saved ROI as a solid green rectangle. Click and drag in any direction to
 preview a dashed green rectangle while retaining the current selection. Release
@@ -64,6 +70,10 @@ and `corner2`, displayed as **Point 1** and **Point 2**, both defaulting to `[0,
 Output `loi: Any` is the immutable tuple `((x1, y1), (x2, y2))`.
 Additional `point1: 2D Vector` and `point2: 2D Vector` outputs expose each endpoint
 as a two-element float list `[x, y]`, while retaining the combined tuple output.
+
+Like ROI, **Negate Y** (`negate_y`, default `false`) negates Y in `loi`,
+`point1` and `point2` without changing the saved endpoints or image selection.
+Endpoint order is preserved even when enabled.
 
 The web editor draws a solid green line between the saved endpoints, and a dashed
 green line during click-and-drag. Release commits both endpoints in one undo step;
