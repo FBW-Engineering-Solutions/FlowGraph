@@ -95,8 +95,10 @@ def test_registry_plugins_are_local_and_imported_once(plugin):
         ("raise SystemExit(4)", "SystemExit"),
     ],
 )
-def test_plugin_errors_identify_file_and_allow_retry(tmp_path, source, message):
-    path = tmp_path / "bad.py"
+@pytest.mark.parametrize("filename", ["bad.py", "bad\\plugin.py"])
+def test_plugin_errors_identify_file_and_allow_retry(tmp_path, source, message, filename):
+    path = tmp_path / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(source, encoding="utf-8")
     with pytest.raises(PluginError, match=message) as caught:
         create_node_registry(plugins=[path])

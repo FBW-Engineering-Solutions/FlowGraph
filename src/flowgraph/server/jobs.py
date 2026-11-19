@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import subprocess
@@ -218,7 +219,6 @@ class JobManager:
                         if "node_result" in event:
                             result_bytes += len(line)
                             if result_bytes > self.max_result:
-                                self._stop(process)
                                 raise ValueError("Live node results exceed the server size limit")
                             with self.lock:
                                 self.jobs[identifier]["node_results"].append(event["node_result"])
@@ -252,8 +252,19 @@ class JobManager:
                 raise TypeError("Invalid execution response")
         except Exception as exception:  # noqa: BLE001 - convert process failures to job state
             error = str(exception)
+            # Close progress readers before stopping the writer and removing files.
+            # Failed session workers must not retain caches or private job handles.
+            self._stop(process)
         finally:
-            temporary.cleanup()
+            try:
+                temporary.cleanup()
+            except OSError:
+                # A Windows sharing violation must not leave the job running forever.
+                logging.getLogger(__name__).warning(
+                    "Could not remove execution temporary directory %s",
+                    temporary.name,
+                    exc_info=True,
+                )
         with self.lock:
             job = self.jobs.get(identifier)
             if job is not None and job["state"] == "running":

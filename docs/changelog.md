@@ -2,6 +2,10 @@ New in version 0.1.9:
 **********************
 **********************
 
+- Fix Windows plugin path diagnostics, reject rooted Workspace Folder selections,
+  and keep execution failures reportable when temporary-file cleanup fails.
+  Preserve CLI string output formatting in cross-platform tests.
+
 - Fix Transfer Fields' default to use the Muscat value `Interp/Clamp`, not its
   display label; retain Nearest point and test all five transfer choices.
 
