@@ -60,6 +60,17 @@ def _saved_parameters(
         return []
     visited = visited | {key}
     node = workflow.require_node(node_id)
+    if node.definition_id == "user-function":
+        from flowgraph.adapters.user_code import USER_FUNCTION
+
+        for parameter in USER_FUNCTION.parameters_for_instance(node):
+            if parameter.input_port == node_port:
+                return [
+                    (
+                        node.parameters.get(parameter.name, parameter.default),
+                        f"{prefix}{node_id}.{parameter.name}",
+                    )
+                ]
     if node_port in node.parameters:
         return [(node.parameters[node_port], f"{prefix}{node_id}.{node_port}")]
     if node.definition_id == "workflow-input" and node_port == "value":

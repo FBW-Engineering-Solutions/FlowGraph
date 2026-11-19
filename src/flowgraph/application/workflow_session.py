@@ -208,8 +208,16 @@ class WorkflowSession:
             definition = self.registry.require(node.definition_id)
             incoming = tuple(edge for edge in graph.edges if edge.target_node == node.id)
             supplied = {edge.target_port for edge in incoming} | set(injected.get(node.id, {}))
+            aliases = {
+                p.input_port: p.name
+                for p in definition.parameters_for_instance(node)
+                if p.input_port is not None
+            }
+            supplied = {aliases.get(name, name) for name in supplied}
             parameter_ports = {
-                port.name for port in definition.ports_for_instance(node) if port.is_param
+                aliases.get(port.name, port.name)
+                for port in definition.ports_for_instance(node)
+                if port.is_param
             }
             parameters = {
                 **definition.default_parameters,

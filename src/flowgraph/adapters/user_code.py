@@ -47,6 +47,60 @@ _ANNOTATION_TYPES = {
 }
 
 
+_SCALAR_DEFAULTS = {"bool": False, "int": 0, "float": 0.0, "str": ""}
+_INPUT_PREFIX = "__user_input__"
+
+
+def _input_parameters(source: str) -> tuple[ParameterDefinition, ...]:
+    """Read scalar defaults using literals only, never executing authored code."""
+    function = _execute_function(source)
+    arguments = [*function.args.posonlyargs, *function.args.args]
+    defaults = dict(
+        zip(
+            [
+                argument.arg
+                for argument in arguments[len(arguments) - len(function.args.defaults) :]
+            ],
+            function.args.defaults,
+            strict=True,
+        )
+    )
+    parameters = []
+    for argument in arguments:
+        annotation = _annotation_name(argument.annotation)
+        if annotation not in _SCALAR_DEFAULTS:
+            continue
+        value = _SCALAR_DEFAULTS[annotation]
+        if argument.arg in defaults:
+            try:
+                value = ast.literal_eval(defaults[argument.arg])
+            except (ValueError, TypeError, SyntaxError) as error:
+                raise ValueError(
+                    f"Execute default for {argument.arg!r} must be a scalar literal"
+                ) from error
+            expected = type(_SCALAR_DEFAULTS[annotation])
+            if annotation == "float" and type(value) is int:
+                value = float(value)
+            if type(value) is not expected:
+                raise TypeError(f"Execute default for {argument.arg!r} must be {annotation}")
+        parameters.append(
+            ParameterDefinition(
+                _INPUT_PREFIX + argument.arg,
+                _ANNOTATION_TYPES[annotation],
+                argument.arg,
+                value,
+                input_port=argument.arg,
+            )
+        )
+    return tuple(parameters)
+
+
+def _parameters_for_instance(instance: NodeInstance) -> tuple[ParameterDefinition, ...]:
+    """Expose the source editor followed by scalar argument controls."""
+    source = instance.parameters.get("code", DEFAULT_CODE)
+    return USER_FUNCTION.parameters + _input_parameters(source)
+
+
 def _annotation_name(annotation: ast.expr | None) -> str:
     """Return the supported source spelling for one function annotation."""
     if annotation is None:
@@ -108,7 +162,12 @@ def _input_ports(source: str) -> tuple[PortDefinition, ...]:
             )
         ports.append(
             PortDefinition(
-                argument.arg, PortDirection.INPUT, data_type, argument.arg, required=False
+                argument.arg,
+                PortDirection.INPUT,
+                data_type,
+                argument.arg,
+                required=False,
+                is_param=annotation_name in _SCALAR_DEFAULTS,
             )
         )
     return tuple(ports)
@@ -147,6 +206,7 @@ def _output_ports(source: str) -> tuple[PortDefinition, ...]:
 def _ports_for_instance(instance: NodeInstance) -> tuple[PortDefinition, ...]:
     """Resolve User Function inputs and outputs from an instance's source code."""
     source = instance.parameters.get("code", DEFAULT_CODE)
+    _input_parameters(source)
     return _input_ports(source) + _output_ports(source)
 
 
@@ -159,6 +219,7 @@ def _execute_user_code(
     code = parameters.get("code", DEFAULT_CODE)
     input_ports = _input_ports(code)
     output_ports = _output_ports(code)
+    scalar_parameters = {parameter.input_port: parameter for parameter in _input_parameters(code)}
 
     namespace: dict[str, Any] = {"__builtins__": __builtins__, "Any": Any}
     compiled = compile(code, "<flowgraph user-function>", "exec")
@@ -178,7 +239,20 @@ def _execute_user_code(
     ):
         raise ValueError("Execute must not be reassigned after its validated function declaration")
 
-    result = function(*(inputs.get(port.name) for port in input_ports))
+    values = []
+    for port in input_ports:
+        parameter = scalar_parameters.get(port.name)
+        value = inputs.get(port.name)
+        if port.name not in inputs and parameter is not None:
+            value = parameters.get(parameter.name, parameter.default)
+        if parameter is not None:
+            expected = type(parameter.default)
+            if expected is float and type(value) is int:
+                value = float(value)
+            if type(value) is not expected:
+                raise TypeError(f"Execute input {port.name!r} expected {port.data_type.label}")
+        values.append(value)
+    result = function(*values)
     if not isinstance(result, tuple) or len(result) != len(output_ports):
         raise TypeError(
             f"Execute must return a tuple containing exactly {len(output_ports)} outputs"
@@ -199,6 +273,7 @@ USER_FUNCTION = NodeDefinition(
     ports=(),
     executor=_execute_user_code,
     instance_port_resolver=_ports_for_instance,
+    instance_parameter_resolver=_parameters_for_instance,
     parameters=(
         ParameterDefinition(
             "code",

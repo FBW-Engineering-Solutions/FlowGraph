@@ -374,8 +374,8 @@ def _render_graph(
             [port for port in ports if port.direction is PortDirection.INPUT and port.is_param],
             input_edges,
         )
-        for parameter in definition.parameters:
-            if parameter.name in input_edges:
+        for parameter in definition.parameters_for_instance(node):
+            if (parameter.input_port or parameter.name) in input_edges:
                 continue
             value = node.parameters.get(parameter.name, parameter.default)
             lines.append(
@@ -598,7 +598,7 @@ def _apply_overrides(
         if node is None:
             raise WorkflowCliError(f"Parameter override references unknown node {node_id!r}")
         definition = registry.require(node.definition_id)
-        known = {parameter.name for parameter in definition.parameters}
+        known = {parameter.name for parameter in definition.parameters_for_instance(node)}
         unknown = set(parameters).difference(known)
         if unknown:
             raise WorkflowCliError(f"Unknown parameters for node {node_id!r}: {sorted(unknown)!r}")
