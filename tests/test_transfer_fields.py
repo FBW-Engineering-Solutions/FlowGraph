@@ -12,7 +12,7 @@ from flowgraph.application.workflow_core import WorkflowGraph
 from flowgraph.application.workflow_io import load_workflow, save_workflow
 from flowgraph.domain.mesh_document import MeshDocument
 
-METHODS = ("Interp/Clamp", "Interp/Nearest", "Interp/Extrap", "Interp/ZeroFill")
+METHODS = ("Nearest/Nearest", "Interp/Clamp", "Interp/Nearest", "Interp/Extrap", "Interp/ZeroFill")
 
 
 def tetrahedron():
@@ -33,8 +33,28 @@ def test_interpolation_is_ui_only_and_defaults_to_clamp():
     definition = next(p for p in TRANSFER_FIELDS_NODE.parameters if p.name == "method")
     assert definition.default == "Interp/Clamp"
     assert tuple(option.value for option in definition.options) == METHODS
+    assert definition.default in METHODS
+    assert next(
+        option.label for option in definition.options if option.value == definition.default
+    ) == ("Interpolation / Clamp")
+    assert definition.port is False
     assert [port.name for port in TRANSFER_FIELDS_NODE.inputs] == ["source_data", "target"]
     assert TRANSFER_FIELDS_NODE.create_instance("transfer").parameters["method"] == "Interp/Clamp"
+
+
+def test_new_instance_default_executes_with_real_muscat():
+    source, target = tetrahedron(), tetrahedron()
+    target.mesh.nodeFields.pop("temperature")
+    target.mesh.elemFields.pop("material")
+    instance = TRANSFER_FIELDS_NODE.create_instance("transfer")
+    result = TRANSFER_FIELDS_NODE.executor(
+        {"source_data": source, "target": target}, instance.parameters
+    )["mesh_document"]
+    np.testing.assert_allclose(result.mesh.nodeFields["temperature"], [0.0, 1.0, 2.0, 3.0])
+    np.testing.assert_allclose(result.mesh.elemFields["material"], [7.0])
+    assert "temperature" not in target.mesh.nodeFields
+    assert "material" not in target.mesh.elemFields
+    assert np.shares_memory(result.mesh.nodes, target.mesh.nodes)
 
 
 @pytest.mark.parametrize("method", [None, *METHODS])
@@ -94,8 +114,9 @@ def test_real_nodal_interpolation_inside_and_outside(method, expected):
     np.testing.assert_array_equal(source.mesh.nodeFields["temperature"], [0.0, 1.0, 2.0, 3.0])
 
 
-@pytest.mark.parametrize("method", METHODS)
+@pytest.mark.parametrize("method", [method for method in METHODS if method != "Nearest/Nearest"])
 def test_real_element_and_tag_transfer(method):
+    # Muscat 2.6.0's nearest-point operator produces an invalid index for P0 fields.
     source, target = tetrahedron(), tetrahedron()
     target.mesh.nodeFields.pop("temperature")
     target.mesh.elemFields.pop("material")
