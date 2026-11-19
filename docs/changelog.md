@@ -2,6 +2,9 @@ New in version 0.1.9:
 **********************
 **********************
 
+- Fix Transfer Fields' default to use the Muscat value `Interp/Clamp`, not its
+  display label; retain Nearest point and test all five transfer choices.
+
 - Defer five nested-selector regression cases that fail with Muscat 2.6.0 to
   branch `tests/muscat-next` for integration with a future version; retain the
   selector tests supported by the current dependency.

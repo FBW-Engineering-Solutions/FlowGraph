@@ -162,7 +162,8 @@ onto the target mesh. Parameters are UI-only and default to:
 
 The **Interpolation** dropdown controls both field and tag transfers, for nodes
 and elements. **Interpolation / Clamp** interpolates inside the source mesh and
-uses the closest point on its boundary outside. Other choices are
+uses the closest point on its boundary outside. **Nearest point** uses
+`Nearest/Nearest` to select the nearest source point. Other choices are
 **Interpolation / Nearest**, **Interpolation / Extrapolation**,
 and **Interpolation / Zero Fill**. Workflows without a saved method use
 Interpolation / Clamp.
