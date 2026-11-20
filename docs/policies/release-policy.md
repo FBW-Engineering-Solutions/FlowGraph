@@ -52,8 +52,9 @@ Before publishing an alpha release:
 - pass the applicable CI matrix and local quality gates;
 - build and inspect the source distribution and wheel;
 - publish release notes and known limitations;
-- validate license, dependency, artifact, and SBOM requirements through the
-  release compliance pipeline;
+- pass the automated dependency inventory/audit and artifact checks, and manually
+  review the exact distributed files and applicable license/notice requirements
+  using the [packaging review procedure](../../packaging/README.md#manual-redistribution-review);
 - document workflow-format changes and migration guidance; and
 - verify the release through the supported GitHub and PyPI channels.
 
@@ -61,6 +62,12 @@ Apply these requirements to each release candidate. Review and record relevant
 unresolved security, dependency, licensing, and support risks before publication.
 Unrelated owner decisions and optional improvements do not automatically block
 a release.
+
+The current workflow does not generate an SBOM, a native-component audit, or a
+complete preserved-license bundle. Do not claim these outputs exist. Record the
+manual review's scope, evidence, unresolved risks, and maintainer disposition;
+missing evidence must not be treated as a successful compliance check. Required
+permissions and redistribution obligations still apply independently of automation.
 
 ## Release operations
 
