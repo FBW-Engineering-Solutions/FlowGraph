@@ -2,6 +2,14 @@ New in version 0.1.9:
 **********************
 **********************
 
+FlowGraph Core 0.1.9 remains an alpha release, with breaking workflow changes.
+This release focuses on portable workspaces, trusted native plugins, execution
+diagnostics and recovery, ImageJ integration, and mesh/image workflow improvements.
+Review the migration guidance below before opening existing workflows. Desktop
+and Web clients have separate validation and distribution procedures.
+
+Changes and fixes:
+
 - Use a bounded staged close for ParaView HTTP connections so rejected uploads
   can receive their error response without a Windows connection-reset race.
   Origin authorization remains exact-match and rejected data is never accepted.
@@ -29,10 +37,12 @@ New in version 0.1.9:
 - Add LOI (`image-loi`) with equivalent line selection, editable integer endpoints
   and immutable tuple output preserving endpoint order.
 
-- Expose separate `point1` and `point2` tuple outputs on ROI and LOI while keeping
-  their combined selection outputs.
+- Expose separate `point1` and `point2` 2D Vector outputs as two-element float lists
+  on ROI and LOI while keeping their combined immutable tuple outputs.
 
 - Require Muscat 2.6.0 or newer for compatibility with the quadratic-to-linear API.
+- Add the base dependency `packaging>=24` and the optional `server` extra
+  (`uv>=0.6`) for native workspace package installation.
 - Lock Muscat from PyPI and verify release configuration does not depend on a
   sibling editable checkout.
 - Use Muscat 2.6's `linearizeMiddlePoints` parameter in both quadratic-to-linear
@@ -90,6 +100,36 @@ Breaking changes and workflow migration:
   to `skin_mesh` and review the configurable `Skin_Name`.
 - Rebuild or update Desktop/Web clients and their catalogs against the matching
   Core version before using these changed node definitions and port types.
+- Read Directory Files now consumes Path (`pathlib.Path`) instead of FilePath;
+  review custom Python callers and connections to that input.
+- Native execution timeouts are advisory, not automatic termination. Hosts that
+  require a hard stop must explicitly cancel the execution; otherwise the worker
+  can continue and deliver late results.
+
+Known limitations and operational notes:
+
+- Muscat 2.6.0 has known nested-selector failures. Five unsupported regression
+  cases are deferred; this release does not claim to fix those dependency issues.
+- Transfer Fields' Nearest point (`Nearest/Nearest`) mode can fail for P0 element
+  fields with Muscat 2.6.0. The four interpolation modes remain covered for element
+  fields; nearest-point nodal transfer is covered separately.
+- Python-file plugins and code-execution nodes run trusted arbitrary code, not in
+  a security sandbox. The local server must be configured and exposed only to
+  trusted users; reverse-proxy support does not make untrusted workflows safe.
+- Package installation is opt-in. Native package storage is workspace-local;
+  browser package installation is session-only and does not persist after reload.
+- Execution recovery is in-memory and does not survive server restart. Verbose
+  output can include paths, node values, and other sensitive information.
+- ImageJ/Fiji and other optional integrations need their external runtimes and
+  dependencies. Core wheel/sdist smoke tests do not certify every optional backend
+  or the separate Desktop and Web applications.
+- Python 3.11–3.14 are the CI target versions on Ubuntu, Windows, and macOS;
+  platform support for this release depends on the corresponding candidate jobs
+  passing. A pure-Python Core wheel still requires compatible native dependency
+  wheels; `requires-python >=3.11` alone is not a promise for newer interpreters.
+- Release preparation documentation now distinguishes automated dependency and
+  artifact checks from manual redistribution review; no generated SBOM, native
+  audit, or complete license bundle is claimed by the current workflow.
 
 New in version 0.1.8:
 **********************

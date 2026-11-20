@@ -67,6 +67,53 @@ def test_release_notes_document_019_workflow_migration() -> None:
     assert "`workspace-folder`" not in previous
 
 
+def test_release_notes_document_019_limitations_and_final_output_types() -> None:
+    current = (
+        (ROOT / "docs/changelog.md")
+        .read_text(encoding="utf-8")
+        .split("New in version 0.1.8:", 1)[0]
+    )
+    current = " ".join(current.split())
+    for text in (
+        "alpha release",
+        "`packaging>=24`",
+        "`uv>=0.6`",
+        "two-element float lists",
+        "P0 element fields",
+        "nested-selector failures",
+        "not automatic termination",
+        "not in a security sandbox",
+        "session-only",
+        "does not survive server restart",
+        "Python 3.11–3.14",
+    ):
+        assert text in current
+    assert "`point1` and `point2` tuple outputs" not in current
+
+
+def test_release_review_does_not_claim_ungenerated_compliance_outputs() -> None:
+    packaging = " ".join((ROOT / "packaging/README.md").read_text(encoding="utf-8").split())
+    policy = " ".join(
+        (ROOT / "docs/policies/release-policy.md").read_text(encoding="utf-8").split()
+    )
+    assert "### Manual redistribution review" in packaging
+    for document in (packaging, policy):
+        assert "does not generate an SBOM" in document or "not generate an SBOM" in document
+        assert "native-component audit" in document
+        assert "unresolved risks" in document
+        assert "release compliance pipeline" not in document
+    for text in (
+        "both exact archives",
+        "separately installed dependencies",
+        "archive SHA-256 hashes",
+        "required permissions or notices",
+        "only PyPI waits",
+        "retained for 30 days",
+    ):
+        assert text in packaging
+    assert "retained for one day" not in packaging
+
+
 def test_security_reporting_docs_keep_unverified_delivery_explicit() -> None:
     security = " ".join((ROOT / "SECURITY.md").read_text(encoding="utf-8").split())
     assert "GitHub private vulnerability reporting" in security

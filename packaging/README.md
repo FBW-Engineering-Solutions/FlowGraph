@@ -59,7 +59,7 @@ ignored `.validation-dist/` directory and use it in all three commands. Artifact
 output may be inside the checkout; the runner creates its installation and smoke
 test environments outside the checkout. Python 3.11+ and `uv` on PATH
 are required; network access is needed for uncached dependencies/build tools.
-The commands do not upload anything. CI archives are retained for one day.
+The commands do not upload anything. CI package artifacts are retained for 30 days.
 
 Both production publication jobs wait for the complete artifact matrix and tag
 validation, then use the same named artifacts from that workflow run. Required
@@ -112,10 +112,13 @@ uv sync --locked --extra dev --extra io
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest --cov=flowgraph --cov-report=term-missing
-rm -rf dist/
-uv build --out-dir dist/
-python packaging/check_release.py --artifacts dist/ --tag "v$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+uv build --no-sources --out-dir .validation-dist/release-candidate
+VERSION=$(uv run python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+uv run python packaging/check_release.py --artifacts .validation-dist/release-candidate --tag "v$VERSION"
 ```
+
+Use a new, empty artifact directory, as described for the rehearsal above. Use a
+Python version covered by the CI matrix and available dependency wheels.
 
 The validator compares source declarations, filenames, and internal wheel/sdist
 metadata to the exact tag. Omit `--tag` only for untagged development builds.
@@ -125,12 +128,46 @@ tags to include later fixes or reuse a published version for different bytes.
 
 Inspect both artifacts, install them in clean environments, run `flowgraph
 --help`, import `flowgraph`, and exercise a representative workflow before
-publishing. Retain dependency notices, SBOM, native
-audit, preserved license texts, and checksums with the release record. Publish
-through GitHub Releases and PyPI only after applicable release checks pass and
+publishing. Perform the manual redistribution review below and retain its actual
+evidence, applicable notices/license texts, and checksums with the release record.
+Publish through GitHub Releases and PyPI only after applicable release checks pass and
 relevant unresolved risks have been reviewed and recorded. Optional improvements
 are not automatic release blockers. Required security and artifact reviews still
 apply. Core package validation does not validate optional Desktop or Web clients.
+
+### Manual redistribution review
+
+The current workflow automates Python dependency inventory/advisory checks,
+wheel/sdist version validation, and isolated installation/CLI smoke tests. It does
+not generate an SBOM, a native-component audit, or a complete preserved-license
+bundle. The [third-party notices](../doc/reference/third-party-notices.md) describe
+direct dependency evidence and its limitations, not artifact-specific clearance.
+
+Before publication, the release manager must:
+
+1. Inspect both exact archives: filenames, internal metadata, license files,
+   packaged code/resources, unexpected binaries, personal paths, and sensitive
+   data. Confirm the wheel contains only the intended Core namespace/resources,
+   not Desktop/Web code or a developer's workspace/build products.
+2. Distinguish bundled files from separately installed dependencies. Review
+   permissions and required notices for shipped code, images, test data, and
+   other resources; identify unresolved ownership or attribution questions.
+   Optional Java/native runtimes and separately bundled applications need their
+   own delivery-specific review; a Python advisory scan does not cover them.
+3. Record the reviewed commit, archive SHA-256 hashes, review scope/evidence,
+   dependency audit result, unresolved risks, and the maintainer's disposition in
+   the private release record. Obtain missing required permissions or notices
+   before distributing affected files. Do not mark unknown obligations satisfied.
+4. Preserve only actually generated evidence and applicable license/notice files
+   with the release archive and independently verified backup. State unavailable
+   evidence explicitly; do not claim an ungenerated SBOM or native audit.
+
+After a successful `master` CI run and review, push the matching version tag to
+start publication. GitHub Release creation and PyPI publication are separate jobs
+after tag/artifact validation; only PyPI waits for the `pypi` environment approval.
+The workflow generates GitHub notes automatically: review them and incorporate
+the current section of `docs/changelog.md`, including migration and limitations.
+Do not use a release tag as a non-publishing rehearsal.
 
 ## Published-release evidence archive
 
