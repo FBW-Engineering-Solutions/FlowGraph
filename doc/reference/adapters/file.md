@@ -15,8 +15,8 @@ and returns the path of the downloaded temporary file.
 | Node (ID) | Inputs and outputs | Parameters and behavior |
 | --- | --- | --- |
 | **Select file** (`select-file`) | Output `path: Text` | `path`: `""`; accepts local file patterns such as `*.*`. The desktop UI opens a local file chooser. |
-| **Workspace File** (`workspace-file`) | Output `path: Text` | `file name`: `""` (UI-only, not a port). Stores a workspace-relative path and outputs its absolute runtime path. |
-| **Workspace Folder** (`workspace-folder`) | Output `path: Path` | `folder`: `"."`. Dropdown includes the workspace root and all nested subfolders, including empty folders. Outputs the selected directory as an absolute `pathlib.Path`. |
+| **Workspace File** (`workspace-file`) | Optional inputs `workspace: Path` (also Text), `file name: Text`; output `path: Text` | `file name`: `""`. Connected inputs override the runtime workspace and selected relative file without changing the saved selection. |
+| **Workspace Folder** (`workspace-folder`) | Optional input `folder: Text` (also Path); output `path: Path` | `folder`: `"."`. Dropdown includes the workspace root and nested subfolders. Connected input overrides only this node without filesystem validation. |
 | **Download URL** (`download-url`) | Output `path: Text` | `url`: `""`; accepts only HTTP(S) URLs and downloads the response to a persistent system temporary file. |
 | **Read Directory Files** (`read-directory-files`) | Parameter/input `path: Path`; outputs `files: List Text`, `files_full_paths: List Text` | Local `include_pattern` and `exclude_pattern` regular expressions filter immediate regular files by filename. |
 
@@ -35,6 +35,17 @@ copying file contents. Connect it to the `path` input of **Read Mesh** or anothe
 reader. Moving the workspace does not require editing the saved workflow.
 
 The node ID is `workspace-file` and its parameter is `file name`.
+Its optional `workspace` input overrides the configured root for this node only;
+connect **Workspace Folder** or supply directory-path text. Its optional `file name` Text input overrides the
+selector with a workspace-relative path, for example `meshes/model.vtu`.
+Disconnected inputs fall back to the runtime workspace and saved file selection.
+Connected values do not replace the saved selection; disconnecting restores it.
+When either input is connected, the node only resolves the path: it does not
+validate file/directory existence, file kind, or workspace confinement. This allows
+new destinations such as `results/output.vtu` to feed writer nodes, even when
+the destination directory does not exist yet. It does not create files or folders;
+the downstream writer is responsible for them. Input types and nonempty values
+are still required, and relative file paths still need a workspace root.
 Existing absolute paths remain external references. In the web
 editor, exact matches to current workspace files are normalized to relative paths;
 ambiguous basenames and unmatched external paths are not rewritten.
@@ -45,8 +56,9 @@ keyword. Browser execution uses its uploaded/mounted files directory. Desktop
 launchers accept `--workspace ./project`; without it, Desktop uses its temporary
 session upload folder. Persistent workspace files are not removed on exit.
 
-Relative references require an explicit workspace and an existing regular file.
-Traversal or symlinks escaping that workspace are rejected. Legacy absolute paths
+Without connected inputs, relative selections require an explicit workspace and
+an existing regular file. Traversal or symlinks escaping that workspace are
+rejected for these selector values. Legacy absolute paths
 are intentionally not confined to it. No `{workspace}` substitution is performed
 in arbitrary text parameters; use the node's output instead.
 
@@ -63,8 +75,16 @@ The root comes from the same runtime configuration as **Workspace File** and is
 inherited by nested workflows. An unconfigured workspace produces a clear error;
 there is no implicit fallback to the process working directory. Moving the
 workspace updates the output on the next run, including incremental execution.
-Missing folders, file selections, absolute paths and paths escaping the workspace
-are rejected. The node ID is `workspace-folder`; nodes without a
+The optional `folder` input accepts Text or Path and overrides only this node,
+not the runtime workspace or other graph branches. Relative inputs resolve against
+the runtime workspace; absolute inputs work without a configured workspace.
+Connected paths skip existence, directory-kind and workspace-confinement checks,
+allowing new output directories. No directories are created. Empty text and invalid
+input types are rejected. The saved dropdown selection is preserved and restored
+when the input is disconnected.
+
+Without a connected input, missing folders, file selections, absolute paths and
+paths escaping the workspace are rejected. The node ID is `workspace-folder`; nodes without a
 `folder` parameter continue to select the workspace root.
 
 ## Download URL
