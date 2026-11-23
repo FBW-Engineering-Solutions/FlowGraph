@@ -53,12 +53,13 @@ SELECT_FILE = NodeDefinition(
 
 
 def _select_server_file(
-    _inputs: Mapping[str, Any],
+    inputs: Mapping[str, Any],
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Resolve a portable workspace file, preserving legacy absolute paths."""
-    path = parameters.get("file name", "")
+    """Resolve selected files, or compose connected paths without filesystem validation."""
+    validate_selection = "workspace" not in inputs and "file name" not in inputs
+    path = inputs.get("file name", parameters.get("file name", ""))
     if not isinstance(path, str):
         raise TypeError("The selected file path parameter must be text")
     if len(path) == 0:
@@ -68,12 +69,19 @@ def _select_server_file(
     if source.is_absolute():
         return {"path": str(source)}
     root = _exec_context.workspace if _exec_context is not None else None
+    if "workspace" in inputs:
+        workspace = inputs["workspace"]
+        if not isinstance(workspace, (str, Path)):
+            raise TypeError("Workspace File workspace path must be text or a Path")
+        if workspace == "":
+            raise ValueError("Workspace File workspace path can't be empty")
+        root = Path(workspace).expanduser().resolve()
     if root is None:
         raise ValueError("Workspace File requires a configured workspace directory")
     source = (root / source).resolve()
-    if not source.is_relative_to(root):
+    if validate_selection and not source.is_relative_to(root):
         raise ValueError("Workspace File path escapes the workspace directory")
-    if not source.is_file():
+    if validate_selection and not source.is_file():
         raise ValueError(f"Workspace file does not exist or is not a file: {path}")
     return {"path": str(source)}
 
@@ -84,12 +92,28 @@ SELECT_SERVER_FILE = NodeDefinition(
     requirements=(),
     icon="mdi-cloud-upload-outline",
     label="Workspace File",
-    description="Resolves a workspace-relative file path at runtime without reading the file. Legacy absolute paths remain external references.",
-    ports=(PortDefinition("path", PortDirection.OUTPUT, STRING, "File path"),),
+    description="Resolves a workspace-relative file path without reading the file. Connected workspace or file name inputs compose paths without filesystem validation, including new writer destinations. Legacy absolute paths remain external references.",
+    ports=(
+        PortDefinition("path", PortDirection.OUTPUT, STRING, "File path"),
+        PortDefinition(
+            "workspace",
+            PortDirection.INPUT,
+            DIRECTORY,
+            "Workspace path",
+            required=False,
+            accepted_data_types=(STRING,),
+        ),
+        PortDefinition("file name", PortDirection.INPUT, STRING, "Workspace file", required=False),
+    ),
     executor=_select_server_file,
     parameters=(
         ParameterDefinition(
-            "file name", ParameterKind.SELECT_SERVER_FILENAME, "Workspace file", "", port=False
+            "file name",
+            ParameterKind.SELECT_SERVER_FILENAME,
+            "Workspace file",
+            "",
+            port=False,
+            input_port="file name",
         ),
     ),
 )
@@ -100,12 +124,24 @@ class DirectoryReadError(ValueError):
 
 
 def _workspace_directory(
-    _inputs: Mapping[str, Any],
+    inputs: Mapping[str, Any],
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Resolve the selected relative folder within the host-configured workspace."""
+    """Resolve the selector, or a node-local connected folder without filesystem checks."""
     root = _exec_context.workspace if _exec_context is not None else None
+    if "folder" in inputs:
+        selected = inputs["folder"]
+        if not isinstance(selected, (str, Path)):
+            raise TypeError("Workspace Folder input must be text or a Path")
+        if selected == "":
+            raise ValueError("Workspace Folder input can't be empty")
+        folder = Path(selected).expanduser()
+        if folder.is_absolute():
+            return {"path": folder.resolve()}
+        if root is None:
+            raise ValueError("Workspace Folder requires a configured workspace directory")
+        return {"path": (root / folder).resolve()}
     if root is None:
         raise ValueError("Workspace Folder requires a configured workspace directory")
     selected = parameters.get("folder", ".")
@@ -128,11 +164,23 @@ WORKSPACE = NodeDefinition(
     requirements=(),
     icon="mdi-folder-outline",
     label="Workspace Folder",
-    description="Resolves a selected workspace-relative folder as an absolute directory path. Defaults to the workspace root.",
-    ports=(PortDefinition("path", PortDirection.OUTPUT, DIRECTORY, "Directory path"),),
+    description="Resolves a selected workspace-relative folder as an absolute directory path. An optional folder input overrides this node only, without filesystem validation. Defaults to the workspace root.",
+    ports=(
+        PortDefinition("path", PortDirection.OUTPUT, DIRECTORY, "Directory path"),
+        PortDefinition(
+            "folder",
+            PortDirection.INPUT,
+            STRING,
+            "Workspace folder",
+            required=False,
+            accepted_data_types=(DIRECTORY,),
+        ),
+    ),
     executor=_workspace_directory,
     parameters=(
-        ParameterDefinition("folder", ParameterKind.TEXT, "Workspace folder", ".", port=False),
+        ParameterDefinition(
+            "folder", ParameterKind.TEXT, "Workspace folder", ".", port=False, input_port="folder"
+        ),
     ),
 )
 

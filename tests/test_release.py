@@ -42,11 +42,11 @@ def test_release_docs_use_planned_mvp_baseline_without_missing_audit() -> None:
 
 
 def test_release_notes_document_019_workflow_migration() -> None:
-    """Keep breaking workflow changes in the next release, not published history."""
+    """Keep the published 0.1.9 workflow migration guidance intact."""
     changelog = (ROOT / "docs/changelog.md").read_text(encoding="utf-8")
     current, previous = changelog.split("New in version 0.1.8:", 1)
+    current = current.split("New in version 0.1.9:", 1)[1]
     current = " ".join(current.split())
-    assert current.startswith("New in version 0.1.9:")
     for text in (
         "Muscat 2.6.0 or newer",
         "`definition_id`",
@@ -65,6 +65,24 @@ def test_release_notes_document_019_workflow_migration() -> None:
         assert text in current
     assert "`workspace-file`" not in previous
     assert "`workspace-folder`" not in previous
+
+
+def test_workspace_override_notes_are_in_next_release() -> None:
+    changelog = (ROOT / "docs/changelog.md").read_text(encoding="utf-8")
+    upcoming, published = changelog.split("New in version 0.1.9:", 1)
+    assert upcoming.startswith("New in Next:")
+    fixes, improvements = upcoming.split("New functionalities and improvements:", 1)
+    assert "Changes and fixes:" in fixes
+    assert "skip filesystem validation" in fixes
+    assert "optional folder Text/Path input" in improvements
+    assert "workspace-path and relative-file inputs" in improvements
+    for text in (
+        "optional folder Text/Path input",
+        "new writer destinations",
+        "skip filesystem validation",
+    ):
+        assert text in upcoming
+        assert text not in published
 
 
 def test_release_notes_document_019_limitations_and_final_output_types() -> None:

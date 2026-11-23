@@ -1,3 +1,21 @@
+New in Next:
+**********************
+**********************
+
+Changes and fixes:
+
+- For connected Workspace File and Workspace Folder inputs, skip filesystem validation
+  so new writer destinations are allowed, even when files or directories do not
+  exist. Retain validation for selector-only paths and legacy absolute references.
+
+New functionalities and improvements:
+
+- Expose Workspace Folder's optional folder Text/Path input for branch-local
+  overrides, preserving its saved dropdown fallback.
+
+- Add optional workspace-path and relative-file inputs to Workspace File. Connected
+  values override runtime/selector fallbacks without replacing the saved selection.
+
 New in version 0.1.9:
 **********************
 **********************
