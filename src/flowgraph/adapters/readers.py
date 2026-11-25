@@ -14,7 +14,8 @@ from flowgraph.application.workflow_core import (
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
-from .data_types import MESH_DOCUMENT, TABLE_DOCUMENT, ParameterKind
+from .data_types import ANY, MESH_DOCUMENT, TABLE_DOCUMENT, ParameterKind
+from .file_conversion import TIMESTEP_OPTIONS, get_available_mesh_times
 
 LOGGER = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ def _load_muscat(
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Load *source* with Muscat's extension-aware universal mesh reader.
+    """Load one Muscat mesh or an ordered series of timed mesh snapshots.
 
     The returned :class:`~flowgraph.domain.mesh_document.MeshDocument` is the
     canonical editable model. The caller can display its summary immediately;
@@ -72,16 +73,49 @@ def _load_muscat(
     """
 
     source = _validate_source(inputs, parameters, "Muscat")
+    selection = inputs.get("timestep_to_read", parameters.get("timestep_to_read", "last"))
+    if selection not in ("first", "last", "all"):
+        raise MeshLoadError(
+            f"Invalid time-step selection {selection!r}; expected first, last, or all"
+        )
 
     try:
         from Muscat.IO.IOFactory import CreateReader, InitAllReaders
+        from Muscat.IO.XdmfReader import XdmfReader
 
         LOGGER.debug("Initialising Muscat readers for %s", source)
         InitAllReaders()
         reader = CreateReader(source.suffix)
         LOGGER.info("Loading mesh with Muscat reader %s: %s", type(reader).__name__, source)
         reader.SetFileName(str(source))
-        mesh = reader.Read()
+        times = get_available_mesh_times(reader)
+        series: tuple[tuple[float | None, MeshDocument], ...] = ()
+        if len(times) == 0:
+            document = MeshDocument(mesh=reader.Read())
+            if selection == "all":
+                series = ((None, document),)
+        else:
+            # XdmfReader.Read() resets its time metadata on every call. Reuse the
+            # parsed grids, in the same order as XdmfReader.GetAvailableTimes().
+            grids = (
+                [grid for grid in reader.xdmf.GetDomain(0).grids if grid.GetTime() is not None]
+                if isinstance(reader, XdmfReader)
+                else None
+            )
+
+            def read_step(index: int) -> MeshDocument:
+                if grids is not None:
+                    mesh = grids[index].GetSupport()
+                else:
+                    reader.SetTimeToRead(None, timeIndex=index)
+                    mesh = reader.Read()
+                return MeshDocument(mesh=MeshDocument(mesh=mesh).mesh.View())
+
+            if selection == "all":
+                series = tuple((float(time), read_step(i)) for i, time in enumerate(times))
+                document = series[-1][1]
+            else:
+                document = read_step(0 if selection == "first" else len(times) - 1)
     except Exception as error:
         LOGGER.exception("Muscat failed while loading %s", source)
         raise MeshLoadError(f"Muscat could not load '{source}': {error}") from error
@@ -89,10 +123,10 @@ def _load_muscat(
     LOGGER.info(
         "Muscat loaded %s (%d nodes, %d elements)",
         source,
-        mesh.GetNumberOfNodes(),
-        mesh.GetNumberOfElements(),
+        document.mesh.GetNumberOfNodes(),
+        document.mesh.GetNumberOfElements(),
     )
-    return {"mesh": MeshDocument(mesh=mesh)}
+    return {"mesh": document, "mesh_series": series}
 
 
 def _load_meshio(
@@ -215,12 +249,35 @@ LOAD_MUSCAT = NodeDefinition(
     requirements=("py:muscat",),
     icon="/__flowgraph_ui/LOAD_MUSCAT.svg",
     label="Read Mesh (Muscat)",
-    description="Loads a file path into the canonical mesh document. Companion changes must update the principal file timestamp.",
-    ports=(PortDefinition("mesh", PortDirection.OUTPUT, MESH_DOCUMENT, "Mesh"),),
+    description=(
+        "Loads a mesh at the first or last time step, or all snapshots as a mesh series. "
+        "Companion changes must update the principal file timestamp."
+    ),
+    ports=(
+        PortDefinition("mesh", PortDirection.OUTPUT, MESH_DOCUMENT, "Mesh"),
+        PortDefinition("mesh_series", PortDirection.OUTPUT, ANY, "Mesh Series"),
+        PortDefinition(
+            "timestep_to_read",
+            PortDirection.INPUT,
+            ParameterKind.STR_SELECT,
+            "Timestep to read",
+            required=False,
+            is_param=True,
+        ),
+    ),
     executor=_load_muscat,
     parameters=(
         ParameterDefinition(
             "path", ParameterKind.FILE, "File path", "", "/path/to/mesh", port=True
+        ),
+        ParameterDefinition(
+            "timestep_to_read",
+            ParameterKind.STR_SELECT,
+            "Timestep to read",
+            "last",
+            options=TIMESTEP_OPTIONS,
+            port=False,
+            input_port="timestep_to_read",
         ),
     ),
 )
