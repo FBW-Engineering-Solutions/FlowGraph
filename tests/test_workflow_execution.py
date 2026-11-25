@@ -189,6 +189,29 @@ def test_execute_workflow_json_returns_python_generated_projection_and_results()
     assert "[source] String Input" in response["projection"]
 
 
+def test_vector_shape_is_available_in_live_and_final_execution_results():
+    registry = create_node_registry()
+    workflow = WorkflowGraph(
+        [
+            registry.create_instance(
+                "set-array-1d", "source", parameters={"value": list(range(1500))}
+            ),
+            registry.create_instance("extract-vector-value", "extract", parameters={"index": -1}),
+        ]
+    )
+    workflow.add_edge(WorkflowEdge("source", "value", "extract", "vector"), registry)
+    deltas = []
+    response = json.loads(
+        execute_workflow_json(json.dumps(workflow_to_dict(workflow)), on_node_result=deltas.append)
+    )
+    assert response["status"] == "ok"
+    vector = response["nodes"]["outputs"]["source"]["value"]
+    assert vector["shape"] == [1500]
+    assert "..." in vector["description"]
+    assert deltas[0]["nodes"]["outputs"]["source"]["value"] == vector
+    assert response["nodes"]["outputs"]["extract"]["value"] == 1499
+
+
 @pytest.mark.parametrize("failed", [False, True])
 def test_execution_serializes_nonfinite_values_as_null(monkeypatch, failed):
     values = {

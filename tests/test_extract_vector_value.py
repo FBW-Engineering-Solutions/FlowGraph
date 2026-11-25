@@ -28,8 +28,9 @@ def test_extract_value_without_copy_or_mutation(index, expected, dtype):
 
     with patch("flowgraph.adapters.vector_tools.np.asarray", side_effect=check_shared_storage):
         result = EXTRACT_VECTOR_VALUE.executor({"vector": vector}, {"index": index})
-    assert result == {"value": expected}
+    assert result == {"value": expected, "index": index}
     assert type(result["value"]) is float
+    assert type(result["index"]) is int
     np.testing.assert_array_equal(vector, original)
     assert vector.flags.writeable
 
@@ -37,14 +38,14 @@ def test_extract_value_without_copy_or_mutation(index, expected, dtype):
 def test_default_index_and_readonly_array():
     vector = np.array([4.0, 5.0])
     vector.flags.writeable = False
-    assert EXTRACT_VECTOR_VALUE.executor({"vector": vector}, {}) == {"value": 4.0}
+    assert EXTRACT_VECTOR_VALUE.executor({"vector": vector}, {}) == {"value": 4.0, "index": 0}
     assert not vector.flags.writeable
 
 
 def test_connected_index_overrides_parameter():
     assert EXTRACT_VECTOR_VALUE.executor(
         {"vector": [10, 20], "index": np.int64(1)}, {"index": 0}
-    ) == {"value": 20.0}
+    ) == {"value": 20.0, "index": 1}
 
 
 @pytest.mark.parametrize("index", [2, -3, 10**100])
@@ -82,10 +83,11 @@ def test_registration_and_catalog():
     group = next(g for g in workflow_web_catalog()["groups"] if g["label"] == "Vector Tools")
     node = next(n for n in group["nodes"] if n["id"] == EXTRACT_VECTOR_VALUE.id)
     assert node["requirements"] == ["py:numpy"]
-    assert [(p["name"], p["data_type_id"]) for p in node["ports"]] == [
-        ("vector", "array-1d"),
-        ("value", "float"),
-        ("index", "integer"),
+    assert [(p["direction"], p["name"], p["data_type_id"]) for p in node["ports"]] == [
+        ("input", "vector", "array-1d"),
+        ("output", "value", "float"),
+        ("output", "index", "integer"),
+        ("input", "index", "integer"),
     ]
 
 
@@ -103,7 +105,11 @@ def test_workflow_roundtrip_and_execution(tmp_path, connected_index):
     if connected_index:
         graph.add_edge(WorkflowEdge("index", "value", "extract", "index"), registry)
     graph.export_output("selected", "extract", "value", registry)
+    graph.export_output("selected_index", "extract", "index", registry)
     path = tmp_path / "extract.json"
     save_workflow(graph, path)
-    result = WorkflowExecutor(registry).run(load_workflow(path, registry))
-    assert result.node_outputs["extract"] == {"value": 30.0 if connected_index else 20.0}
+    loaded = load_workflow(path, registry)
+    value, index = (30.0, -1) if connected_index else (20.0, 1)
+    result = WorkflowExecutor(registry).run(loaded)
+    assert result.node_outputs["extract"] == {"value": value, "index": index}
+    assert loaded.execute({}, registry) == {"selected": value, "selected_index": index}

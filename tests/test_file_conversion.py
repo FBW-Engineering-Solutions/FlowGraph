@@ -4,7 +4,9 @@ import meshio
 import numpy as np
 import pytest
 from Muscat.IO.XdmfReader import XdmfReader
+from Muscat.IO.XdmfWriter import XdmfWriter
 from Muscat.MeshContainers.ElementsDescription import ElementType
+from Muscat.MeshTools.MeshCreationTools import CreateMeshOfTriangles
 from Muscat.TestData import GetTestDataPath
 
 from flowgraph.adapters import ADAPTERS
@@ -165,6 +167,50 @@ def test_mesh_file_conversion_writes_static_xdmf_as_one_mesh(
         np.testing.assert_allclose(mesh.points, points)
         np.testing.assert_array_equal(mesh.cells_dict["triangle"], triangles)
         np.testing.assert_allclose(mesh.point_data["temperature"].ravel(), temperature)
+
+
+@pytest.mark.parametrize(("timestep", "expected"), [("first", 2.5), ("last", 13.0), ("all", 13.0)])
+def test_mesh_file_conversion_writes_selected_snapshot_to_meshio(
+    tmp_path: Path, timestep: str, expected: float
+) -> None:
+    source = tmp_path / "series.xdmf"
+    destination = tmp_path / "snapshot.vtu"
+    points = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 1.0]]
+    triangles = [[0, 1, 2]]
+    mesh = CreateMeshOfTriangles(points, triangles)
+    writer = XdmfWriter(str(source))
+    writer.SetBinary(False)
+    writer.SetTemporal()
+    writer.Open()
+    try:
+        for time in (2.5, 8.0, 13.0):
+            writer.Write(
+                mesh, Time=time, PointFieldsNames=["temperature"], PointFields=[np.full(3, time)]
+            )
+    finally:
+        writer.Close()
+
+    graph = WorkflowGraph(
+        [
+            MESH_FILE_CONVERSION.create_instance(
+                "convert",
+                parameters={
+                    "input_filename": source,
+                    "output_filename": destination,
+                    "writer": ".vtu MeshIO vtu_vtu_Writer",
+                    "timestep_to_read": timestep,
+                },
+            )
+        ]
+    )
+
+    result = WorkflowExecutor(create_node_registry()).run(graph)
+
+    assert result.node_outputs["convert"] == {"converted_filename": FilePath(destination)}
+    converted = meshio.read(destination)
+    np.testing.assert_allclose(converted.points, points)
+    np.testing.assert_array_equal(converted.cells_dict["triangle"], triangles)
+    np.testing.assert_allclose(converted.point_data["temperature"].ravel(), [expected] * 3)
 
 
 def test_mesh_file_conversion_writes_non_temporal_mesh_and_closes_writer(

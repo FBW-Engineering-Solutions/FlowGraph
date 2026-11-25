@@ -15,7 +15,7 @@ mesh readers also require a filename extension.
 
 | Node (ID) | Output | Behavior |
 | --- | --- | --- |
-| **Read Mesh (Muscat)** (`load-muscat`) | `mesh: Mesh document`, `mesh_series: Any`, `available_timesteps: 1D Array` | Lists available times and loads requested snapshots with Muscat's extension-aware reader. |
+| **Read Mesh (Muscat)** (`load-muscat`) | `mesh: Mesh document`, `available_timesteps: 1D Array` | Lists available times and loads the selected snapshot with Muscat's extension-aware reader. |
 | **Read Mesh (MeshIO)** (`load-meshio`) | `mesh: Mesh document` | Reads with meshio and converts through Muscat's bridge. |
 | **Read Mesh (MeshLane)** (`load-meshlane`) | `mesh: Mesh document` | Reads with the optional MeshLane adapter and bridge. |
 | **Read Table (Pandas)** (`load-csv`) | `table: Table` | Reads CSV columns with pandas and returns a mapping of column names to arrays. |
@@ -25,20 +25,21 @@ Mesh readers return the canonical editable `MeshDocument`. MeshLane requires
 the optional MeshLane dependency and matching Muscat bridge. Reader failures are
 reported as actionable `MeshLoadError` messages.
 
-**Read Mesh (Muscat)** exposes a connectable `timestep_to_read` selector:
-`first`, `last` (default), or `all`. First and Last use the file's time-step
-order and return one mesh. All returns an ordered tuple of `(time, MeshDocument)`
-pairs on **Mesh Series** and returns the last snapshot on **Mesh**. The series
-output is empty when First or Last is selected. For a static mesh, All returns
-one `(None, MeshDocument)` pair; the Mesh output is the same in every mode.
+**Read Mesh (Muscat)** exposes a connectable integer `timestep_to_read` input.
+It selects a snapshot by its position in file order, not by its time value.
+Use `0` for the first snapshot or `-1` (the default) for the last. Other
+negative indices count back from the end; out-of-range indices are rejected
+when **Mesh** is connected. A static file has one snapshot (`0` or `-1`).
+
+Old saved `first`, `last`, and `all` values still run as `0`, `-1`, and `-1`
+respectively. Replace any text connection to `timestep_to_read` with an integer source.
 
 **Available Time Steps** returns a read-only 1D float array in file order,
 independent of the selection. If no time steps are reported, it returns `[0.0]`.
 An unconnected and unexported time output also defaults to `[0.0]`. A connection
 or workflow export counts as a request for an output. Connect only **Available
-Time Steps** to inspect metadata without loading geometry or fields. With All
-selected, connecting only **Mesh** loads just the last snapshot; connect **Mesh
-Series** to load and retain all snapshots.
+Time Steps** to inspect metadata without loading geometry or fields. Connecting
+only **Mesh** loads just the selected snapshot.
 
 The Excel reader has `path: Path` (default `input_pandas.xlsx`) and
 `sheet_name: Text` (default `Sheet1`) parameter ports. Supply the workbook path

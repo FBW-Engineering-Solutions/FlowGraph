@@ -319,7 +319,7 @@ def mesh_file_conversion(
             writer.SetBinary(binary)
 
         if timestep_to_read == "first":
-            times = [0]
+            times = [times_available[0]]
         elif timestep_to_read == "last":
             times = [times_available[-1]]
         elif timestep_to_read == "all":
@@ -340,7 +340,9 @@ def mesh_file_conversion(
             finally:
                 writer.Close()
         else:
-            writer.Open(outputfilename)
+            # A single-snapshot writer uses the last of the selected times.
+            reader.SetTimeToRead(times[-1])
+            writer.Open()
             try:
                 DoWrite(reader.Read(), writer)
             finally:

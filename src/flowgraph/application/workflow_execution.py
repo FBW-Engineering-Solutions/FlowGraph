@@ -439,6 +439,8 @@ def _json_safe(value: Any) -> Any:
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, (list, tuple, set)):
         return [_json_safe(item) for item in value]
+    if isinstance(value, np.ndarray):
+        return {"type": type(value).__name__, "description": str(value), "shape": list(value.shape)}
     if hasattr(value, "mode") and hasattr(value, "size"):
         return {"type": type(value).__name__, "mode": value.mode, "size": list(value.size)}
     return {"type": type(value).__name__, "description": str(value)}
