@@ -640,12 +640,33 @@ def test_file_roundtrip_and_demos(api):
     assert request(api, "POST", "/api/v1/files/demo", b"")[0] == 409
 
 
+def test_create_empty_workspace_directory_then_upload_into_it(api):
+    route = "/api/v1/files/directories"
+    assert request(api, "GET", "/api/v1/runtime")[1]["capabilities"]["createDirectory"] is True
+    assert request(api, "POST", route, {"path": "data"}, {"Authorization": ""})[0] == 401
+    assert request(api, "POST", route, {"path": "data"}) == (201, {"status": "ok"})
+    assert request(api, "POST", route, {"path": "data/empty dir"})[0] == 201
+    assert request(api, "POST", route, {"path": "data/empty dir"})[0] == 409
+    assert request(api, "POST", route, {"path": "missing/child"})[0] == 404
+    assert request(api, "POST", route, {})[0] == 400
+    _, listing = request(api, "GET", "/api/v1/files")
+    assert listing["directories"] == ["data", "data/empty dir"]
+    assert listing["files"] == []
+    upload = "/api/v1/files/content?" + urlencode({"path": "data/empty dir/input.bin"})
+    assert (
+        request(api, "PUT", upload, b"\x00\xff", {"Content-Type": "application/octet-stream"})[0]
+        == 200
+    )
+    assert request(api, "GET", upload) == (200, b"\x00\xff")
+
+
 @pytest.mark.parametrize(
     "name", ["../escape", "/etc/passwd", "a/../../escape", "a\\escape", "a//b", "a/./b"]
 )
 def test_file_paths_cannot_escape_workspace(api, name):
     route = "/api/v1/files/content?" + urlencode({"path": name})
     assert request(api, "PUT", route, b"bad")[0] == 400
+    assert request(api, "POST", "/api/v1/files/directories", {"path": name})[0] == 400
 
 
 def test_symlinks_are_hidden_and_rejected(api, tmp_path):
@@ -658,6 +679,7 @@ def test_symlinks_are_hidden_and_rejected(api, tmp_path):
     except OSError:
         pytest.skip("Symlinks unavailable")
     route = "/api/v1/files/content?" + urlencode({"path": "link/secret"})
+    assert request(api, "POST", "/api/v1/files/directories", {"path": "link/child"})[0] == 400
     assert request(api, "GET", route)[0] == 400
     assert request(api, "PUT", route, b"bad")[0] == 400
     assert request(api, "GET", "/api/v1/files")[1]["files"] == []
