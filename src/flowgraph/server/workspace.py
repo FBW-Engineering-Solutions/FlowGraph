@@ -86,6 +86,15 @@ class Workspace:
             target.write_bytes(data)
             return self.listing()
 
+    def create_directory(self, name: str) -> None:
+        with self.lock:
+            target = self.path(name, allow_directory=True)
+            if any(not part.strip() for part in name.split("/")) or any(
+                ord(char) < 32 or ord(char) == 127 for char in name
+            ):
+                raise ValueError("Invalid workspace-relative directory path")
+            target.mkdir()
+
     def read(self, name: str, limit: int) -> bytes:
         with self.lock:
             target = self.path(name, allow_directory=True)

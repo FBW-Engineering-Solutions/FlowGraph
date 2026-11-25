@@ -205,6 +205,7 @@ class LocalServer(ThreadingHTTPServer):
             "workflow_format_version": WORKFLOW_FORMAT_VERSION,
             "capabilities": {
                 "mountDirectory": False,
+                "createDirectory": True,
                 "cancelExecution": True,
                 "advisoryExecutionTimeout": 1,
                 "incrementalExecution": 1,
@@ -251,6 +252,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             "/api/v1/files",
             "/api/v1/files/demo",
             "/api/v1/files/content",
+            "/api/v1/files/directories",
         }
         endpoint = path if path in routes else "<unknown endpoint>"
         if path.startswith("/api/v1/executions/"):
@@ -421,6 +423,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             elif path == "/api/v1/files/demo" and method == "POST":
                 self._body()
                 self._reply(200, self.server.workspace.copy_demos())
+            elif path == "/api/v1/files/directories" and method == "POST":
+                body = self._body(json_body=True)
+                self.server.workspace.create_directory(body.get("path"))
+                self._reply(201, {"status": "ok"})
             elif path == "/api/v1/files/content" and method in {"GET", "PUT", "DELETE"}:
                 names = parse_qs(parsed.query).get("path", [])
                 if len(names) != 1:

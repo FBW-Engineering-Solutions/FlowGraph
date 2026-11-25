@@ -57,6 +57,33 @@ def test_workflow_web_catalog_groups_table_to_mesh_under_mesh_creation() -> None
     assert sum(node["id"] == "csv-to-mesh" for node in _nodes([mesh])) == 1
 
 
+def test_mesh_file_conversion_catalog_exports_connectable_parameters() -> None:
+    catalog = workflow_web_catalog()
+    node = next(
+        node for node in _nodes(catalog["groups"]) if node["id"] == "convert-mesh-file-format"
+    )
+    parameters = {
+        "input_filename": "filename",
+        "output_filename": "filename",
+        "reader": "str",
+        "writer": "str",
+        "timestep_to_read": "str",
+        "binary": "boolean",
+    }
+    assert {param["name"]: param["kind_id"] for param in node["parameters"] if param["port"]} == (
+        parameters
+    )
+    assert {
+        port["name"]: port["data_type_id"]
+        for port in node["ports"]
+        if port["direction"] == "input" and port["is_param"] and not port["required"]
+    } == parameters
+    assert any(
+        item["source_type_id"] == "string" and item["target_type_id"] == "str"
+        for item in catalog["conversions"]
+    )
+
+
 def test_workspace_folder_catalog_exports_path_output() -> None:
     catalog = workflow_web_catalog()
     node = next(node for node in _nodes(catalog["groups"]) if node["id"] == "workspace-folder")

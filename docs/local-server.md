@@ -165,6 +165,7 @@ requests (cancel/demo) use Content-Length 0. File uploads/downloads are raw byte
 | GET | `/api/v1/executions/{id}` | Get job state and result |
 | POST | `/api/v1/executions/{id}/cancel` | Cancel a running job; terminal jobs are unchanged |
 | GET | `/api/v1/files` | List workspace files and directories |
+| POST | `/api/v1/files/directories` | Create an empty directory with `{"path":"relative/path"}` (HTTP 201); its parent must already exist |
 | GET | `/api/v1/files/content?path=relative/path` | Download a file |
 | PUT | `/api/v1/files/content?path=relative/path` | Upload/replace a file; missing parents are created |
 | DELETE | `/api/v1/files/content?path=relative/path` | Delete a file |
