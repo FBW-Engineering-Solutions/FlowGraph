@@ -84,6 +84,21 @@ def test_mesh_file_conversion_catalog_exports_connectable_parameters() -> None:
     )
 
 
+def test_muscat_reader_catalog_exports_temporal_selection_and_series() -> None:
+    catalog = workflow_web_catalog()
+    node = next(node for node in _nodes(catalog["groups"]) if node["id"] == "load-muscat")
+    timestep = next(param for param in node["parameters"] if param["name"] == "timestep_to_read")
+    assert timestep["default"] == "last"
+    assert [option["value"] for option in timestep["options"]] == ["first", "last", "all"]
+    port = next(port for port in node["ports"] if port["name"] == "timestep_to_read")
+    assert port["direction"] == "input" and not port["required"] and port["is_param"]
+    assert {
+        port["name"]: port["data_type_id"]
+        for port in node["ports"]
+        if port["direction"] == "output"
+    } == {"mesh": "mesh-document", "mesh_series": "any"}
+
+
 def test_workspace_folder_catalog_exports_path_output() -> None:
     catalog = workflow_web_catalog()
     node = next(node for node in _nodes(catalog["groups"]) if node["id"] == "workspace-folder")

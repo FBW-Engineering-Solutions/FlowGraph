@@ -13,6 +13,9 @@ Changes and fixes:
 
 New functionalities and improvements:
 
+- Add First, Last, and All time-step selection to Read Mesh (Muscat). Keep the
+  single Mesh output and expose all snapshots through a separate Mesh Series port.
+
 - Expose all Convert Mesh File Format parameters as connectable inputs while
   retaining their defaults and controls. Return the converted filename as the
   declared `FilePath` type so it can be passed to downstream nodes.

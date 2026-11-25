@@ -21,6 +21,23 @@ class MeshFileConversionError(RuntimeError):
     """Raised when a mesh file conversion cannot be completed."""
 
 
+TIMESTEP_OPTIONS = (
+    ParameterOption("first", "First time step"),
+    ParameterOption("last", "Last time step"),
+    ParameterOption("all", "All time steps"),
+)
+
+
+def get_available_mesh_times(reader: Any) -> Any:
+    """Load temporal metadata only when supported, without copying the times."""
+    if getattr(reader, "canHandleTemporal", False):
+        reader.ReadMetaData()
+        times = reader.GetAvailableTimes()
+        if times is not None:
+            return times
+    return ()
+
+
 class DelayInitialization:
     """Lazily resolve the reader or writer classes in a conversion catalog."""
 
@@ -293,10 +310,7 @@ def mesh_file_conversion(
             **extras,
         )
 
-    times_available = ()
-    if reader.canHandleTemporal:
-        reader.ReadMetaData()
-        times_available = reader.GetAvailableTimes()
+    times_available = get_available_mesh_times(reader)
 
     # A temporal-capable reader can still be reading a static mesh.
     if len(times_available) > 0:
@@ -378,12 +392,7 @@ MESH_FILE_CONVERSION = NodeDefinition(
             ParameterKind.STR_SELECT,
             "Timestep to read",
             "last",
-            options=(
-                ParameterOption("first", "First time step"),
-                ParameterOption("last", "Last time step"),
-                ParameterOption("all", "All time steps"),
-                # ParameterOption("Selected time step", "selected")
-            ),
+            options=TIMESTEP_OPTIONS,
         ),
         ParameterDefinition("binary", ParameterKind.BOOLEAN, "binary (if available)", True),
         # ParameterDefinition(

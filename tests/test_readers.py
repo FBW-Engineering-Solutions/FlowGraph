@@ -4,7 +4,11 @@ from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import meshio
+import numpy as np
 import pytest
+from Muscat.IO.XdmfWriter import XdmfWriter
+from Muscat.MeshTools.MeshCreationTools import CreateMeshOfTriangles
+from Muscat.TestData import GetTestDataPath
 
 from flowgraph.adapters import ADAPTERS
 from flowgraph.adapters.data_types import DIRECTORY, LIST_STR, TABLE_DOCUMENT
@@ -12,12 +16,111 @@ from flowgraph.adapters.files import READ_DIRECTORY_FILES, DirectoryReadError
 from flowgraph.adapters.readers import (
     LOAD_MESHIO,
     LOAD_MESHLANE,
+    LOAD_MUSCAT,
     READ_TABLE,
+    MeshLoadError,
     TableReadError,
 )
-from flowgraph.application.workflow_core import WorkflowGraph
+from flowgraph.adapters.simple_sources import SET_STRING
+from flowgraph.application.node_registry import create_node_registry
+from flowgraph.application.workflow_core import WorkflowEdge, WorkflowExecutor, WorkflowGraph
 from flowgraph.application.workflow_io import workflow_from_json, workflow_to_dict
 from flowgraph.domain.mesh_document import MeshDocument
+
+
+@pytest.fixture
+def temporal_xdmf(tmp_path: Path) -> Path:
+    source = tmp_path / "series.xdmf"
+    mesh = CreateMeshOfTriangles([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 1.0]], [[0, 1, 2]])
+    writer = XdmfWriter(str(source))
+    writer.SetBinary(False)
+    writer.SetTemporal()
+    writer.Open()
+    try:
+        for time in (2.5, 8.0, 13.0):
+            writer.Write(
+                mesh, Time=time, PointFieldsNames=["value"], PointFields=[np.full(3, time)]
+            )
+    finally:
+        writer.Close()
+    return source
+
+
+@pytest.mark.parametrize(
+    ("selection", "expected"), [(None, 13.0), ("first", 2.5), ("last", 13.0), ("all", 13.0)]
+)
+def test_load_muscat_selects_xdmf_snapshots(
+    temporal_xdmf: Path, selection: str | None, expected: float
+) -> None:
+    parameters = {"path": str(temporal_xdmf)}
+    if selection is not None:
+        parameters["timestep_to_read"] = selection
+    registry = create_node_registry()
+    graph = WorkflowGraph([LOAD_MUSCAT.create_instance("reader", parameters=parameters)])
+    restored = workflow_from_json(json.dumps(workflow_to_dict(graph)), registry)
+
+    output = WorkflowExecutor(registry).run(restored).node_outputs["reader"]
+
+    assert isinstance(output["mesh"], MeshDocument)
+    np.testing.assert_array_equal(output["mesh"].mesh.nodeFields["value"], [expected] * 3)
+    series = output["mesh_series"]
+    if selection == "all":
+        assert tuple(time for time, _ in series) == (2.5, 8.0, 13.0)
+        assert output["mesh"] is series[-1][1]
+        for time, snapshot in series:
+            np.testing.assert_array_equal(snapshot.mesh.nodeFields["value"], [time] * 3)
+            assert not snapshot.mesh.nodeFields["value"].flags.writeable
+    else:
+        assert series == ()
+
+
+def test_connected_muscat_timestep_overrides_saved_setting(temporal_xdmf: Path) -> None:
+    registry = create_node_registry()
+    reader = LOAD_MUSCAT.create_instance("reader", parameters={"path": temporal_xdmf})
+    graph = WorkflowGraph(
+        [SET_STRING.create_instance("mode", parameters={"value": "first"}), reader]
+    )
+    graph.add_edge(WorkflowEdge("mode", "value", "reader", "timestep_to_read"), registry)
+
+    output = WorkflowExecutor(registry).run(graph).node_outputs["reader"]
+
+    np.testing.assert_array_equal(output["mesh"].mesh.nodeFields["value"], [2.5] * 3)
+    assert reader.parameters["timestep_to_read"] == "last"
+
+
+@pytest.mark.parametrize("selection", ["first", "last", "all"])
+def test_load_muscat_static_xdmf_has_no_time(tmp_path: Path, selection: str) -> None:
+    source = tmp_path / "static.xdmf"
+    meshio.write(
+        source,
+        meshio.Mesh(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 1.0]], [("triangle", [[0, 1, 2]])]
+        ),
+        data_format="XML",
+    )
+
+    result = LOAD_MUSCAT.executor({"path": source}, {"timestep_to_read": selection})
+
+    assert result["mesh"].mesh.GetNumberOfNodes() == 3
+    assert result["mesh_series"] == (((None, result["mesh"]),) if selection == "all" else ())
+
+
+def test_load_muscat_reads_ut_results_at_each_available_time() -> None:
+    source = Path(GetTestDataPath()) / "UtExample" / "cube.ut"
+
+    output = LOAD_MUSCAT.executor({"path": source}, {"timestep_to_read": "all"})
+
+    series = output["mesh_series"]
+    assert len(series) > 1
+    assert output["mesh"] is series[-1][1]
+    assert not np.array_equal(
+        series[0][1].mesh.nodeFields["U1"], series[-1][1].mesh.nodeFields["U1"]
+    )
+
+
+def test_load_muscat_rejects_unknown_timestep(temporal_xdmf: Path) -> None:
+    with pytest.raises(MeshLoadError, match="expected first, last, or all"):
+        LOAD_MUSCAT.executor({"path": temporal_xdmf}, {"timestep_to_read": "unknown"})
 
 
 def test_load_meshio_converts_mesh_through_muscat_bridge(tmp_path: Path) -> None:
