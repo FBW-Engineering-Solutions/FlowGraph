@@ -61,11 +61,14 @@ support that operation.
 
 ## Temporal data
 
-For readers that support temporal data:
+When the reader reports available time steps:
 
 - `first` writes the first available time step.
 - `last` writes the last available time step.
 - `all` writes every available time step when the writer supports temporal data.
+
+If the reader reports no time steps, the node writes one static mesh regardless
+of the time-step setting.
 
 If the selected writer does not support temporal output, the conversion writes a
 single mesh using the reader's current read state. Writer resources are closed

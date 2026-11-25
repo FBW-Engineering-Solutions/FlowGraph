@@ -4,6 +4,9 @@ New in Next:
 
 Changes and fixes:
 
+- Convert Mesh File Format writes a single static mesh when the reader reports
+  no time steps, instead of failing with the default Last time step setting.
+
 - For connected Workspace File and Workspace Folder inputs, skip filesystem validation
   so new writer destinations are allowed, even when files or directories do not
   exist. Retain validation for selector-only paths and legacy absolute references.

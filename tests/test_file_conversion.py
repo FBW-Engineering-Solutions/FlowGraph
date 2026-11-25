@@ -1,6 +1,10 @@
 from pathlib import Path
 
+import meshio
+import numpy as np
 import pytest
+from Muscat.IO.XdmfReader import XdmfReader
+from Muscat.MeshContainers.ElementsDescription import ElementType
 from Muscat.TestData import GetTestDataPath
 
 from flowgraph.adapters import ADAPTERS
@@ -115,6 +119,52 @@ def test_mesh_file_conversion_converts_muscat_test_sphere_to_meshb(
     }
     assert destination.is_file()
     assert destination.stat().st_size > 0
+
+
+@pytest.mark.parametrize("timestep", [None, "first", "all"], ids=["default-last", "first", "all"])
+@pytest.mark.parametrize("output_extension", ["vtu", "xdmf"])
+def test_mesh_file_conversion_writes_static_xdmf_as_one_mesh(
+    tmp_path: Path, timestep: str | None, output_extension: str
+) -> None:
+    source = tmp_path / "static.xdmf"
+    destination = tmp_path / f"converted.{output_extension}"
+    points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 1.0]])
+    triangles = np.array([[0, 1, 2]])
+    temperature = np.array([1.0, 2.0, 3.0])
+    pressure = np.array([4.0])
+    meshio.write(
+        source,
+        meshio.Mesh(
+            points,
+            [("triangle", triangles)],
+            point_data={"temperature": temperature},
+            cell_data={"pressure": [pressure]} if output_extension == "xdmf" else None,
+        ),
+        data_format="XML",
+    )
+    parameters = {"input_filename": source, "output_filename": destination, "binary": False}
+    if timestep is not None:
+        parameters["timestep_to_read"] = timestep
+    graph = WorkflowGraph([MESH_FILE_CONVERSION.create_instance("convert", parameters=parameters)])
+
+    result = WorkflowExecutor(create_node_registry()).run(graph)
+
+    assert result.node_outputs["convert"] == {"converted_filename": FilePath(destination)}
+    if output_extension == "xdmf":
+        reader = XdmfReader(destination)
+        reader.ReadMetaData()
+        assert len(reader.GetAvailableTimes()) == 0
+        assert len(reader.xdmf.GetDomain(0).grids) == 1
+        mesh = reader.Read()
+        np.testing.assert_allclose(mesh.nodes, points)
+        np.testing.assert_array_equal(mesh.elements[ElementType.Triangle_3].connectivity, triangles)
+        np.testing.assert_allclose(mesh.nodeFields["temperature"].ravel(), temperature)
+        np.testing.assert_allclose(mesh.elemFields["pressure"].ravel(), pressure)
+    else:
+        mesh = meshio.read(destination)
+        np.testing.assert_allclose(mesh.points, points)
+        np.testing.assert_array_equal(mesh.cells_dict["triangle"], triangles)
+        np.testing.assert_allclose(mesh.point_data["temperature"].ravel(), temperature)
 
 
 def test_mesh_file_conversion_writes_non_temporal_mesh_and_closes_writer(

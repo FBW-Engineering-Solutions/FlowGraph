@@ -293,9 +293,13 @@ def mesh_file_conversion(
             **extras,
         )
 
+    times_available = ()
     if reader.canHandleTemporal:
         reader.ReadMetaData()
-        timesAvailable = reader.GetAvailableTimes()
+        times_available = reader.GetAvailableTimes()
+
+    # A temporal-capable reader can still be reading a static mesh.
+    if len(times_available) > 0:
         writer.SetFileName(outputfilename)
         if hasattr(writer, "SetBinary"):
             writer.SetBinary(binary)
@@ -303,13 +307,13 @@ def mesh_file_conversion(
         if timestep_to_read == "first":
             times = [0]
         elif timestep_to_read == "last":
-            times = [timesAvailable[-1]]
+            times = [times_available[-1]]
         elif timestep_to_read == "all":
-            times = timesAvailable
+            times = times_available
         else:
             from Muscat.Helpers.ParserHelper import ReadInts
 
-            times = timesAvailable[ReadInts(timestep_to_read)]
+            times = times_available[ReadInts(timestep_to_read)]
 
         if writer.canHandleTemporal:
             writer.SetTemporal()
