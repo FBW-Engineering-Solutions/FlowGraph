@@ -1,9 +1,12 @@
 """Workflow nodes that read external data into FlowGraph domain objects."""
 
 import logging
+import xml.sax
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from flowgraph.application.workflow_core import (
     ExecContext,
@@ -14,7 +17,7 @@ from flowgraph.application.workflow_core import (
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
-from .data_types import ANY, MESH_DOCUMENT, TABLE_DOCUMENT, ParameterKind
+from .data_types import ANY, ARRAY_1D, MESH_DOCUMENT, TABLE_DOCUMENT, ParameterKind
 from .file_conversion import TIMESTEP_OPTIONS, get_available_mesh_times
 
 LOGGER = logging.getLogger(__name__)
@@ -65,43 +68,55 @@ def _load_muscat(
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Load one Muscat mesh or an ordered series of timed mesh snapshots.
-
-    The returned :class:`~flowgraph.domain.mesh_document.MeshDocument` is the
-    canonical editable model. The caller can display its summary immediately;
-    VTK conversion remains a separate, derived projection.
-    """
+    """Read temporal metadata and materialize only the requested snapshots."""
+    from Muscat.MeshContainers.Mesh import Mesh
 
     source = _validate_source(inputs, parameters, "Muscat")
+    requested = (
+        {port.name for port in LOAD_MUSCAT.outputs}
+        if _exec_context is None
+        else _exec_context.connected_output_ports
+    )
+    want_mesh = "mesh" in requested
+    want_times = "available_timesteps" in requested
     selection = inputs.get("timestep_to_read", parameters.get("timestep_to_read", "last"))
-    if selection not in ("first", "last", "all"):
+    if (want_mesh or "mesh_series" in requested) and selection not in ("first", "last", "all"):
         raise MeshLoadError(
             f"Invalid time-step selection {selection!r}; expected first, last, or all"
         )
+    want_series = "mesh_series" in requested and selection == "all"
+    document = None
+    series: tuple[tuple[float | None, MeshDocument], ...] = ()
+    times = ()
 
     try:
-        from Muscat.IO.IOFactory import CreateReader, InitAllReaders
-        from Muscat.IO.XdmfReader import XdmfReader
+        if want_mesh or want_series or want_times:
+            from Muscat.IO.IOFactory import CreateReader, InitAllReaders
+            from Muscat.IO.XdmfReader import XdmfReader
 
-        LOGGER.debug("Initialising Muscat readers for %s", source)
-        InitAllReaders()
-        reader = CreateReader(source.suffix)
-        LOGGER.info("Loading mesh with Muscat reader %s: %s", type(reader).__name__, source)
-        reader.SetFileName(str(source))
-        times = get_available_mesh_times(reader)
-        series: tuple[tuple[float | None, MeshDocument], ...] = ()
-        if len(times) == 0:
-            document = MeshDocument(mesh=reader.Read())
-            if selection == "all":
-                series = ((None, document),)
-        else:
-            # XdmfReader.Read() resets its time metadata on every call. Reuse the
-            # parsed grids, in the same order as XdmfReader.GetAvailableTimes().
-            grids = (
-                [grid for grid in reader.xdmf.GetDomain(0).grids if grid.GetTime() is not None]
-                if isinstance(reader, XdmfReader)
-                else None
-            )
+            InitAllReaders()
+            reader = CreateReader(source.suffix)
+            reader.SetFileName(str(source))
+            grids = None
+            if isinstance(reader, XdmfReader):
+                # ReadMetaData calls Read(), which materializes a grid even in
+                # lazy mode. Parse with Muscat's SAX handler without GetSupport.
+                reader.Reset()
+                reader.lazy = True
+                if not (want_mesh or want_series):
+                    # Ignore inline DataItem payloads; time values are attributes.
+                    reader.characters = lambda _content: None
+                parser = xml.sax.make_parser()
+                parser.setContentHandler(reader)
+                parser.setFeature(xml.sax.handler.feature_external_ges, False)
+                with source.open("rb") as stream:
+                    parser.parse(stream)
+                grids = [grid for grid in reader.xdmf.GetDomain(0).grids if grid.time is not None]
+                times = [grid.GetTime() for grid in grids]
+            elif want_mesh or want_series:
+                times = get_available_mesh_times(reader)
+            else:
+                times = _muscat_times_only(reader)
 
             def read_step(index: int) -> MeshDocument:
                 if grids is not None:
@@ -111,22 +126,47 @@ def _load_muscat(
                     mesh = reader.Read()
                 return MeshDocument(mesh=MeshDocument(mesh=mesh).mesh.View())
 
-            if selection == "all":
-                series = tuple((float(time), read_step(i)) for i, time in enumerate(times))
-                document = series[-1][1]
-            else:
-                document = read_step(0 if selection == "first" else len(times) - 1)
+            if want_mesh or want_series:
+                if len(times) == 0:
+                    mesh = (
+                        reader.Read()
+                        if grids is None
+                        else reader.xdmf.GetDomain(-1).GetGrid(-1).GetSupport()
+                    )
+                    snapshot = MeshDocument(mesh=mesh)
+                    if want_series:
+                        series = ((None, snapshot),)
+                elif want_series:
+                    series = tuple((float(time), read_step(i)) for i, time in enumerate(times))
+                    snapshot = series[-1][1]
+                else:
+                    snapshot = read_step(0 if selection == "first" else len(times) - 1)
+                if want_mesh:
+                    document = snapshot
     except Exception as error:
         LOGGER.exception("Muscat failed while loading %s", source)
         raise MeshLoadError(f"Muscat could not load '{source}': {error}") from error
 
-    LOGGER.info(
-        "Muscat loaded %s (%d nodes, %d elements)",
-        source,
-        document.mesh.GetNumberOfNodes(),
-        document.mesh.GetNumberOfElements(),
-    )
-    return {"mesh": document, "mesh_series": series}
+    available = np.asarray(times if want_times and len(times) else (0.0,), dtype=float).view()
+    available.flags.writeable = False
+    return {
+        "mesh": document if document is not None else MeshDocument(mesh=Mesh()),
+        "mesh_series": series,
+        "available_timesteps": available,
+    }
+
+
+def _muscat_times_only(reader: Any) -> Any:
+    """Avoid backends' mesh-related metadata work when only times are requested."""
+    from Muscat.IO.RstReader import RstReader
+    from Muscat.IO.UtReader import UtReader
+
+    if isinstance(reader, UtReader):
+        reader.ReadUTMetaData()
+        return reader.GetAvailableTimes() if len(reader.time) else ()
+    if isinstance(reader, RstReader):
+        return reader.GetModel().metadata.time_freq_support.time_frequencies.data
+    return get_available_mesh_times(reader)
 
 
 def _load_meshio(
@@ -251,11 +291,15 @@ LOAD_MUSCAT = NodeDefinition(
     label="Read Mesh (Muscat)",
     description=(
         "Loads a mesh at the first or last time step, or all snapshots as a mesh series. "
+        "Lists available time steps without loading snapshots when only that output is used. "
         "Companion changes must update the principal file timestamp."
     ),
     ports=(
         PortDefinition("mesh", PortDirection.OUTPUT, MESH_DOCUMENT, "Mesh"),
         PortDefinition("mesh_series", PortDirection.OUTPUT, ANY, "Mesh Series"),
+        PortDefinition(
+            "available_timesteps", PortDirection.OUTPUT, ARRAY_1D, "Available Time Steps"
+        ),
         PortDefinition(
             "timestep_to_read",
             PortDirection.INPUT,

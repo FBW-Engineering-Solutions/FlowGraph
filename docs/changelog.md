@@ -15,6 +15,8 @@ New functionalities and improvements:
 
 - Add First, Last, and All time-step selection to Read Mesh (Muscat). Keep the
   single Mesh output and expose all snapshots through a separate Mesh Series port.
+  Add an Available Time Steps output that can be used without loading any mesh.
+  It defaults to `[0.0]` when no time steps are reported.
 
 - Expose all Convert Mesh File Format parameters as connectable inputs while
   retaining their defaults and controls. Return the converted filename as the
