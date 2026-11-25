@@ -96,7 +96,7 @@ def test_muscat_reader_catalog_exports_temporal_selection_and_series() -> None:
         port["name"]: port["data_type_id"]
         for port in node["ports"]
         if port["direction"] == "output"
-    } == {"mesh": "mesh-document", "mesh_series": "any"}
+    } == {"mesh": "mesh-document", "mesh_series": "any", "available_timesteps": "array-1d"}
 
 
 def test_workspace_folder_catalog_exports_path_output() -> None:

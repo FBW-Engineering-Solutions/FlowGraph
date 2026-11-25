@@ -6,6 +6,7 @@ from types import ModuleType, SimpleNamespace
 import meshio
 import numpy as np
 import pytest
+from Muscat.IO.XdmfReader import XdmfGrid
 from Muscat.IO.XdmfWriter import XdmfWriter
 from Muscat.MeshTools.MeshCreationTools import CreateMeshOfTriangles
 from Muscat.TestData import GetTestDataPath
@@ -25,6 +26,7 @@ from flowgraph.adapters.simple_sources import SET_STRING
 from flowgraph.application.node_registry import create_node_registry
 from flowgraph.application.workflow_core import WorkflowEdge, WorkflowExecutor, WorkflowGraph
 from flowgraph.application.workflow_io import workflow_from_json, workflow_to_dict
+from flowgraph.application.workflow_session import WorkflowSession
 from flowgraph.domain.mesh_document import MeshDocument
 
 
@@ -57,11 +59,15 @@ def test_load_muscat_selects_xdmf_snapshots(
         parameters["timestep_to_read"] = selection
     registry = create_node_registry()
     graph = WorkflowGraph([LOAD_MUSCAT.create_instance("reader", parameters=parameters)])
+    for port in ("mesh", "mesh_series", "available_timesteps"):
+        graph.export_output(port, "reader", port, registry)
     restored = workflow_from_json(json.dumps(workflow_to_dict(graph)), registry)
 
     output = WorkflowExecutor(registry).run(restored).node_outputs["reader"]
 
     assert isinstance(output["mesh"], MeshDocument)
+    np.testing.assert_array_equal(output["available_timesteps"], [2.5, 8.0, 13.0])
+    assert not output["available_timesteps"].flags.writeable
     np.testing.assert_array_equal(output["mesh"].mesh.nodeFields["value"], [expected] * 3)
     series = output["mesh_series"]
     if selection == "all":
@@ -81,6 +87,7 @@ def test_connected_muscat_timestep_overrides_saved_setting(temporal_xdmf: Path) 
         [SET_STRING.create_instance("mode", parameters={"value": "first"}), reader]
     )
     graph.add_edge(WorkflowEdge("mode", "value", "reader", "timestep_to_read"), registry)
+    graph.export_output("mesh", "reader", "mesh", registry)
 
     output = WorkflowExecutor(registry).run(graph).node_outputs["reader"]
 
@@ -102,6 +109,8 @@ def test_load_muscat_static_xdmf_has_no_time(tmp_path: Path, selection: str) -> 
     result = LOAD_MUSCAT.executor({"path": source}, {"timestep_to_read": selection})
 
     assert result["mesh"].mesh.GetNumberOfNodes() == 3
+    np.testing.assert_array_equal(result["available_timesteps"], [0.0])
+    assert not result["available_timesteps"].flags.writeable
     assert result["mesh_series"] == (((None, result["mesh"]),) if selection == "all" else ())
 
 
@@ -112,10 +121,87 @@ def test_load_muscat_reads_ut_results_at_each_available_time() -> None:
 
     series = output["mesh_series"]
     assert len(series) > 1
+    np.testing.assert_array_equal(output["available_timesteps"], [time for time, _ in series])
     assert output["mesh"] is series[-1][1]
     assert not np.array_equal(
         series[0][1].mesh.nodeFields["U1"], series[-1][1].mesh.nodeFields["U1"]
     )
+
+
+@pytest.mark.parametrize(
+    ("selection", "ports", "snapshots"),
+    [
+        ("all", (), []),
+        ("all", ("available_timesteps",), []),
+        ("first", ("mesh_series", "available_timesteps"), []),
+        ("all", ("mesh",), [13.0]),
+        ("all", ("mesh_series",), [2.5, 8.0, 13.0]),
+        ("all", ("mesh", "mesh_series"), [2.5, 8.0, 13.0]),
+    ],
+)
+def test_muscat_materializes_only_requested_xdmf_snapshots(
+    temporal_xdmf, monkeypatch, selection, ports, snapshots
+) -> None:
+    calls = []
+    get_support = XdmfGrid.GetSupport
+
+    def track_support(grid):
+        calls.append(grid.GetTime())
+        return get_support(grid)
+
+    monkeypatch.setattr(XdmfGrid, "GetSupport", track_support)
+    registry = create_node_registry()
+    graph = WorkflowGraph(
+        [
+            LOAD_MUSCAT.create_instance(
+                "reader", parameters={"path": temporal_xdmf, "timestep_to_read": selection}
+            )
+        ]
+    )
+    for port in ports:
+        graph.export_output(port, "reader", port, registry)
+
+    output = WorkflowExecutor(registry).run(graph).node_outputs["reader"]
+
+    assert calls == snapshots
+    if "mesh" not in ports:
+        assert output["mesh"].mesh.GetNumberOfNodes() == 0
+    else:
+        np.testing.assert_array_equal(output["mesh"].mesh.nodeFields["value"], [13.0] * 3)
+    if "mesh_series" in ports and selection == "all":
+        assert [time for time, _ in output["mesh_series"]] == snapshots
+    else:
+        assert output["mesh_series"] == ()
+    expected_times = [2.5, 8.0, 13.0] if "available_timesteps" in ports else [0.0]
+    np.testing.assert_array_equal(output["available_timesteps"], expected_times)
+
+
+@pytest.mark.parametrize("temporal", [True, False])
+def test_xdmf_times_only_without_geometry(tmp_path, temporal) -> None:
+    source = tmp_path / "metadata.xdmf"
+    time = '<Time Value="2.5" />' if temporal else ""
+    source.write_text(f"<Xdmf><Domain><Grid>{time}</Grid></Domain></Xdmf>")
+    registry = create_node_registry()
+    graph = WorkflowGraph([LOAD_MUSCAT.create_instance("reader", parameters={"path": source})])
+    graph.export_output("times", "reader", "available_timesteps", registry)
+    session = WorkflowSession(registry)
+
+    output = session.run(graph).node_outputs["reader"]
+
+    np.testing.assert_array_equal(output["available_timesteps"], [2.5] if temporal else [0.0])
+    assert output["mesh"].mesh.GetNumberOfNodes() == 0
+
+
+def test_ut_times_only_without_companions(tmp_path) -> None:
+    source = tmp_path / "metadata.ut"
+    source.write_text("**meshfile missing.geof\n**node U1\n1 1 1 1 4.5\n2 2 2 2 7.0\n")
+    registry = create_node_registry()
+    graph = WorkflowGraph([LOAD_MUSCAT.create_instance("reader", parameters={"path": source})])
+    graph.export_output("times", "reader", "available_timesteps", registry)
+
+    output = WorkflowExecutor(registry).run(graph).node_outputs["reader"]
+
+    np.testing.assert_array_equal(output["available_timesteps"], [4.5, 7.0])
 
 
 def test_load_muscat_rejects_unknown_timestep(temporal_xdmf: Path) -> None:

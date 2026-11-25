@@ -49,6 +49,11 @@ puts the ordered `(time, mesh)` pairs on **Mesh Series** and still sends the las
 snapshot to existing mesh nodes through **Mesh**. Static files load the same
 mesh regardless of the setting.
 
+Connect only **Available Time Steps** to get the file's time values as a 1D
+array without loading the mesh. Static files return `[0.0]` by default. If you
+select **All time steps** but connect only **Mesh**, the reader loads just the
+last snapshot. Connect **Mesh Series** to load every snapshot.
+
 ```text
 Select file.path ──▶ Read Mesh (Muscat).path
                      Read Mesh (Muscat).mesh ──▶ mesh operations
