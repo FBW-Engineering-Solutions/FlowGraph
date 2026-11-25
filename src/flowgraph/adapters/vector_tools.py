@@ -63,7 +63,7 @@ def _extract_vector_value(
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Return one real vector component without copying or modifying its storage."""
+    """Return the selected component and its signed index without copying the vector."""
     vector = np.asarray(inputs["vector"])
     if vector.ndim != 1 or vector.size == 0:
         raise ValueError("Extract Vector Value requires a non-empty one-dimensional vector")
@@ -77,18 +77,19 @@ def _extract_vector_value(
         raise IndexError(
             f"Extract Vector Value index {index} is out of range for vector length {vector.size}"
         )
-    return {"value": float(vector[index])}
+    return {"value": float(vector[index]), "index": index}
 
 
 EXTRACT_VECTOR_VALUE = NodeDefinition(
     id="extract-vector-value",
     label="Extract Vector Value",
     icon="mdi-vector-point",
-    description="Extract a scalar by zero-based index; negative indices count from the end.",
+    description="Return the selected scalar and its index; negative indices count from the end.",
     requirements=("py:numpy",),
     ports=(
         PortDefinition("vector", PortDirection.INPUT, ARRAY_1D, "Vector"),
         PortDefinition("value", PortDirection.OUTPUT, FLOAT, "Value"),
+        PortDefinition("index", PortDirection.OUTPUT, INTEGER, "Index"),
     ),
     parameters=(ParameterDefinition("index", ParameterKind.INTEGER, "Index", 0, "0"),),
     executor=_extract_vector_value,

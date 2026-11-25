@@ -43,16 +43,12 @@ The Muscat reader uses the file extension to select a Muscat reader, then loads
 the file into the canonical `MeshDocument` used by FlowGraph. The result is the
 editable mesh model; visualization is built later as a derived 3D projection.
 
-For a file with time steps, set **Timestep to read** to **First time step** or
-**Last time step** (the default) to load a single snapshot. **All time steps**
-puts the ordered `(time, mesh)` pairs on **Mesh Series** and still sends the last
-snapshot to existing mesh nodes through **Mesh**. Static files load the same
-mesh regardless of the setting.
+Set **Timestep to read** to an integer index: `0` for the first snapshot, `1`
+for the second, or `-1` (the default) for the last. The index selects **Mesh**,
+not a time value. A static file has just one snapshot (`0` or `-1`).
 
 Connect only **Available Time Steps** to get the file's time values as a 1D
-array without loading the mesh. Static files return `[0.0]` by default. If you
-select **All time steps** but connect only **Mesh**, the reader loads just the
-last snapshot. Connect **Mesh Series** to load every snapshot.
+array without loading the mesh. Static files return `[0.0]` by default.
 
 ```text
 Select file.path ──▶ Read Mesh (Muscat).path

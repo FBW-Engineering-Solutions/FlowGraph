@@ -69,10 +69,12 @@ once; no additional output copy is made. There are no parameters.
 ## Extract Vector Value (`extract-vector-value`)
 
 Extract one component from the required `vector: 1D Array` input, returning
-`value: Float`. Configure the integer `index` parameter (default `0`), or connect
+`value: Float` and the `index: Integer` used. Configure the integer `index`
+parameter (default `0`), or connect
 an Integer output to its optional input port to override the local setting.
 Indices are zero-based: `0` selects the first value, `1` the second, and `-1`
-the last. For example, `[10, 20, 30]` with index `1` returns `20.0`.
+the last. The output preserves negative indices: `[10, 20, 30]` with index `-1`
+returns `value = 30.0` and `index = -1`.
 
 Numeric list and fixed-size vector ports use the existing array conversions.
 Generic Array inputs are rank-checked by those conversions; `(n, 1)` columns

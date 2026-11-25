@@ -4,6 +4,10 @@ New in Next:
 
 Changes and fixes:
 
+- Fix Convert Mesh File Format when exporting a time-dependent mesh to a
+  single-snapshot writer such as MeshIO. The selected snapshot is now written;
+  All falls back to the last snapshot for these writers.
+
 - Convert Mesh File Format writes a single static mesh when the reader reports
   no time steps, instead of failing with the default Last time step setting.
 
@@ -13,8 +17,10 @@ Changes and fixes:
 
 New functionalities and improvements:
 
-- Add First, Last, and All time-step selection to Read Mesh (Muscat). Keep the
-  single Mesh output and expose all snapshots through a separate Mesh Series port.
+- Extract Vector Value also outputs the integer index used, preserving negative indices.
+
+- Add a connectable integer time-step index to Read Mesh (Muscat), defaulting to
+  `-1` (last snapshot). The reader outputs only the selected mesh, not a series.
   Add an Available Time Steps output that can be used without loading any mesh.
   It defaults to `[0.0]` when no time steps are reported.
 

@@ -17,8 +17,8 @@ from flowgraph.application.workflow_core import (
 )
 from flowgraph.domain.mesh_document import MeshDocument
 
-from .data_types import ANY, ARRAY_1D, MESH_DOCUMENT, TABLE_DOCUMENT, ParameterKind
-from .file_conversion import TIMESTEP_OPTIONS, get_available_mesh_times
+from .data_types import ARRAY_1D, MESH_DOCUMENT, TABLE_DOCUMENT, ParameterKind
+from .file_conversion import get_available_mesh_times
 
 LOGGER = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ def _load_muscat(
     parameters: Mapping[str, Any],
     _exec_context: ExecContext | None = None,
 ) -> Mapping[str, Any]:
-    """Read temporal metadata and materialize only the requested snapshots."""
+    """Read temporal metadata and materialize the selected snapshot if requested."""
     from Muscat.MeshContainers.Mesh import Mesh
 
     source = _validate_source(inputs, parameters, "Muscat")
@@ -79,18 +79,19 @@ def _load_muscat(
     )
     want_mesh = "mesh" in requested
     want_times = "available_timesteps" in requested
-    selection = inputs.get("timestep_to_read", parameters.get("timestep_to_read", "last"))
-    if (want_mesh or "mesh_series" in requested) and selection not in ("first", "last", "all"):
-        raise MeshLoadError(
-            f"Invalid time-step selection {selection!r}; expected first, last, or all"
-        )
-    want_series = "mesh_series" in requested and selection == "all"
+    index = parameters.get("timestep_to_read", -1)
+    # Legacy saved dropdown values still select the same single snapshot.
+    if "timestep_to_read" not in inputs and isinstance(index, str):
+        index = {"first": 0, "last": -1, "all": -1}.get(index, index)
+    if want_mesh and (
+        isinstance(index, (bool, np.bool_)) or not isinstance(index, (int, np.integer))
+    ):
+        raise MeshLoadError(f"Timestep to read must be an integer index, got {index!r}")
     document = None
-    series: tuple[tuple[float | None, MeshDocument], ...] = ()
     times = ()
 
     try:
-        if want_mesh or want_series or want_times:
+        if want_mesh or want_times:
             from Muscat.IO.IOFactory import CreateReader, InitAllReaders
             from Muscat.IO.XdmfReader import XdmfReader
 
@@ -103,7 +104,7 @@ def _load_muscat(
                 # lazy mode. Parse with Muscat's SAX handler without GetSupport.
                 reader.Reset()
                 reader.lazy = True
-                if not (want_mesh or want_series):
+                if not want_mesh:
                     # Ignore inline DataItem payloads; time values are attributes.
                     reader.characters = lambda _content: None
                 parser = xml.sax.make_parser()
@@ -113,36 +114,30 @@ def _load_muscat(
                     parser.parse(stream)
                 grids = [grid for grid in reader.xdmf.GetDomain(0).grids if grid.time is not None]
                 times = [grid.GetTime() for grid in grids]
-            elif want_mesh or want_series:
+            elif want_mesh:
                 times = get_available_mesh_times(reader)
             else:
                 times = _muscat_times_only(reader)
 
-            def read_step(index: int) -> MeshDocument:
-                if grids is not None:
-                    mesh = grids[index].GetSupport()
-                else:
-                    reader.SetTimeToRead(None, timeIndex=index)
-                    mesh = reader.Read()
-                return MeshDocument(mesh=MeshDocument(mesh=mesh).mesh.View())
-
-            if want_mesh or want_series:
+            if want_mesh:
+                count = max(1, len(times))
+                if not -count <= int(index) < count:
+                    raise ValueError(f"Time-step index {index} out of range for {count} snapshots")
+                index = int(index) % count
                 if len(times) == 0:
                     mesh = (
                         reader.Read()
                         if grids is None
                         else reader.xdmf.GetDomain(-1).GetGrid(-1).GetSupport()
                     )
-                    snapshot = MeshDocument(mesh=mesh)
-                    if want_series:
-                        series = ((None, snapshot),)
-                elif want_series:
-                    series = tuple((float(time), read_step(i)) for i, time in enumerate(times))
-                    snapshot = series[-1][1]
+                    document = MeshDocument(mesh=mesh.View())
                 else:
-                    snapshot = read_step(0 if selection == "first" else len(times) - 1)
-                if want_mesh:
-                    document = snapshot
+                    if grids is not None:
+                        mesh = grids[index].GetSupport()
+                    else:
+                        reader.SetTimeToRead(None, timeIndex=index)
+                        mesh = reader.Read()
+                    document = MeshDocument(mesh=mesh.View())
     except Exception as error:
         LOGGER.exception("Muscat failed while loading %s", source)
         raise MeshLoadError(f"Muscat could not load '{source}': {error}") from error
@@ -151,7 +146,6 @@ def _load_muscat(
     available.flags.writeable = False
     return {
         "mesh": document if document is not None else MeshDocument(mesh=Mesh()),
-        "mesh_series": series,
         "available_timesteps": available,
     }
 
@@ -290,23 +284,14 @@ LOAD_MUSCAT = NodeDefinition(
     icon="/__flowgraph_ui/LOAD_MUSCAT.svg",
     label="Read Mesh (Muscat)",
     description=(
-        "Loads a mesh at the first or last time step, or all snapshots as a mesh series. "
+        "Loads a mesh by time-step index (0 is first, -1 is last). "
         "Lists available time steps without loading snapshots when only that output is used. "
         "Companion changes must update the principal file timestamp."
     ),
     ports=(
         PortDefinition("mesh", PortDirection.OUTPUT, MESH_DOCUMENT, "Mesh"),
-        PortDefinition("mesh_series", PortDirection.OUTPUT, ANY, "Mesh Series"),
         PortDefinition(
             "available_timesteps", PortDirection.OUTPUT, ARRAY_1D, "Available Time Steps"
-        ),
-        PortDefinition(
-            "timestep_to_read",
-            PortDirection.INPUT,
-            ParameterKind.STR_SELECT,
-            "Timestep to read",
-            required=False,
-            is_param=True,
         ),
     ),
     executor=_load_muscat,
@@ -316,12 +301,11 @@ LOAD_MUSCAT = NodeDefinition(
         ),
         ParameterDefinition(
             "timestep_to_read",
-            ParameterKind.STR_SELECT,
+            ParameterKind.INTEGER,
             "Timestep to read",
-            "last",
-            options=TIMESTEP_OPTIONS,
-            port=False,
-            input_port="timestep_to_read",
+            -1,
+            "-1",
+            port=True,
         ),
     ),
 )

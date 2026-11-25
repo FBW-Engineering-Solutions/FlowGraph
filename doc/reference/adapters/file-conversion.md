@@ -70,9 +70,10 @@ When the reader reports available time steps:
 If the reader reports no time steps, the node writes one static mesh regardless
 of the time-step setting.
 
-If the selected writer does not support temporal output, the conversion writes a
-single mesh using the reader's current read state. Writer resources are closed
-when the conversion finishes, including when writing raises an error.
+If the selected writer does not support temporal output, the conversion writes
+one mesh: the first snapshot for `first`, and the last snapshot for `last` or
+`all`. Writer resources are closed when the conversion finishes, including when
+writing raises an error.
 
 ## Example
 
