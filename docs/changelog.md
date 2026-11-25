@@ -1,6 +1,9 @@
-New in Next:
+New in version 0.1.10:
 **********************
 **********************
+
+FlowGraph Core 0.1.10 is an alpha release focused on time-dependent mesh I/O
+and workspace path overrides. Desktop and Web clients are released separately.
 
 Changes and fixes:
 
@@ -33,6 +36,17 @@ New functionalities and improvements:
 
 - Add optional workspace-path and relative-file inputs to Workspace File. Connected
   values override runtime/selector fallbacks without replacing the saved selection.
+
+- Add `POST /api/v1/files/directories` to the authenticated local server API.
+  It creates an empty workspace directory whose parent already exists.
+
+Migration and limitations:
+
+- To select a snapshot in Read Mesh (Muscat), use `0` for the first or `-1`
+  for the last. To process multiple snapshots, use Available Time Steps to
+  drive repeated reads by index; the Mesh output contains one snapshot per run.
+- Connected workspace inputs can point to paths that do not exist. The path
+  nodes do not create those paths; the downstream reader or writer handles them.
 
 New in version 0.1.9:
 **********************

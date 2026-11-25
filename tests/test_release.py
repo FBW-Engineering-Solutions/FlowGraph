@@ -67,11 +67,11 @@ def test_release_notes_document_019_workflow_migration() -> None:
     assert "`workspace-folder`" not in previous
 
 
-def test_workspace_override_notes_are_in_next_release() -> None:
+def test_workspace_override_notes_are_in_0110_release() -> None:
     changelog = (ROOT / "docs/changelog.md").read_text(encoding="utf-8")
-    upcoming, published = changelog.split("New in version 0.1.9:", 1)
-    assert upcoming.startswith("New in Next:")
-    fixes, improvements = upcoming.split("New functionalities and improvements:", 1)
+    current, previous = changelog.split("New in version 0.1.9:", 1)
+    current = current.split("New in version 0.1.10:\n", 1)[1]
+    fixes, improvements = current.split("New functionalities and improvements:", 1)
     assert "Changes and fixes:" in fixes
     assert "skip filesystem validation" in fixes
     assert "optional folder Text/Path input" in improvements
@@ -81,8 +81,8 @@ def test_workspace_override_notes_are_in_next_release() -> None:
         "new writer destinations",
         "skip filesystem validation",
     ):
-        assert text in upcoming
-        assert text not in published
+        assert text in current
+        assert text not in previous
 
 
 def test_release_notes_document_019_limitations_and_final_output_types() -> None:
