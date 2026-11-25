@@ -10,6 +10,10 @@ Changes and fixes:
 
 New functionalities and improvements:
 
+- Expose all Convert Mesh File Format parameters as connectable inputs while
+  retaining their defaults and controls. Return the converted filename as the
+  declared `FilePath` type so it can be passed to downstream nodes.
+
 - Expose Workspace Folder's optional folder Text/Path input for branch-local
   overrides, preserving its saved dropdown fallback.
 

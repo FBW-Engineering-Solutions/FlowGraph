@@ -9,6 +9,10 @@ from flowgraph.adapters.file_conversion import (
     DelayInitialization,
     MeshFileConversionError,
 )
+from flowgraph.adapters.simple_sources import SET_BOOLEAN, SET_STRING
+from flowgraph.application.node_registry import create_node_registry
+from flowgraph.application.workflow_core import WorkflowEdge, WorkflowExecutor, WorkflowGraph
+from flowgraph.domain.filepath import FilePath
 
 
 def test_mesh_file_conversion_is_registered_in_mesh_tools_catalog() -> None:
@@ -19,12 +23,20 @@ def test_mesh_file_conversion_is_registered_in_mesh_tools_catalog() -> None:
     assert conversion.node_definitions == (MESH_FILE_CONVERSION,)
 
 
-def test_mesh_file_conversion_schema_has_valid_defaults() -> None:
+def test_mesh_file_conversion_exports_all_parameters_as_optional_inputs() -> None:
     assert [(port.name, port.direction.value) for port in MESH_FILE_CONVERSION.ports] == [
         ("converted_filename", "output"),
         ("input_filename", "input"),
         ("output_filename", "input"),
+        ("reader", "input"),
+        ("writer", "input"),
+        ("timestep_to_read", "input"),
+        ("binary", "input"),
     ]
+    for parameter in MESH_FILE_CONVERSION.parameters:
+        port = MESH_FILE_CONVERSION.input(parameter.name)
+        assert port is not None and port.is_param and not port.required
+        assert port.data_type is parameter.kind
     assert MESH_FILE_CONVERSION.default_parameters == {
         "input_filename": "",
         "output_filename": "",
@@ -78,17 +90,29 @@ def test_mesh_file_conversion_converts_muscat_test_sphere_to_meshb(
     source = Path(GetTestDataPath()) / "stlsphere.stl"
     destination = tmp_path / f"stlsphere-{reader.split()[1].lower()}.meshb"
 
-    result = MESH_FILE_CONVERSION.executor(
-        {},
-        {
-            "input_filename": source,
-            "output_filename": destination,
-            "reader": reader,
-            "writer": writer,
-        },
-    )
+    values = {
+        "input_filename": str(source),
+        "output_filename": str(destination),
+        "reader": reader,
+        "writer": writer,
+        "timestep_to_read": "first",
+        "binary": False,
+    }
+    registry = create_node_registry()
+    graph = WorkflowGraph([MESH_FILE_CONVERSION.create_instance("convert")])
+    for name, value in values.items():
+        definition = SET_BOOLEAN if isinstance(value, bool) else SET_STRING
+        graph.add_node(definition.create_instance(name, parameters={"value": value}))
+        graph.add_edge(WorkflowEdge(name, "value", "convert", name), registry)
 
-    assert result == {"converted_filename": str(destination)}
+    result = WorkflowExecutor(registry).run(graph)
+
+    assert result.node_outputs["convert"] == {"converted_filename": FilePath(destination)}
+    assert result.node_inputs["convert"] == {
+        **values,
+        "input_filename": FilePath(source),
+        "output_filename": FilePath(destination),
+    }
     assert destination.is_file()
     assert destination.stat().st_size > 0
 
@@ -140,7 +164,7 @@ def test_mesh_file_conversion_writes_non_temporal_mesh_and_closes_writer(
         {"input_filename": source, "output_filename": destination},
     )
 
-    assert result == {"converted_filename": str(destination)}
+    assert result == {"converted_filename": FilePath(destination)}
     assert calls == [
         ("reader-file", source),
         "read",

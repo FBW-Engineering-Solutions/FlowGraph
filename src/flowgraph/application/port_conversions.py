@@ -24,6 +24,7 @@ from flowgraph.adapters.data_types import (
     LIST_INT,
     MUSCAT_ELEMENT_FILTER,
     MUSCAT_NODE_FILTER,
+    STR_SELECT,
     STRING,
     VEC2D,
     VEC2DI,
@@ -73,6 +74,8 @@ FLOAT_TO_LIST_FLOAT = PortConversion(
 
 FILE_TO_STR = PortConversion("filename", "string", "FilePath → Text", str)
 STR_TO_FILE = PortConversion("string", "filename", "Text → FilePath", FilePath)
+# Core already treats these as compatible strings; catalog clients compare type IDs.
+TEXT_TO_STR_SELECT = PortConversion(STRING.id, STR_SELECT.id, "Text → select str", str)
 
 
 PATH_TO_STR = PortConversion("dirname", "string", "dirname → Text", str)
@@ -188,6 +191,7 @@ PORT_CONVERSIONS = (
     PILLOW_TO_IMAGEJ,
     FILE_TO_STR,
     STR_TO_FILE,
+    TEXT_TO_STR_SELECT,
     *VECTOR_CONVERSIONS,
 )
 

@@ -12,6 +12,7 @@ from flowgraph.application.workflow_core import (
     PortDefinition,
     PortDirection,
 )
+from flowgraph.domain.filepath import FilePath
 
 from .data_types import FILE, ParameterKind
 
@@ -231,9 +232,9 @@ def mesh_file_conversion(
     Parameters
     ----------
     inputs : collections.abc.Mapping[str, Any]
-        Input and output filenames.
+        Connected inputs, already merged into parameters by the workflow executor.
     parameters : collections.abc.Mapping[str, Any]
-        Reader, writer, temporal selection, and binary-output settings.
+        Input and output filenames, reader, writer, temporal selection, and binary-output settings.
 
     Returns
     -------
@@ -338,7 +339,7 @@ def mesh_file_conversion(
         finally:
             writer.Close()
 
-    return {"converted_filename": str(outputfilename)}
+    return {"converted_filename": FilePath(outputfilename)}
 
 
 MESH_FILE_CONVERSION = NodeDefinition(
@@ -359,7 +360,6 @@ MESH_FILE_CONVERSION = NodeDefinition(
             "auto",
             options=(ParameterOption("auto", "Auto"),)
             + tuple(ParameterOption(k, k) for k in ReaderMapping.keys()),  # noqa: SIM118
-            port=False,
         ),
         ParameterDefinition(
             "writer",
@@ -368,7 +368,6 @@ MESH_FILE_CONVERSION = NodeDefinition(
             "auto",
             options=(ParameterOption("auto", "Auto"),)
             + tuple(ParameterOption(k, k) for k in WriterMapping.keys()),  # noqa: SIM118
-            port=False,
         ),
         ParameterDefinition(
             "timestep_to_read",
@@ -381,11 +380,8 @@ MESH_FILE_CONVERSION = NodeDefinition(
                 ParameterOption("all", "All time steps"),
                 # ParameterOption("Selected time step", "selected")
             ),
-            port=False,
         ),
-        ParameterDefinition(
-            "binary", ParameterKind.BOOLEAN, "binary (if available)", True, port=False
-        ),
+        ParameterDefinition("binary", ParameterKind.BOOLEAN, "binary (if available)", True),
         # ParameterDefinition(
         #    "timestep", ParameterKind.LIST_INT, "time step to read", [-1], port=True
         # ),

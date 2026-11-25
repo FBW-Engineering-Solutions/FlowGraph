@@ -16,13 +16,17 @@ fields during the conversion.
 
 | Direction | Port or parameter | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| Input port | `input_filename` | `Path` | — | Existing source mesh file. |
-| Input port | `output_filename` | `Path` | — | Destination mesh filename. Its parent directory must already exist. |
-| Output port | `converted_filename` | `Path` | — | Destination filename returned after conversion. |
-| Parameter | `reader` | `select str` | `auto` | Reader selection. `auto` chooses a reader from the input extension and prefers a Muscat reader when both Muscat and MeshIO entries are available. |
-| Parameter | `writer` | `select str` | `auto` | Writer selection. `auto` chooses a writer from the output extension and prefers a Muscat writer when both choices are available. |
-| Parameter | `timestep_to_read` | `select str` | `last` | Selects `first`, `last`, or `all` for temporal readers. |
-| Parameter | `binary` | `Boolean` | `True` | Requests binary output when the selected writer supports it. |
+| Input parameter | `input_filename` | `FilePath` | Empty | Existing source mesh file. |
+| Input parameter | `output_filename` | `FilePath` | Empty | Destination mesh filename. Its parent directory must already exist. |
+| Output port | `converted_filename` | `FilePath` | — | Destination filename returned after conversion. |
+| Input parameter | `reader` | `select str` | `auto` | Reader selection. `auto` chooses a reader from the input extension and prefers a Muscat reader when both Muscat and MeshIO entries are available. |
+| Input parameter | `writer` | `select str` | `auto` | Writer selection. `auto` chooses a writer from the output extension and prefers a Muscat writer when both choices are available. |
+| Input parameter | `timestep_to_read` | `select str` | `last` | Selects `first`, `last`, or `all` for temporal readers. |
+| Input parameter | `binary` | `Boolean` | `True` | Requests binary output when the selected writer supports it. |
+
+Each input parameter can be set on the node or supplied through a connection.
+A connected value takes precedence during execution; an unconnected input uses
+the value saved on the node.
 
 The source path must identify an existing file and both filenames must have an
 extension. The destination directory is not created automatically. Reader and
